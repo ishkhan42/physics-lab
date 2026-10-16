@@ -273,7 +273,7 @@ Every build slice gets its mechanical verification. After integration, run the p
 
 ## Decisions and Open Issues
 
-The user approved the build order and fast mode. The functional implementation now passes production building, 43 behavioral checks and actual Chromium engine/UI checks. Authenticated provider generation and the learner's hands-on feedback remain open; synthetic assembly-boundary checks do not complete that gate. No further product or engine approval is needed.
+The user approved the build order and fast mode. Production building, 43 behavioral checks and actual Chromium engine/UI checks pass. An authenticated `openrouter/free` request now passes model generation, paused native preview, Run/Pause and both speed endpoints with no interception. The learner's early hands-on feedback remains open; OpenAI/Anthropic live calls and final presentation/review are not claimed complete.
 
 Source/provider contracts and numerical evidence informed the engineering defaults above. Any discovered change to the product, chosen architecture or supported physical meaning must be discussed, while routine internal corrections are recorded in the checklist's Revisions. A needed new model is not labeled impossible merely because it is absent.
 

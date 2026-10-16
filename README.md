@@ -4,9 +4,9 @@ A web mechanics lab that turns a described situation into a validated MuJoCo mod
 
 ## Development status
 
-The functional experiment, playback and inspection code is implemented. The production build, 43 behavioral regressions and actual Chromium/WASM checks pass. Authenticated model inference still needs an authorized application key. Presentation finishing and the learner's hands-on reviews remain in the [build checklist](devpost/checklist.md); the app is not declared ready to ship.
+The functional experiment, playback and inspection code is implemented. The production build, 43 behavioral regressions and actual Chromium/WASM checks pass. An authenticated `openrouter/free` description-to-preview-to-playback journey has also passed. Presentation finishing and the learner's hands-on reviews remain in the [build checklist](devpost/checklist.md); the app is not declared ready to ship. OpenAI and Anthropic have not been exercised live.
 
-The application never loads a pretend model when credentials are missing. Browser verification used synthetic assembly responses only at the test boundary; MuJoCo, rendering, controls and observations were real. No such interception or fake provider is part of the app.
+The application never loads a pretend model when credentials are missing. Earlier browser checks used synthetic assembly responses only at the test boundary; the subsequent authenticated OpenRouter check used no interception or synthetic response. No fake provider is part of the app.
 
 ## Run locally
 
