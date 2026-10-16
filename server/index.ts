@@ -183,6 +183,7 @@ async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
 ): Promise<void> {
+  let streaming = false;
   try {
     enforceLocalRequest(request);
     if (!request.url?.startsWith('/')) throw new ApiError(400, 'invalid_path', 'The requested path is invalid.');
@@ -210,8 +211,29 @@ async function handleRequest(
       if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use POST to assemble an experiment.');
       const parsed = AssemblyRequestSchema.safeParse(await readJsonBody(request));
       if (!parsed.success) throw new ApiError(400, 'invalid_request', 'The assembly request does not match the supported format.');
-      const decision = await assemble(parsed.data);
-      sendJson(response, 200, decision);
+      const ensureConnected = () => {
+        if (response.destroyed || response.writableEnded) throw new ApiError(499, 'assembly_canceled', 'The assembly wait was canceled.');
+      };
+      if (request.headers.accept?.split(',').some(value => value.split(';', 1)[0].trim() === 'application/x-ndjson')) {
+        const writeRecord = (record: unknown) => {
+          ensureConnected();
+          if (!streaming) {
+            setSafeHeaders(response);
+            response.writeHead(200, {
+              'content-type': 'application/x-ndjson; charset=utf-8',
+              'cache-control': 'no-store',
+              'x-accel-buffering': 'no',
+            });
+            streaming = true;
+          }
+          response.write(`${JSON.stringify(record)}\n`);
+        };
+        const decision = await assemble(parsed.data, progress => writeRecord({ type: 'progress', ...progress }));
+        writeRecord({ type: 'decision', decision });
+        response.end();
+      } else {
+        sendJson(response, 200, await assemble(parsed.data, ensureConnected));
+      }
       return;
     }
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
@@ -224,7 +246,9 @@ async function handleRequest(
       : error instanceof ProviderError
         ? new ApiError(error.status, error.code, error.message)
         : new ApiError(500, 'internal_error', 'The request could not be completed.');
-    if (!response.destroyed && !response.headersSent) {
+    if (streaming && !response.destroyed && !response.writableEnded) {
+      response.end(`${JSON.stringify({ type: 'error', error: { code: safeError.code, message: safeError.message } })}\n`);
+    } else if (!response.destroyed && !response.headersSent) {
       sendJson(response, safeError.status, { error: { code: safeError.code, message: safeError.message } }, safeError.closeConnection);
     } else if (!response.destroyed) {
       response.destroy();
@@ -237,7 +261,7 @@ export function createApiServer() {
     void handleRequest(request, response).catch(() => response.destroy());
   });
   server.headersTimeout = 10_000;
-  server.requestTimeout = 65_000;
+  server.requestTimeout = 255_000;
   return server;
 }
 

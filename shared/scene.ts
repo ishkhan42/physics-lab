@@ -36,7 +36,7 @@ export type Shape = z.infer<typeof ShapeSchema>;
 const joint = {
   axis: Vec3Schema.describe('World-space unit axis in the reference configuration.'),
   anchor: Vec3Schema.describe('World-space joint anchor in the reference configuration.'),
-  position: number.default(0),
+  position: number.default(0).describe('Initial joint coordinate applied AFTER the body reference pose, metres for slide and radians for hinge. Use 0 when body.position/orientation already encode the requested initial pose; never encode the same initial displacement twice.'),
   velocity: number.default(0),
   limits: z.tuple([number, number]).nullable().default(null),
   stiffness: nonnegative.default(0),
@@ -44,18 +44,18 @@ const joint = {
   springReference: number.default(0),
 };
 export const MotionSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('fixed') }),
-  z.strictObject({ kind: z.literal('free'), linearVelocity: Vec3Schema.default(zero), angularVelocity: Vec3Schema.default(zero) }),
-  z.strictObject({ kind: z.literal('particle'), linearVelocity: Vec3Schema.default(zero) }),
-  z.strictObject({ kind: z.literal('hinge'), ...joint }),
-  z.strictObject({ kind: z.literal('slide'), ...joint }),
-  z.strictObject({ kind: z.literal('ball'), angularVelocity: Vec3Schema.default(zero), damping: nonnegative.default(0) }),
+  z.strictObject({ kind: z.literal('fixed') }).describe('Immobile support: no translation or rotation; mass must be null.'),
+  z.strictObject({ kind: z.literal('free'), linearVelocity: Vec3Schema.default(zero), angularVelocity: Vec3Schema.default(zero) }).describe('Unconstrained rigid body with three translations and three rotations; NOT a linear guide.'),
+  z.strictObject({ kind: z.literal('particle'), linearVelocity: Vec3Schema.default(zero) }).describe('Unconstrained point particle with three translations, no rotation and no collision surface.'),
+  z.strictObject({ kind: z.literal('hinge'), ...joint }).describe('Exactly one rotational DOF around axis through anchor; all other relative motion constrained.'),
+  z.strictObject({ kind: z.literal('slide'), ...joint }).describe('Ideal linear guide: exactly one translational DOF along axis, no rotation. Use this for motion constrained to one straight line.'),
+  z.strictObject({ kind: z.literal('ball'), angularVelocity: Vec3Schema.default(zero), damping: nonnegative.default(0) }).describe('Three rotations about a fixed reference point; no translation.'),
 ]);
 export const BodySchema = z.strictObject({
   id,
   label: z.string().trim().min(1).max(100),
   parentId: id.nullable().default(null),
-  position: Vec3Schema.describe('World-space reference pose; joint position then applies the initial DOF coordinate.'),
+  position: Vec3Schema.describe('World-space reference pose. When this is the requested initial pose, use motion.position=0; a nonzero hinge/slide coordinate is applied afterward.'),
   orientation: QuatSchema.default([1, 0, 0, 0]).describe('World-space reference orientation, quaternion w,x,y,z.'),
   shape: ShapeSchema,
   mass: positive.nullable().describe('Kilograms for moving bodies; null for immobile supports.'),
@@ -85,9 +85,9 @@ export const TendonSchema = z.strictObject({
 });
 export type Tendon = z.infer<typeof TendonSchema>;
 const ConnectionSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('connect'), id, label: z.string().min(1).max(100), bodyA: id, bodyB: id.nullable(), anchor: Vec3Schema }),
-  z.strictObject({ kind: z.literal('weld'), id, label: z.string().min(1).max(100), bodyA: id, bodyB: id.nullable() }),
-  z.strictObject({ kind: z.literal('coupling'), id, label: z.string().min(1).max(100), bodyA: id, bodyB: id, ratio: number, offset: number }),
+  z.strictObject({ kind: z.literal('connect'), id, label: z.string().min(1).max(100), bodyA: id, bodyB: id.nullable(), anchor: Vec3Schema }).describe('Ball-point equality: keeps the attachment points coincident, constraining three translations while permitting rotation. This is NOT a slider or a distance-only spring/cable.'),
+  z.strictObject({ kind: z.literal('weld'), id, label: z.string().min(1).max(100), bodyA: id, bodyB: id.nullable() }).describe('Locks all relative translation and rotation between the two bodies.'),
+  z.strictObject({ kind: z.literal('coupling'), id, label: z.string().min(1).max(100), bodyA: id, bodyB: id, ratio: number, offset: number }).describe('Linear relation between two existing hinge/slide coordinates; does not create their joints.'),
 ]);
 const LoadSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('force'), bodyId: id, vector: Vec3Schema, point: Vec3Schema.nullable().default(null) }),
@@ -102,7 +102,7 @@ export const SceneSchema = z.strictObject({
   gravity: Vec3Schema,
   ground: GroundSchema.nullable().default({
     height: 0, restitution: 1, friction: { sliding: 0, torsional: 0, rolling: 0, static: null },
-  }),
+  }).describe('Physical ground is included by default. Use null ONLY for an explicitly requested groundless scene or a custom replacement support. Zero gravity or a noncontact experiment is not a request to remove ground.'),
   bodies: z.array(BodySchema).min(1).max(128),
   sites: z.array(SiteSchema).max(512).default([]),
   tendons: z.array(TendonSchema).max(128).default([]),
@@ -124,21 +124,36 @@ export function physicalScene(scene: Scene): Scene {
   if (scene.ground === null) return scene;
   return validateScene({ ...scene, bodies: [...scene.bodies, groundBody(scene.ground)], ground: null });
 }
-export const DecisionSchema = z.strictObject({
-  kind: z.enum(['scene', 'clarify', 'unsupported']),
+
+export function hasGroundPlane(scene: Scene): boolean {
+  return scene.ground !== null || scene.bodies.some(body => body.shape.kind === 'plane'
+    && body.motion.kind === 'fixed' && body.orientation[1] ** 2 + body.orientation[2] ** 2 < 1e-10);
+}
+export const ProviderSchema = z.enum(['openai', 'anthropic', 'openrouter']);
+export type Provider = z.infer<typeof ProviderSchema>;
+const decisionFields = {
   summary: z.string().trim().min(1).max(3000),
   assumptions: z.array(z.string().min(1).max(600)).max(40),
   question: z.string().min(1).max(2000).nullable(),
   reason: z.string().min(1).max(3000).nullable(),
-  scene: SceneSchema.nullable(),
+  approximation: z.null().default(null),
+  scene: z.null(),
   alternative: z.strictObject({
     label: z.string().trim().min(1).max(60),
     description: z.string().trim().min(1).max(1600),
   }).nullable().default(null),
-});
+};
+export const DecisionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    ...decisionFields, kind: z.literal('scene'), question: z.null(), reason: z.null(),
+    approximation: z.string().trim().min(1).max(1200).nullable().default(null),
+    scene: SceneSchema, alternative: z.null().default(null),
+  }),
+  z.strictObject({ ...decisionFields, kind: z.literal('clarify'), question: z.string().min(1).max(2000) }),
+  z.strictObject({ ...decisionFields, kind: z.literal('unsupported'), reason: z.string().min(1).max(3000) }),
+]);
 export type Decision = z.infer<typeof DecisionSchema>;
-export const ProviderSchema = z.enum(['openai', 'anthropic', 'openrouter']);
-export type Provider = z.infer<typeof ProviderSchema>;
+
 export const AssemblyRequestSchema = z.strictObject({
   provider: ProviderSchema,
   model: z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9][A-Za-z0-9._:/+-]*$/),
@@ -244,12 +259,6 @@ export function validateScene(input: unknown): Scene {
 
 export function validateDecision(input: unknown): Decision {
   const decision = DecisionSchema.parse(input);
-  const valid = decision.kind === 'scene'
-    ? decision.scene !== null && decision.question === null && decision.reason === null && decision.alternative === null
-    : decision.kind === 'clarify'
-      ? decision.scene === null && decision.question !== null
-      : decision.scene === null && decision.reason !== null;
-  if (!valid) throw new z.ZodError([{ code: 'custom', path: ['kind'], message: 'Only a complete scene without unresolved questions, limitations or alternatives may be ready. Other decisions must not include a scene.' }]);
   if (decision.scene) decision.scene = validateScene(decision.scene);
   return decision;
 }

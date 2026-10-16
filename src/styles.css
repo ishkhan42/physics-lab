@@ -6,28 +6,28 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
-  --page: #e9eff1;
-  --surface: #f3f7f8;
-  --surface-soft: #eaf1f2;
-  --surface-raised: #fbfcfc;
-  --canvas: #dbe5e8;
-  --ink-100: #223840;
-  --ink-300: #405860;
-  --ink-500: #536970;
-  --ink-600: #60757c;
-  --line: rgb(55 84 92 / 16%);
-  --line-strong: #bdcdd1;
-  --cyan: #356f73;
-  --cyan-deep: #285b61;
-  --cyan-soft: #e2eeee;
-  --warning: #80550e;
-  --warning-bg: #fff3dc;
-  --warning-line: #e3ca9b;
-  --danger: #9a3932;
+  --page: #edf3f0;
+  --surface: #f6faf8;
+  --surface-soft: #e8f0ec;
+  --surface-raised: #ffffff;
+  --canvas: #dfe9e5;
+  --ink-100: #1d3034;
+  --ink-300: #354b4f;
+  --ink-500: #465d61;
+  --ink-600: #52686c;
+  --line: rgb(41 68 70 / 19%);
+  --line-strong: #b5c6c3;
+  --cyan: #176a66;
+  --cyan-deep: #145551;
+  --cyan-soft: #e1efeb;
+  --warning: #79520b;
+  --warning-bg: #fff5df;
+  --warning-line: #dfc487;
+  --danger: #943a34;
   --danger-bg: #fff0ed;
-  --danger-line: #e6c2bb;
-  --on-accent: #f7fbfb;
-  --shadow: rgb(41 65 72 / 11%);
+  --danger-line: #e2bdb5;
+  --on-accent: #f8fcfa;
+  --shadow: rgb(31 52 54 / 10%);
   --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
@@ -39,9 +39,9 @@ body {
   margin: 0;
   color: var(--ink-100);
   background:
-    radial-gradient(ellipse at 8% 2%, rgb(83 153 156 / 11%), transparent 31rem),
-    radial-gradient(ellipse at 94% 15%, rgb(93 143 148 / 8%), transparent 35rem),
-    linear-gradient(155deg, #eff3f4 0%, #e8eef0 54%, #edf2f3 100%);
+    radial-gradient(ellipse at 8% 2%, rgb(83 153 156 / 9%), transparent 31rem),
+    radial-gradient(ellipse at 94% 15%, rgb(93 143 148 / 6%), transparent 35rem),
+    linear-gradient(155deg, #f2f6f3 0%, #eaf1ee 54%, #eff4f1 100%);
 }
 body::before {
   position: fixed;
@@ -101,7 +101,7 @@ button:disabled, select:disabled, input:disabled { cursor: not-allowed; }
 .glass-panel {
   border: 1px solid var(--line);
   border-radius: 22px;
-  background: linear-gradient(145deg, rgb(255 255 255 / 74%), transparent 34%), rgb(249 252 252 / 82%);
+  background: linear-gradient(145deg, rgb(255 255 255 / 82%), transparent 34%), rgb(251 253 252 / 94%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 86%), 0 18px 52px var(--shadow);
   -webkit-backdrop-filter: blur(22px) saturate(135%);
   backdrop-filter: blur(22px) saturate(135%);
@@ -246,7 +246,7 @@ button:disabled, select:disabled, input:disabled { cursor: not-allowed; }
 .assembly-progress__heading output { flex: 0 0 auto; color: var(--ink-500); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
  .assembly-progress__track { height: 5px; overflow: hidden; border-radius: 999px; background: var(--line-strong); }
  .assembly-progress__track > span { display: block; width: 36%; height: 100%; border-radius: inherit; background: var(--cyan); animation: assembly-progress-sweep 1.5s ease-in-out infinite alternate; }
- .assembly-progress__steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.assembly-progress__steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
  .assembly-progress__steps li { min-width: 0; display: flex; align-items: flex-start; gap: 7px; color: var(--ink-500); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
 .assembly-progress__steps li::before { width: 7px; height: 7px; flex: 0 0 7px; margin-top: .35em; border-radius: 50%; background: var(--line-strong); content: ""; }
  .assembly-progress__steps li[data-state="done"] { color: var(--cyan-deep); }
@@ -566,6 +566,8 @@ button:disabled, select:disabled, input:disabled { cursor: not-allowed; }
   .simulation-unit { max-width: 44%; white-space: normal; text-align: right; }
   .simulation-frame { border-radius: 15px; }
   .simulation-viewport { min-height: 300px; height: 68vw; max-height: 430px; }
+  .canvas-empty-state { gap: 10px; padding: 56px 16px 80px; }
+  .canvas-empty-state .empty-orbit { display: none; }
   .canvas-orientation { top: 10px; left: 10px; font-size: 9px; }
   .canvas-tools { top: 9px; right: 9px; gap: 5px; }
   .canvas-tools .secondary-button { min-height: 33px; padding: 0 9px; font-size: 11px; }
@@ -608,4 +610,64 @@ button:disabled, select:disabled, input:disabled { cursor: not-allowed; }
  .flow-message--error { background: var(--danger-bg); }
   .flow-message--unsupported { background: var(--warning-bg); }
   .speed-presets .secondary-button[aria-pressed="true"] { color: var(--on-accent); background: var(--cyan); }
+}
+
+.eyebrow {
+  color: var(--cyan-deep);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .11em;
+}
+.lab-mark small { font-size: 10px; letter-spacing: .12em; }
+.category-stamp, .simulation-unit { font-size: 10px; }
+.canvas-empty-state strong { font-size: 18px; }
+.canvas-empty-state p { color: var(--ink-300); font-size: 14px; line-height: 1.6; }
+.canvas-help { color: var(--ink-300); font-size: 11px; }
+.lab-notes { font-size: 11px; }
+.page-footer { font-size: 11px; }
+.notice { display: grid; gap: 8px; }
+.notice > p { margin: 0; }
+.notice > .secondary-button { justify-self: start; }
+.flow-message:focus { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.assumed-defaults > strong { font-size: 15px; }
+.approximation-notice {
+  display: grid;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 1px solid var(--warning-line);
+  border-radius: 10px;
+  background: var(--warning-bg);
+}
+.approximation-notice > strong { color: var(--warning); font-size: 13px; }
+.approximation-notice > p { margin: 0; color: var(--ink-300); font-size: 13px; line-height: 1.55; }
+.assembly-progress > p { margin: 0; color: var(--ink-300); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.assembly-progress__request, .diagnostic-details { padding-top: 10px; border-top: 1px solid var(--line); }
+.assembly-progress__request > summary, .diagnostic-details > summary {
+  color: var(--cyan-deep);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  list-style-position: inside;
+}
+.assembly-progress__request > summary:focus-visible, .diagnostic-details > summary:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+.assembly-progress__request > div { display: grid; gap: 7px; padding-top: 9px; }
+.assembly-progress__request p, .diagnostic-details > p {
+  margin: 0;
+  color: var(--ink-300);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.assembly-progress__request strong { color: var(--ink-100); }
+.assembly-progress__route { color: var(--ink-500); font-family: var(--mono); font-size: 10px; overflow-wrap: anywhere; }
+.diagnostic-details > p { padding-top: 7px; }
+@media (max-width: 620px) {
+  .assembly-progress { gap: 10px; padding: 13px; }
+  .assembly-progress__heading { align-items: flex-start; }
+  .assembly-progress__heading output { font-size: 11px; }
 }

@@ -65,7 +65,7 @@ The user approved the assemble–preview–run flow:
 - Make progress prominent immediately after submitting: indeterminate activity, actual elapsed time and real interpreting/building phases, never fabricated completion percentages or agent-log walls. Stop waiting preserves the draft/preview and returns focus to the editor.
 - Arrive at a paused, inspectable scene with populated object cards, visible initial conditions and assumptions, and a short summary of the interpreted experiment.
 - Require an explicit Run action; assembly completion does not start motion automatically.
-- Explain unsupported requests honestly. Do not substitute another experiment, silently simplify the model, or invent a result. A proposed simpler model requires the student's agreement.
+- Make the best meaningful model within the selected physics category. When exact requested behavior is unavailable, a paused approximation must explicitly identify what it does and does not represent, with model choices visible before Run. Never silently replace supplied conditions, fabricate a capability or present an approximation as exact.
 - Keep limitation feedback concise and actionable, with technical detail in a disclosure. A question, explanation and supported alternative may coexist without a scene being built. Selecting a proposal fills the draft for review; only a separate Assemble action can request the changed experiment.
 - Default to a real physical ground at z=0, not just the reference grid; expose its height and material assumptions. Omit it only for an explicitly groundless/custom-support setup.
 - Preserve requested elastic/inelastic collisions and friction. Offer restitution targets, static/kinetic coefficients and contact results rather than removing the requested behavior. Static friction prevents slip, not necessarily rolling motion.
@@ -105,7 +105,7 @@ Source: `scope.md > What "Working" Looks Like` and `scope.md > Later`.
 - Missing information that materially changes the experiment triggers clarification before scene readiness.
 - A successfully assembled scene is initially paused, with its interpretation, initial conditions, assumptions, and object cards available for checking.
 - Motion begins only after the student presses Run.
-- An unsupported request produces an explanation, not a fabricated result or an unapproved replacement experiment.
+- An unrealistic request gets the closest scientifically meaningful, explicitly labelled paused model when possible. If no meaningful category model exists, explain the boundary and ask a focused question or offer a reviewable proposal. No invented physical results or silent substitutions.
 - Playback supports both endpoints, 0.1× and 10×, and can be paused.
 - After pausing, each participating object's properties can be inspected at the paused state without editing them.
 - Object cards expose the defining properties relevant to their object and experiment, with values tied to the actual model and simulation state rather than invented fields.

@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
-import { ASSEMBLY_INSTRUCTIONS } from '../shared/catalog.ts';
-import { AssemblyRequestSchema, physicalScene, validateDecision, validateScene } from '../shared/scene.ts';
+import { AssemblyRequestSchema, hasGroundPlane, physicalScene, validateDecision, validateScene } from '../shared/scene.ts';
 import { atwood, projectile } from './fixtures.ts';
 
 function rejected(scene: unknown) {
@@ -119,23 +118,24 @@ test('a model cannot mark a mixed explanation and scene payload successful', () 
   }), z.ZodError);
 });
 
-test('legacy decision payloads default the optional alternative to null', () => {
+test('omitted optional decision metadata does not invent a proposal or approximation', () => {
   for (const decision of [
     { kind: 'scene', summary: 'A projectile setup.', assumptions: [], question: null, reason: null, scene: projectile() },
     { kind: 'clarify', summary: 'Your launch speed is missing.', assumptions: [], question: 'What is the initial speed?', reason: null, scene: null },
     { kind: 'unsupported', summary: 'Your requested law is unavailable.', assumptions: [], question: null, reason: 'This law is not in the supported model.', scene: null },
   ]) {
     assert.equal(validateDecision(decision).alternative, null);
+    assert.equal(validateDecision(decision).approximation, null);
   }
 });
 
 test('questions and supported alternatives may accompany explanations, never a ready scene', () => {
-  const alternative = { label: 'Compare free fall', description: 'Drop 1 kg and 2 kg balls 1 m apart from rest at 1 m; omit prescribed bounce elasticity.' };
+  const alternative = { label: 'Rigid-body impact', description: 'Model a 1 kg rigid sphere hitting a fixed support; omit the requested permanent dent and disclose restitution 0.2.' };
   for (const kind of ['clarify', 'unsupported']) {
     const decision = validateDecision({
-      kind, summary: 'Your requested rebound is not controllable.', assumptions: [],
-      question: 'Would you like to compare motion before impact instead?',
-      reason: 'The model cannot set a restitution coefficient.', scene: null, alternative,
+      kind, summary: 'Permanent dents need a deformation model.', assumptions: [],
+      question: 'Would a rigid-body impact comparison help?',
+      reason: 'The current solver does not model permanent material deformation.', scene: null, alternative,
     });
     assert.equal(decision.scene, null);
     assert.ok(decision.question);
@@ -174,6 +174,28 @@ test('decision scenes still receive semantic scene validation', () => {
     kind: 'scene', summary: 'A projectile setup.', assumptions: [],
     question: null, reason: null, scene,
   }), z.ZodError);
+});
+
+test('an explicitly approximate preview retains physical validation and cannot authorize an unresolved decision', () => {
+  const approximation = 'Rigid-body motion only; permanent deformation is not modeled.';
+  const input = {
+    kind: 'scene', summary: 'A rigid-body impact approximation.', assumptions: [],
+    question: null, reason: null, scene: projectile(), approximation,
+  };
+  const decision = validateDecision(input);
+  assert.equal(decision.approximation, approximation);
+  assert.deepEqual(decision.scene, input.scene);
+  const invalidScene = projectile();
+  invalidScene.bodies[0].mass = null;
+  assert.throws(() => validateDecision({ ...input, scene: invalidScene }), z.ZodError);
+  for (const kind of ['clarify', 'unsupported']) {
+    assert.throws(() => validateDecision({
+      ...input, kind, scene: null,
+      question: kind === 'clarify' ? 'Which impact geometry?' : null,
+      reason: kind === 'unsupported' ? 'No meaningful mechanical model.' : null,
+    }), z.ZodError);
+  }
+  assert.throws(() => validateDecision({ ...input, approximation: ' ' }), z.ZodError);
 });
 
 test('an inextensible cable cannot silently discard elastic or damping parameters', () => {
@@ -294,11 +316,23 @@ test('ground ID is reserved, references resolve, and the body budget includes gr
   rejected({ ...atLimit, bodies: [...atLimit.bodies, { ...oneBody, id: 'body-over-limit' }] });
 });
 
-test('assembly instructions describe supported impacts and default contact materials', () => {
-  assert.match(ASSEMBLY_INSTRUCTIONS, /body restitution defaults to 0/);
-  assert.match(ASSEMBLY_INSTRUCTIONS, /automatic ground defaults to height 0 m, restitution 1/);
-  assert.match(ASSEMBLY_INSTRUCTIONS, /combine restitution conservatively as min/);
-  assert.match(ASSEMBLY_INSTRUCTIONS, /friction as the maximum/);
-  assert.match(ASSEMBLY_INSTRUCTIONS, /calibrated compliant numerical contact model/);
-  assert.doesNotMatch(ASSEMBLY_INSTRUCTIONS, /elastic bounce is not controllable/i);
+
+test('custom horizontal ground avoids duplicate floors while walls and ceilings do not remove the default', () => {
+  assert.equal(hasGroundPlane(projectile()), false);
+  assert.equal(hasGroundPlane(validateScene({ ...projectile(), ground: undefined })), true);
+  const base = projectile().bodies[0];
+  for (const [orientation, expected] of [
+    [[1, 0, 0, 0], true],
+    [[Math.SQRT1_2, 0, 0, Math.SQRT1_2], true],
+    [[Math.SQRT1_2, 0, Math.SQRT1_2, 0], false],
+    [[0, 1, 0, 0], false],
+  ] as const) {
+    const scene = validateScene({
+      ...projectile(), bodies: [base, {
+        ...base, id: 'support', mass: null, motion: { kind: 'fixed' },
+        shape: { kind: 'plane', size: [5, 5] }, orientation,
+      }],
+    });
+    assert.equal(hasGroundPlane(scene), expected);
+  }
 });

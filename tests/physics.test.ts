@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateScene } from '../shared/scene.ts';
+import { parseDecisionText } from '../server/providers.ts';
 import { createRuntime } from '../src/physics/mujoco.ts';
 import type { InspectionSnapshot, MechanicsRuntime } from '../src/physics/types.ts';
 import { atwood, changingWrap, projectile } from './fixtures.ts';
@@ -50,6 +51,34 @@ test('free projectile matches analytical horizontal launch', async () => {
     assert.ok(Math.abs(position[0] - 5) < 1e-8);
     assert.ok(Math.abs(position[1]) < 1e-8);
     assert.ok(Math.abs(position[2] - 15.095) < 0.006);
+  } finally {
+    runtime.dispose();
+  }
+});
+
+test('generated initial world poses use zero joint coordinates without applying the displacement twice', async () => {
+  const decision = parseDecisionText(JSON.stringify({ decision: {
+    kind: 'scene', summary: 'A guided sphere pulled toward its spring equilibrium.', assumptions: [],
+    question: null, reason: null, scene: {
+      category: 'mechanics', title: 'Initial-pose spring', gravity: [0, 0, 0],
+      bodies: [{
+        id: 'sphere', label: 'Guided sphere', position: [2, 0, 1],
+        shape: { kind: 'sphere', radius: 0.05 }, mass: 1,
+        motion: { kind: 'slide', axis: [1, 0, 0], anchor: [0, 0, 1], stiffness: 10, springReference: -1 },
+      }],
+    },
+  } }));
+  assert.ok(decision.scene);
+  const runtime = await createRuntime(decision.scene);
+  try {
+    assert.deepEqual(vectorValue(runtime.snapshot(), 'sphere', 'Position'), [2, 0, 1]);
+    simulate(runtime, 0.01, 1);
+    const velocity = vectorValue(runtime.snapshot(), 'sphere', 'Velocity');
+    assert.ok(Math.abs(velocity[0] + 0.1) < 0.0002);
+    assert.equal(velocity[1], 0);
+    assert.equal(velocity[2], 0);
+    runtime.reset();
+    assert.deepEqual(vectorValue(runtime.snapshot(), 'sphere', 'Position'), [2, 0, 1]);
   } finally {
     runtime.dispose();
   }

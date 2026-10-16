@@ -1,23 +1,26 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ZodError } from 'zod';
 import { MODEL_NOTES, PROVIDER_LABELS, type ModelOption, type ProviderConfig } from '../shared/catalog.ts';
-import { AssemblyRequestSchema, validateDecision, type AssemblyRequest, type Decision, type Provider } from '../shared/scene.ts';
+import { AssemblyRequestSchema, hasGroundPlane, validateScene, type AssemblyRequest, type Decision, type Provider } from '../shared/scene.ts';
+import { readAssemblyResponse, type AssemblyProgress } from '../shared/assembly-stream.ts';
 import ObjectCards from './ObjectCards.tsx';
 import SimulationCanvas, { type CanvasExperiment } from './SimulationCanvas.tsx';
 import type { InspectionSnapshot } from './physics/types.ts';
+type SceneDecision = Extract<Decision, { kind: 'scene' }>;
 
 
 
 type Flow = {
-  kind: 'idle' | 'requesting' | 'clarification' | 'preparing' | 'ready' | 'unsupported' | 'error';
+  kind: 'idle' | 'requesting' | 'clarification' | 'ground-review' | 'preparing' | 'ready' | 'unsupported' | 'error';
   message: string;
+  detail?: string;
 };
 
 const OPENROUTER_FREE_ROUTE: ModelOption = {
   id: 'openrouter/free',
-  name: 'OpenRouter free route',
+  name: 'Random free router',
   free: true,
-  structuredOutputs: false,
+  structuredOutputs: true,
   contextLength: null,
 };
 const PROVIDER_IDS = Object.keys(PROVIDER_LABELS) as Provider[];
@@ -32,7 +35,7 @@ const PROMPT_STARTERS = [
   },
   {
     label: 'Spring motion',
-    prompt: 'Attach a 1 kg point mass to a fixed anchor at the origin with a massless spring of rest length 1 m and stiffness 10 N/m, with zero damping and zero gravity. Start the mass at (2, 0, 0) m at rest and constrain it to move along the x-axis. Show its motion and the spring force.',
+    prompt: 'Constrain a 1 kg sphere of radius 0.05 m to move along the x-axis at z = 1 m using an ideal slider. Attach it to a fixed anchor at [0, 0, 1] m with a massless spring of rest length 1 m and stiffness 10 N/m. Use zero damping and zero gravity. Start the sphere at [2, 0, 1] m at rest with zero spin and zero friction. Show its motion and the spring force.',
   },
 ] as const;
 
@@ -104,11 +107,24 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+function assemblyFailure(error: unknown): { message: string; detail: string } {
+  if (error instanceof Error && 'code' in error && ['provider_busy', 'provider_timeout', 'provider_rate_limited'].includes(String(error.code))) {
+    return { message: error.message, detail: '' };
+  }
+  return {
+    message: error instanceof ZodError
+      ? 'The provider response could not be read as a supported mechanics scene.'
+      : 'The assembly request could not be completed.',
+    detail: errorMessage(error),
+  };
+}
+
 
 
 export default function App() {
   const [config, setConfig] = useState<ProviderConfig | null>(null);
   const [configError, setConfigError] = useState('');
+  const [configAttempt, setConfigAttempt] = useState(0);
   const [provider, setProvider] = useState<Provider | ''>('');
   const [models, setModels] = useState<ModelOption[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -120,15 +136,19 @@ export default function App() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [responseDecision, setResponseDecision] = useState<Decision | null>(null);
+  const [groundReview, setGroundReview] = useState<{ id: number; decision: SceneDecision } | null>(null);
   const [flow, setFlow] = useState<Flow>({ kind: 'idle', message: '' });
   const [activeExperiment, setActiveExperiment] = useState<CanvasExperiment | null>(null);
   const [pendingExperiment, setPendingExperiment] = useState<CanvasExperiment | null>(null);
   const [snapshot, setSnapshot] = useState<InspectionSnapshot | null>(null);
   const [formError, setFormError] = useState('');
+  const [formErrorDetail, setFormErrorDetail] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [assemblyProgress, setAssemblyProgress] = useState<AssemblyProgress | null>(null);
   const requestStartedAt = useRef(0);
   const progressRef = useRef<HTMLDivElement>(null);
   const responseRef = useRef<HTMLElement>(null);
+  const flowMessageRef = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
   const requestController = useRef<AbortController | null>(null);
   const candidateRef = useRef<CanvasExperiment | null>(null);
@@ -145,6 +165,7 @@ export default function App() {
   candidateRef.current = pendingExperiment;
 
   useEffect(() => {
+    setConfigError('');
     const controller = new AbortController();
     void (async () => {
       try {
@@ -159,12 +180,13 @@ export default function App() {
           ? nextConfig.defaultProvider
           : available[0]?.id ?? '';
         setProvider(initialProvider);
+        if (initialProvider === 'openrouter' && nextConfig.defaultModel) setFreeModel(nextConfig.defaultModel);
       } catch (error) {
         if (!isAbortError(error)) setConfigError(errorMessage(error));
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [configAttempt]);
 
   useEffect(() => {
     if (provider !== 'openrouter') {
@@ -188,10 +210,8 @@ export default function App() {
           const configuredFree = config?.defaultProvider === 'openrouter'
             ? currentModels.find(item => item.id === config.defaultModel && item.free)?.id
             : undefined;
-          if (configuredFree) return configuredFree;
-          return current === OPENROUTER_FREE_ROUTE.id || currentModels.some(item => item.id === current && item.free)
-            ? current
-            : OPENROUTER_FREE_ROUTE.id;
+          if (current === OPENROUTER_FREE_ROUTE.id || currentModels.some(item => item.id === current && item.free)) return current;
+          return configuredFree ?? OPENROUTER_FREE_ROUTE.id;
         });
       } catch (error) {
         if (!isAbortError(error)) {
@@ -217,6 +237,7 @@ export default function App() {
     requestController.current = null;
     candidateRef.current = null;
     setPendingExperiment(null);
+    setGroundReview(null);
     setFlow({ kind: 'idle', message: wasWorking ? message : '' });
   }, []);
 
@@ -229,16 +250,27 @@ export default function App() {
       setAnswer('');
       setResponseDecision(null);
       setFormError('');
+      setFormErrorDetail('');
     }
     setDescription(value);
+  };
+
+  const handleAnswerChange = (value: string) => {
+    if (value !== answer) {
+      invalidateWork();
+      setFormError('');
+      setFormErrorDetail('');
+    }
+    setAnswer(value);
   };
 
   const handleProviderChange = (value: string) => {
     invalidateWork();
     setProvider(isProvider(value) ? value : '');
-    setFreeModel(OPENROUTER_FREE_ROUTE.id);
+    setFreeModel(config?.defaultProvider === 'openrouter' && config.defaultModel ? config.defaultModel : OPENROUTER_FREE_ROUTE.id);
     setModelInput('');
     setFormError('');
+    setFormErrorDetail('');
   };
 
   const handleModelInput = (value: string) => {
@@ -246,6 +278,7 @@ export default function App() {
     setModelInput(value);
     if (provider === 'openrouter') setFreeModel('');
     setFormError('');
+    setFormErrorDetail('');
   };
 
   const selectedModel = provider === 'openrouter' ? modelInput.trim() || freeModel : modelInput.trim();
@@ -265,11 +298,41 @@ export default function App() {
   }, [isBusy]);
 
   useEffect(() => {
-    if (flow.kind === 'unsupported') {
+    if (flow.kind === 'unsupported' || flow.kind === 'ground-review') {
       responseRef.current?.scrollIntoView({ block: 'nearest' });
       responseRef.current?.focus({ preventScroll: true });
     }
   }, [flow.kind]);
+
+  useEffect(() => {
+    if (flow.kind === 'error') {
+      flowMessageRef.current?.scrollIntoView({ block: 'center' });
+      flowMessageRef.current?.focus({ preventScroll: true });
+    }
+  }, [flow.kind]);
+
+  const preparePreview = (decision: SceneDecision, id: number, userGroundChoice?: CanvasExperiment['userGroundChoice']) => {
+    if (id !== generation.current) return;
+    const experiment: CanvasExperiment = { id, scene: decision.scene, decision, userGroundChoice };
+    candidateRef.current = experiment;
+    setGroundReview(null);
+    setPendingExperiment(experiment);
+    setQuestion('');
+    setAnswer('');
+    setFlow({ kind: 'preparing', message: 'Building your paused physics preview.' });
+  };
+
+  const chooseGround = (include: boolean) => {
+    if (!groundReview || groundReview.id !== generation.current) return;
+    try {
+      const scene = validateScene({ ...groundReview.decision.scene, ground: include ? undefined : null });
+      requestStartedAt.current = performance.now();
+      setElapsedSeconds(0);
+      preparePreview({ ...groundReview.decision, scene }, groundReview.id, include ? 'default' : 'none');
+    } catch (error) {
+      setFlow({ kind: 'error', message: 'This ground choice could not be prepared.', detail: errorMessage(error) });
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -286,7 +349,8 @@ export default function App() {
         clarification,
       });
     } catch (error) {
-      setFormError(errorMessage(error));
+      setFormError('Review the experiment description and model settings.');
+      setFormErrorDetail(errorMessage(error));
       return;
     }
 
@@ -295,20 +359,22 @@ export default function App() {
     requestController.current = controller;
     requestStartedAt.current = performance.now();
     setElapsedSeconds(0);
+    setAssemblyProgress(null);
     setFormError('');
+    setFormErrorDetail('');
     setResponseDecision(null);
+    setGroundReview(null);
     setFlow({ kind: 'requesting', message: `Sending this description to ${PROVIDER_LABELS[request.provider]} using ${request.model}.` });
     try {
       const response = await fetch('/api/assemble', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
         body: JSON.stringify(request),
         signal: controller.signal,
       });
-      const payload: unknown = await response.json().catch(() => null);
-      if (id !== generation.current) return;
-      if (!response.ok) throw new Error(responseError(payload, response.status));
-      const decision = validateDecision(payload);
+      const decision = await readAssemblyResponse(response, progress => {
+        if (id === generation.current) setAssemblyProgress(progress);
+      });
       if (id !== generation.current) return;
       requestController.current = null;
       if (question) setClarifications(clarification);
@@ -324,19 +390,22 @@ export default function App() {
         setAnswer('');
         setFlow({ kind: 'unsupported', message: 'No replacement scene was created. The current preview, if any, is unchanged.' });
       } else if (decision.scene) {
-        const experiment: CanvasExperiment = { id, scene: decision.scene, decision };
-        candidateRef.current = experiment;
-        setPendingExperiment(experiment);
-        setQuestion('');
-        setAnswer('');
-        setFlow({ kind: 'preparing', message: 'The returned scene is being compiled into a paused physics preview.' });
+        if (!hasGroundPlane(decision.scene)) {
+          setQuestion('');
+          setAnswer('');
+          setGroundReview({ id, decision });
+          setFlow({ kind: 'ground-review', message: '' });
+        } else {
+          preparePreview(decision, id);
+        }
       } else {
         throw new Error('The validated scene decision did not contain a scene.');
       }
     } catch (error) {
       if (id !== generation.current || isAbortError(error)) return;
       requestController.current = null;
-      setFlow({ kind: 'error', message: `Assembly failed. ${errorMessage(error)} The prompt and current preview are preserved.` });
+      const failure = assemblyFailure(error);
+      setFlow({ kind: 'error', message: failure.message, detail: failure.detail });
     } finally {
       if (id === generation.current && requestController.current === controller) requestController.current = null;
     }
@@ -365,8 +434,7 @@ export default function App() {
     if (id !== generation.current) return;
     candidateRef.current = null;
     setPendingExperiment(current => current?.id === id ? null : current);
-    const preservation = activeRef.current ? 'The previous preview is unchanged.' : 'Your prompt is unchanged.';
-    setFlow({ kind: 'error', message: `The replacement preview could not be prepared: ${message} ${preservation}` });
+    setFlow({ kind: 'error', message: 'The paused preview could not be prepared.', detail: message });
   }, []);
 
   const interpretation = activeExperiment?.decision ?? null;
@@ -380,9 +448,9 @@ export default function App() {
   return (
     <div className="lab-shell">
       <header className="topbar">
-        <a className="lab-mark" href="#main" aria-label="Mission Board home">
+        <a className="lab-mark" href="#main" aria-label="Physics Lab workbench home">
           <span className="lab-mark__glyph" aria-hidden="true">M</span>
-          <span><strong>PHYSICS LAB</strong><small>MISSION BOARD</small></span>
+          <span><strong>PHYSICS LAB</strong><small>MECHANICS WORKBENCH</small></span>
         </a>
         <div className="service-state" aria-live="polite">
           <span className={`service-state__signal ${config && !configError ? 'is-live' : ''}`} aria-hidden="true" />
@@ -395,7 +463,7 @@ export default function App() {
           <div className="setup-heading">
             <div>
               <p className="eyebrow">Experiment workspace</p>
-              <h1 id="setup-title">Build a mechanics preview</h1>
+              <h1 id="setup-title">Set up an experiment</h1>
             </div>
             <span className="category-stamp">CLASSICAL · SI UNITS</span>
           </div>
@@ -467,7 +535,7 @@ export default function App() {
                         <span className="field-label">OpenRouter free model</span>
                         <select
                           value={freeModel}
-                          onChange={event => { invalidateWork(); setFreeModel(event.target.value); setModelInput(''); }}
+                          onChange={event => { invalidateWork(); setFreeModel(event.target.value); setModelInput(''); setFormError(''); setFormErrorDetail(''); }}
                           disabled={isBusy}
                         >
                           <option value="" disabled>Choose a free route or enter a model ID</option>
@@ -535,7 +603,7 @@ export default function App() {
                   <textarea
                     ref={answerRef}
                     value={answer}
-                    onChange={event => setAnswer(event.target.value)}
+                    onChange={event => handleAnswerChange(event.target.value)}
                     maxLength={4000}
                     required
                     rows={2}
@@ -547,20 +615,29 @@ export default function App() {
 
             {configError ? (
               <div className="notice notice--error" role="alert">
-                <strong>Local API is unavailable.</strong> {configError} Start the API with <code>npm run api</code>, then reload this page.
+                <p><strong>Provider settings could not be loaded.</strong> Retry without losing your draft. If the local service is offline, start it with <code>npm run api</code>.</p>
+                <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Retry connection</button>
+                <details className="diagnostic-details"><summary>Technical details</summary><p>{configError}</p></details>
               </div>
             ) : null}
             {noProvidersAvailable ? (
               <div className="notice notice--warning" role="status">
-                <strong>No provider key is configured.</strong> Set <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, or <code>OPENROUTER_API_KEY</code> in a private server-side environment file, such as an ignored local <code>.env</code>, and restart the API. Keep the file outside public assets; never use a <code>VITE_</code> key.
+                <p><strong>No provider key is configured.</strong> Add <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, or <code>OPENROUTER_API_KEY</code> to a private server-side environment file, restart the local API, then check again. Never expose a key in browser code.</p>
+                <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Check provider availability</button>
               </div>
             ) : null}
-            {formError ? <div className="notice notice--error" role="alert">{formError}</div> : null}
+            {formError ? (
+              <div className="notice notice--error" role="alert">
+                <p>{formError}</p>
+                {formErrorDetail ? <details className="diagnostic-details"><summary>Technical details</summary><p>{formErrorDetail}</p></details> : null}
+              </div>
+            ) : null}
 
             <div className="submit-row">
+              <p className="privacy-note">Assembly can make one extra call to the same model to correct an invalid model or recover from a temporary service failure. Provider charges may apply. No paid fallback is selected automatically.</p>
               <div className="submit-actions">
                 <button className="primary-button" type="submit" disabled={!canSubmit || (question !== '' && answer.trim().length === 0)}>
-                  {flow.kind === 'requesting' ? 'Waiting for model…' : flow.kind === 'preparing' ? 'Preparing preview…' : question ? 'Answer and continue' : 'Assemble scene'}
+                  {flow.kind === 'requesting' ? 'Waiting for provider…' : flow.kind === 'preparing' ? 'Preparing paused preview…' : flow.kind === 'error' ? 'Retry same request' : question ? 'Answer and continue' : 'Assemble scene'}
                 </button>
               </div>
               <p className="privacy-note">The selected provider receives your scenario and clarification replies. API keys stay on the local server.</p>
@@ -568,12 +645,13 @@ export default function App() {
           </form>
 
           {flow.message && !isBusy && flow.kind !== 'unsupported' && flow.kind !== 'clarification' ? (
-            <div className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live={flow.kind === 'error' ? 'assertive' : 'polite'} aria-busy={isBusy}>
+            <div ref={flow.kind === 'error' ? flowMessageRef : undefined} tabIndex={flow.kind === 'error' ? -1 : undefined} className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live={flow.kind === 'error' ? 'assertive' : 'polite'}>
               <span className="flow-message__line" aria-hidden="true" />
               <div className="flow-message__content">
                 <p>{flow.message}</p>
                 {flow.kind === 'ready' ? <p className="flow-message__next">Review the model summary and assumptions, then run the preview when they match your intent.</p> : null}
-                {flow.kind === 'error' ? <p className="flow-message__next">Check the provider or model settings, or refine the prompt, then assemble again. No request is retried automatically.</p> : null}
+                {flow.kind === 'error' ? <p className="flow-message__next">Your prompt and current preview are unchanged. Retry this request as written, edit the experiment, or review provider settings.</p> : null}
+                {flow.kind === 'error' && flow.detail ? <details className="diagnostic-details"><summary>Technical details</summary><p>{flow.detail}</p></details> : null}
               </div>
             </div>
           ) : null}
@@ -606,6 +684,18 @@ export default function App() {
             </section>
           ) : null}
 
+          {groundReview ? (
+            <section className="response-panel ground-review-panel" ref={responseRef} tabIndex={-1} aria-labelledby="ground-review-title">
+              <h2 id="ground-review-title">Keep a physical ground?</h2>
+              <p>The model proposed no built-in ground. Your lab includes one by default; it will never be removed without your choice.</p>
+              <div className="response-panel__actions">
+                <button className="primary-button" type="button" onClick={() => chooseGround(true)}>Keep default ground</button>
+                <button className="secondary-button" type="button" onClick={() => chooseGround(false)}>Preview without ground</button>
+              </div>
+              <small>This changes only the ground choice. No new model request is sent, and the simulation stays paused.</small>
+            </section>
+          ) : null}
+
           {interpretation ? (
             <aside className={`interpretation-panel${responseDecision ? ' interpretation-panel--preserved' : ''}`} aria-label="Preview interpretation">
               <div className="interpretation-heading">
@@ -614,14 +704,15 @@ export default function App() {
               <p>{interpretation.summary}</p>
               <p className="interpretation-guide">This is the scene currently shown. Editing your draft does not change it.</p>
               <div className="assumed-defaults">
-                <strong>Assumed defaults and idealizations</strong>
-                <p>Check any values you didn’t specify before pressing Run. Initial values for every object are shown below the canvas.</p>
+                <strong>Model choices &amp; approximations</strong>
+                <p>Review these values and any modeling substitutions before Run. Initial values for every object are shown below the canvas.</p>
+                {activeExperiment?.userGroundChoice ? <p><strong>Your ground choice takes precedence over the model’s ground suggestion below.</strong></p> : null}
                 {interpretation.scene?.ground ? (
                   <p>Physical ground: z = {interpretation.scene.ground.height} m; target restitution {interpretation.scene.ground.restitution}; static friction {interpretation.scene.ground.friction.static ?? interpretation.scene.ground.friction.sliding}, sliding friction {interpretation.scene.ground.friction.sliding}.</p>
                 ) : <p>Built-in ground is explicitly disabled. Any separately modeled surfaces are listed in the object cards.</p>}
                 {interpretation.assumptions.length > 0 ? (
                   <ul>{interpretation.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
-                ) : <p>No additional physical assumptions were reported by the model. Verify the interpreted setup against your description.</p>}
+                ) : <p>No other physical assumptions were reported by the model. Verify the interpreted setup against your description.</p>}
               </div>
             </aside>
           ) : null}
@@ -644,25 +735,45 @@ export default function App() {
             </div>
             <span className="simulation-unit">Z-up · metres · seconds</span>
           </div>
+          {interpretation?.approximation ? (
+            <div className="approximation-notice" role="note">
+              <strong>Approximate model · Review before Run</strong>
+              <p>{interpretation.approximation}</p>
+            </div>
+          ) : null}
           {isBusy ? (
             <div className="assembly-progress" data-stage={flow.kind} role="status" aria-live="polite" ref={progressRef} tabIndex={-1}>
               <div className="assembly-progress__heading">
-                <strong>{flow.kind === 'requesting' ? 'Interpreting your experiment' : 'Building your simulation'}</strong>
+                <strong>{flow.kind === 'preparing' ? 'Building a paused preview' : assemblyProgress?.stage === 'retrying' ? 'Reconnecting to the model' : assemblyProgress?.stage === 'repairing' ? 'Correcting the model' : assemblyProgress?.stage === 'validating' ? 'Checking the physics model' : 'Designing your experiment'}</strong>
                 <output aria-label="Elapsed assembly time" aria-live="off">{elapsedSeconds}s elapsed</output>
               </div>
-              <div className="assembly-progress__track" role="progressbar" aria-label="Assembly in progress" aria-valuetext={flow.kind === 'requesting' ? 'Waiting for the selected provider' : flow.message}><span /></div>
-              <ol className="assembly-progress__steps">
-                <li data-state={flow.kind === 'requesting' ? 'active' : 'done'} aria-current={flow.kind === 'requesting' ? 'step' : undefined}>Interpret request</li>
-                <li data-state={flow.kind === 'preparing' ? 'active' : 'pending'} aria-current={flow.kind === 'preparing' ? 'step' : undefined}>Build model</li>
+              <div className="assembly-progress__track" aria-hidden="true"><span /></div>
+              <ol className="assembly-progress__steps" aria-label="Assembly stages">
+                <li data-state={flow.kind === 'preparing' || assemblyProgress?.stage === 'validating' || assemblyProgress?.stage === 'repairing' ? 'done' : 'active'}>Design model</li>
+                <li data-state={flow.kind === 'preparing' ? 'done' : assemblyProgress?.stage === 'validating' || assemblyProgress?.stage === 'repairing' ? 'active' : 'pending'}>{assemblyProgress?.stage === 'repairing' ? 'Correct validation issues · 1 pass' : 'Validate physics'}</li>
+                <li data-state={flow.kind === 'preparing' ? 'active' : 'pending'}>Prepare paused simulation</li>
               </ol>
               <p>{flow.kind === 'requesting'
-                ? `Waiting for ${selectedProviderLabel} to return a scene or a question. No simulation is running yet.`
+                ? assemblyProgress?.message ?? `Connecting to ${selectedProviderLabel}. Waiting for the assembly service to acknowledge your request.`
                 : flow.message}</p>
-              {flow.kind === 'requesting' && elapsedSeconds >= 15 ? <p>The provider is still responding. You can stop waiting without losing your draft or current experiment.</p> : null}
+              <details className="assembly-progress__request">
+                <summary>Review the request</summary>
+                <div>
+                  <span className="assembly-progress__route">{selectedProviderLabel} · {selectedModel}</span>
+                  <p>{description}</p>
+                  {clarifications.map((item, index) => (
+                    <p key={`${index}-${item.question}`}><strong>Clarification {index + 1}:</strong> {item.question}<br /><strong>Answer:</strong> {item.answer}</p>
+                  ))}
+                  {question ? <p><strong>Clarification:</strong> {question}<br /><strong>Answer:</strong> {answer.trim() || 'Not answered yet.'}</p> : null}
+                </div>
+              </details>
+              {flow.kind === 'requesting' && elapsedSeconds >= 15 ? <p>Still waiting for the provider, with a two-minute deadline per attempt. Stop waiting at any time without losing your draft or current experiment.</p> : null}
               <button className="secondary-button" type="button" onClick={() => {
-                invalidateWork('Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.');
+                invalidateWork(flow.kind === 'requesting'
+                  ? 'Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.'
+                  : 'Preview preparation canceled. Your prompt and current preview are unchanged.');
                 descriptionRef.current?.focus();
-              }}>Stop waiting</button>
+              }}>{flow.kind === 'requesting' ? 'Stop waiting' : 'Cancel preparation'}</button>
             </div>
           ) : null}
           <SimulationCanvas

@@ -21,3 +21,11 @@
 - Preserve existing joint/tendon/load composition while substepping collision dynamics, decoupling tangential damping from normal elasticity and respecting native ownership/collision filters.
 - Expose material values including zero, momentum, translational kinetic energy, uniform-gravity potential, contact reactions and joint spring/damping forces; do not pretend these are universal total-energy/net-force measurements.
 - Verify 62 behavioral references and actual provider-generated elastic/inelastic and static/kinetic scenes, both playback endpoints and Reset. Correct the previous claim that lack of a direct restitution scalar made elasticity impossible.
+- Replace JSON-only prompting with provider-native constrained schemas derived from the shared contract; preserve strict semantic/native admission and exact tuple dimensions without prompt-specific aliases or data dropping.
+- Bound assembly to two same-model calls total: initial plus validation correction or temporary-service recovery, with real streamed stages, elapsed time, pre-submit charge disclosure and local cancellation. Preserve normal JSON API clients.
+- Default to a named schema-capable free model rather than random free routing, and use advertised reasoning budgets to leave room for the actual model definition. Keep model choices explicit and no paid fallback.
+- Build meaningful best-effort Mechanics approximations with a prominent review-before-Run notice, while preserving exact represented parameters and declaring missing physics instead of inventing it.
+- Refine light workbench contrast, typography, error recovery and narrow/reduced-motion states; keep the reference grid visible above the default ground and avoid empty-canvas help overlap on mobile.
+- Encode scene/clarify/unsupported alternatives as native discriminated decision branches inside a strict provider envelope, rather than leaving incompatible metadata to a post-generation prompt rule. Public API decisions remain unchanged.
+- Use canonical zero-coordinate generated joint poses, retain physical schema descriptions, and verify actual slider initial position, spring acceleration and Reset through native MuJoCo.
+- Require consent before a proposal removes physical ground; recognize existing upward horizontal ground planes so the app does not add duplicate floors.

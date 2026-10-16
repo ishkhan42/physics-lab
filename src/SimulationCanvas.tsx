@@ -36,6 +36,7 @@ export interface CanvasExperiment {
   id: number;
   scene: Scene;
   decision: Decision;
+  userGroundChoice?: 'default' | 'none';
 }
 
 interface SimulationCanvasProps {
@@ -288,7 +289,8 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
       scene.add(fillLight);
       const grid = new GridHelper(12, 24, 0x758b90, 0xb7c6c9);
       grid.rotation.x = Math.PI / 2;
-      grid.position.z = -0.008;
+      grid.renderOrder = 1;
+      grid.position.z = 0.002; // Keep the visual reference above z=0 supports, without z-fighting.
       grid.material.transparent = true;
       grid.material.opacity = 0.42;
       grid.material.depthWrite = false;
@@ -601,7 +603,7 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
           <div className="canvas-empty-state" role="status">
             <span className="empty-orbit" aria-hidden="true"><i /><b /></span>
             <strong>{preparing ? 'Preparing your model' : canvasIssue || candidateError ? 'Preview unavailable' : 'Canvas ready for an experiment'}</strong>
-            <p>{canvasIssue || candidateError || 'The reference grid is not a physical floor. Assemble a scene to see its real geometry here.'}</p>
+            <p>{canvasIssue || candidateError || 'Assemble an experiment to see your objects and physical ground. The grid is a visual aid.'}</p>
           </div>
         ) : null}
         {preparing && runtimeRef.current ? <div className="replacement-indicator" role="status">Preparing replacement · current preview is paused and preserved</div> : null}
