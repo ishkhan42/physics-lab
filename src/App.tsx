@@ -125,6 +125,10 @@ export default function App() {
   const [pendingExperiment, setPendingExperiment] = useState<CanvasExperiment | null>(null);
   const [snapshot, setSnapshot] = useState<InspectionSnapshot | null>(null);
   const [formError, setFormError] = useState('');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const requestStartedAt = useRef(0);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const responseRef = useRef<HTMLElement>(null);
   const generation = useRef(0);
   const requestController = useRef<AbortController | null>(null);
   const candidateRef = useRef<CanvasExperiment | null>(null);
@@ -250,6 +254,23 @@ export default function App() {
   const availableProviders = config?.providers.filter(item => item.available) ?? [];
   const isBusy = flow.kind === 'requesting' || flow.kind === 'preparing';
 
+  useEffect(() => {
+    if (!isBusy) return;
+    progressRef.current?.scrollIntoView({ block: 'start' });
+    progressRef.current?.focus({ preventScroll: true });
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((performance.now() - requestStartedAt.current) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isBusy]);
+
+  useEffect(() => {
+    if (flow.kind === 'unsupported') {
+      responseRef.current?.scrollIntoView({ block: 'nearest' });
+      responseRef.current?.focus({ preventScroll: true });
+    }
+  }, [flow.kind]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isBusy) return;
@@ -272,6 +293,8 @@ export default function App() {
     const id = ++generation.current;
     const controller = new AbortController();
     requestController.current = controller;
+    requestStartedAt.current = performance.now();
+    setElapsedSeconds(0);
     setFormError('');
     setResponseDecision(null);
     setFlow({ kind: 'requesting', message: `Sending this description to ${PROVIDER_LABELS[request.provider]} using ${request.model}.` });
@@ -297,7 +320,7 @@ export default function App() {
         setFlow({ kind: 'clarification', message: 'One consequential detail is needed before this experiment can be assembled.' });
       } else if (decision.kind === 'unsupported') {
         setResponseDecision(decision);
-        setQuestion('');
+        setQuestion(decision.question ?? '');
         setAnswer('');
         setFlow({ kind: 'unsupported', message: 'No replacement scene was created. The current preview, if any, is unchanged.' });
       } else if (decision.scene) {
@@ -346,7 +369,7 @@ export default function App() {
     setFlow({ kind: 'error', message: `The replacement preview could not be prepared: ${message} ${preservation}` });
   }, []);
 
-  const interpretation = responseDecision ?? activeExperiment?.decision ?? null;
+  const interpretation = activeExperiment?.decision ?? null;
   const noProvidersAvailable = config !== null && availableProviders.length === 0;
   const canSubmit = !isBusy && !configError && provider !== '' && selectedModel.length > 0 && description.trim().length >= 3;
   const settingsSummary = provider
@@ -391,7 +414,7 @@ export default function App() {
                 rows={4}
                 aria-describedby="description-hint"
               />
-              <span className="field-hint" id="description-hint">Include the objects, masses, starting heights or positions, initial speeds, and contacts. State what you want to compare.</span>
+              <span className="field-hint" id="description-hint">Describe what you know. We’ll ask about missing details or explicitly list the sensible defaults used.</span>
             </label>
 
             <div className="prompt-starters" role="group" aria-label="Fill the editable prompt with a starter">
@@ -539,63 +562,64 @@ export default function App() {
                 <button className="primary-button" type="submit" disabled={!canSubmit || (question !== '' && answer.trim().length === 0)}>
                   {flow.kind === 'requesting' ? 'Waiting for model…' : flow.kind === 'preparing' ? 'Preparing preview…' : question ? 'Answer and continue' : 'Assemble scene'}
                 </button>
-                {isBusy ? (
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => invalidateWork('Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.')}
-                  >
-                    Stop waiting
-                  </button>
-                ) : null}
               </div>
               <p className="privacy-note">The selected provider receives your scenario and clarification replies. API keys stay on the local server.</p>
             </div>
           </form>
 
-          {flow.message ? (
+          {flow.message && !isBusy && flow.kind !== 'unsupported' && flow.kind !== 'clarification' ? (
             <div className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live={flow.kind === 'error' ? 'assertive' : 'polite'} aria-busy={isBusy}>
               <span className="flow-message__line" aria-hidden="true" />
               <div className="flow-message__content">
                 <p>{flow.message}</p>
-                {flow.kind === 'clarification' ? <p className="flow-message__next">Answer the question above; your original scenario stays editable.</p> : null}
                 {flow.kind === 'ready' ? <p className="flow-message__next">Review the model summary and assumptions, then run the preview when they match your intent.</p> : null}
-                {flow.kind === 'unsupported' ? <p className="flow-message__next">Refine the scenario around supported mechanics or make the essential condition explicit, then assemble again.</p> : null}
                 {flow.kind === 'error' ? <p className="flow-message__next">Check the provider or model settings, or refine the prompt, then assemble again. No request is retried automatically.</p> : null}
               </div>
             </div>
           ) : null}
 
-          {interpretation ? (
-            <aside className="interpretation-panel" aria-label="Model interpretation">
-              <div className="interpretation-heading">
-                <span className="eyebrow">{responseDecision ? 'Current response' : 'Preview interpretation'}</span>
-                {responseDecision?.kind === 'unsupported' ? <span className="state-label state-label--warning">Unsupported</span> : null}
-              </div>
-              {interpretation.kind === 'scene' ? <p className="interpretation-guide">Check what the model included and assumed before running.</p> : null}
-              <p>{interpretation.summary}</p>
-              {interpretation.kind === 'unsupported' && interpretation.reason ? <p className="interpretation-reason">{interpretation.reason}</p> : null}
-              {interpretation.assumptions.length > 0 ? (
-                <div className="assumption-list">
-                  <span className="field-label">Assumptions and idealizations</span>
-                  <ul>{interpretation.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
+          {responseDecision && (responseDecision.kind === 'unsupported' || responseDecision.alternative) ? (
+            <section className="response-panel response-panel--unsupported" ref={responseRef} tabIndex={-1} aria-labelledby="response-title">
+              <h2 id="response-title">{responseDecision.kind === 'unsupported' ? 'Let’s adjust this experiment' : 'Another way to try this'}</h2>
+              <p>{responseDecision.summary}</p>
+              {responseDecision.alternative ? (
+                <div className="response-proposal">
+                  <h3>{responseDecision.alternative.label}</h3>
+                  <p>{responseDecision.alternative.description}</p>
+                  <button className="primary-button" type="button" onClick={() => {
+                    handleDescriptionChange(responseDecision.alternative!.description);
+                    descriptionRef.current?.focus();
+                  }}>Use this setup</button>
+                  <small>Fills your draft for review. Nothing is built until you press Assemble.</small>
                 </div>
               ) : null}
-            </aside>
+              <div className="response-panel__actions">
+                <button className="secondary-button" type="button" onClick={() => descriptionRef.current?.focus()}>Edit my request</button>
+              </div>
+              {responseDecision.reason ? (
+                <details className="response-details">
+                  <summary>Why this needs a change</summary>
+                  <p>{responseDecision.reason}</p>
+                </details>
+              ) : null}
+              <p className="field-hint">{activeExperiment ? 'Your existing experiment is unchanged.' : 'No simulation has been created.'}</p>
+            </section>
           ) : null}
-          {responseDecision && activeExperiment ? (
-            <aside className="interpretation-panel interpretation-panel--preserved" aria-label="Existing preview interpretation">
+
+          {interpretation ? (
+            <aside className={`interpretation-panel${responseDecision ? ' interpretation-panel--preserved' : ''}`} aria-label="Preview interpretation">
               <div className="interpretation-heading">
-                <span className="eyebrow">Existing preview</span>
+                <span className="eyebrow">{responseDecision ? 'Unchanged preview' : 'Current preview'}</span>
               </div>
-              <p className="interpretation-guide">This is the unchanged scene currently shown in the canvas.</p>
-              <p>{activeExperiment.decision.summary}</p>
-              {activeExperiment.decision.assumptions.length > 0 ? (
-                <div className="assumption-list">
-                  <span className="field-label">Assumptions and idealizations</span>
-                  <ul>{activeExperiment.decision.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
-                </div>
-              ) : null}
+              <p>{interpretation.summary}</p>
+              <p className="interpretation-guide">This is the scene currently shown. Editing your draft does not change it.</p>
+              <div className="assumed-defaults">
+                <strong>Assumed defaults and idealizations</strong>
+                <p>Check any values you didn’t specify before pressing Run. Initial values for every object are shown below the canvas.</p>
+                {interpretation.assumptions.length > 0 ? (
+                  <ul>{interpretation.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
+                ) : <p>No additional physical assumptions were reported by the model. Verify the interpreted setup against your description.</p>}
+              </div>
             </aside>
           ) : null}
 
@@ -616,6 +640,27 @@ export default function App() {
             </div>
             <span className="simulation-unit">Z-up · metres · seconds</span>
           </div>
+          {isBusy ? (
+            <div className="assembly-progress" data-stage={flow.kind} role="status" aria-live="polite" ref={progressRef} tabIndex={-1}>
+              <div className="assembly-progress__heading">
+                <strong>{flow.kind === 'requesting' ? 'Interpreting your experiment' : 'Building your simulation'}</strong>
+                <output aria-label="Elapsed assembly time" aria-live="off">{elapsedSeconds}s elapsed</output>
+              </div>
+              <div className="assembly-progress__track" role="progressbar" aria-label="Assembly in progress" aria-valuetext={flow.kind === 'requesting' ? 'Waiting for the selected provider' : flow.message}><span /></div>
+              <ol className="assembly-progress__steps">
+                <li data-state={flow.kind === 'requesting' ? 'active' : 'done'} aria-current={flow.kind === 'requesting' ? 'step' : undefined}>Interpret request</li>
+                <li data-state={flow.kind === 'preparing' ? 'active' : 'pending'} aria-current={flow.kind === 'preparing' ? 'step' : undefined}>Build model</li>
+              </ol>
+              <p>{flow.kind === 'requesting'
+                ? `Waiting for ${selectedProviderLabel} to return a scene or a question. No simulation is running yet.`
+                : flow.message}</p>
+              {flow.kind === 'requesting' && elapsedSeconds >= 15 ? <p>The provider is still responding. You can stop waiting without losing your draft or current experiment.</p> : null}
+              <button className="secondary-button" type="button" onClick={() => {
+                invalidateWork('Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.');
+                descriptionRef.current?.focus();
+              }}>Stop waiting</button>
+            </div>
+          ) : null}
           <SimulationCanvas
             experiment={pendingExperiment}
             replacementPending={isBusy}

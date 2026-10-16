@@ -307,6 +307,10 @@ function requestBody(provider: Provider, request: AssemblyRequest): unknown {
   }
   return {
     model: request.model,
+    ...(request.model === 'openrouter/free' ? {
+      response_format: { type: 'json_object' },
+      provider: { require_parameters: true },
+    } : {}),
     messages: [
       { role: 'system', content: ASSEMBLY_INSTRUCTIONS },
       { role: 'user', content: data },

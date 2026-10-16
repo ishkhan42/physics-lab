@@ -11,3 +11,8 @@
 - Redesign the Mission Board as a responsive composer/canvas workbench with secondary model settings, editable prompt starters, focused clarification, visible capabilities, preserved preview context and an honest local stop-waiting action.
 - Add native Reset, camera Fit view and speed shortcuts. Reset restores post-impulse initial conditions, clears queued time and reframes the original geometry without recompilation or another model request.
 - Spell out complete model-decision alternatives and unsupported restitution behavior; expose bounded schema diagnostics without leaking response values. Verify the reported two-ball request returns a valid limitation response, genuine two-sphere free fall, recovery/focus states and 45 behavioral checks.
+- Brighten the complete workbench and actual 3D canvas with cool light surfaces, dark ink and teal controls, including light reduced-transparency fallbacks.
+- Show real assembly phases with indeterminate activity, elapsed time and visible local stop-waiting; keep a static active indicator and advancing time under reduced motion.
+- Replace raw limitation dumps with concise feedback, optional supported proposals and explicit draft-review consent. Permit useful questions and explanations together without accepting an unresolved scene.
+- Require omitted physical details to be clarified or explicitly assumed; improve placement guidance and camera framing so arbitrary infinite-plane patch size does not hide small objects.
+- Request JSON-capable free routing, retain strict physical admission and verify the real two-ball proposal-to-native-model journey, cancellation/stale-result safety, narrow-screen focus and all 49 behavioral regressions.

@@ -45,7 +45,7 @@ Source: `scope.md > The POC Boundary`.
 
 User direction: physics-lab character, Apple-inspired glassmorphism, and “kintict style UI/UX.”
 
-“Kinetic” interface motion is the working interpretation of “kintict,” not a confirmed reference to a particular product or design system. The implementation uses graphite surfaces, a restrained cyan accent, frosted panels, system typography and a brief nonblocking entrance; motion yields to inspection and reduced-motion preferences.
+“Kinetic” interface motion is the working interpretation of “kintict,” not a confirmed product reference. After hands-on feedback, the user requested a brighter appearance: cool light surfaces, dark ink, a restrained teal accent and a light blue-grey simulation canvas. The nonblocking entrance and activity indication yield to reduced-motion preferences.
 
 Apple-inspired glass is an aesthetic reference, not a claim of an official Apple web component system. This is an interactive laboratory workspace, not a marketing landing page; do not introduce pricing, testimonials, scroll-pinned promotional sections, or unrelated decoration.
 
@@ -61,11 +61,12 @@ The student supplies a scenario rather than choosing only a complete preset. The
 
 The user approved the assemble–preview–run flow:
 
-- Resolve consequential ambiguity with a focused question; cosmetic details must not turn every prompt into a long interview.
-- Communicate real assembly progress without fabricated percentages or a wall of agent logs.
+- For every omitted physical detail, ask a focused clarification or choose a sensible default explicitly disclosed with its actual value and units. Preserve supplied conditions; do not silently guess consequential ambiguities. Group shared defaults without a long interview about irrelevant quantities.
+- Make progress prominent immediately after submitting: indeterminate activity, actual elapsed time and real interpreting/building phases, never fabricated completion percentages or agent-log walls. Stop waiting preserves the draft/preview and returns focus to the editor.
 - Arrive at a paused, inspectable scene with populated object cards, visible initial conditions and assumptions, and a short summary of the interpreted experiment.
 - Require an explicit Run action; assembly completion does not start motion automatically.
 - Explain unsupported requests honestly. Do not substitute another experiment, silently simplify the model, or invent a result. A proposed simpler model requires the student's agreement.
+- Keep limitation feedback concise and actionable, with technical detail in a disclosure. A question, explanation and supported alternative may coexist without a scene being built. Selecting a proposal fills the draft for review; only a separate Assemble action can request the changed experiment.
 
 Source: `scope.md > The Unique Kernel` and `scope.md > The POC Boundary`.
 

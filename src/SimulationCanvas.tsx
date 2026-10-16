@@ -177,13 +177,19 @@ function applyFrame(items: RenderItem[], visuals: VisualSet): void {
 }
 
 function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, group: Group): void {
-  const bounds = new Box3().setFromObject(group, true);
+  const bounds = new Box3();
+  const planeOrigin = new Vector3();
+  for (const object of group.children) {
+    // Infinite planes contribute their reference point, not their arbitrary visible patch size.
+    if (object instanceof Mesh && object.geometry instanceof PlaneGeometry) bounds.expandByPoint(object.getWorldPosition(planeOrigin));
+    else bounds.expandByObject(object, true);
+  }
   const center = bounds.getCenter(new Vector3());
   const size = bounds.getSize(new Vector3());
-  const extent = Math.max(size.x, size.y, size.z, 4);
+  const radius = Math.max(size.length() / 2, 0.75);
   const verticalHalfAngle = camera.fov * Math.PI / 360;
   const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * camera.aspect);
-  const distance = extent * 1.35 / Math.sin(Math.min(verticalHalfAngle, horizontalHalfAngle));
+  const distance = radius * 1.2 / Math.sin(Math.min(verticalHalfAngle, horizontalHalfAngle));
   camera.position.copy(center).addScaledVector(initialCameraDirection, distance);
   camera.near = Math.max(distance / 5000, 0.001);
   camera.far = Math.max(distance * 100, 100);
@@ -261,7 +267,7 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
       renderer.domElement.tabIndex = 0;
       renderer.domElement.setAttribute('aria-label', 'Three-dimensional mechanics preview. Focus and use arrow keys to pan; drag to orbit, scroll to zoom, and right-drag to pan.');
       scene = new ThreeScene();
-      scene.background = new Color(0x0b1215);
+      scene.background = new Color(0xdbe5e8);
       camera = new PerspectiveCamera(44, 1, 0.01, 1000);
       camera.up.set(0, 0, 1);
       camera.position.set(7, -9, 6);
@@ -272,15 +278,15 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
       controls.maxDistance = 10000;
       controls.target.set(0, 0, 0);
       controls.listenToKeyEvents(renderer.domElement);
-      const hemisphere = new HemisphereLight(0xdaf8f5, 0x19282b, 2.1);
+      const hemisphere = new HemisphereLight(0xf4fbfc, 0x7b9094, 1.9);
       scene.add(hemisphere);
-      const keyLight = new DirectionalLight(0xe6fbff, 2.3);
+      const keyLight = new DirectionalLight(0xf8ffff, 2.0);
       keyLight.position.set(-4, -5, 8);
       scene.add(keyLight);
-      const fillLight = new DirectionalLight(0x80bec2, 0.75);
+      const fillLight = new DirectionalLight(0xa5c3c6, 0.8);
       fillLight.position.set(5, 4, 3);
       scene.add(fillLight);
-      const grid = new GridHelper(12, 24, 0x456267, 0x273a3e);
+      const grid = new GridHelper(12, 24, 0x758b90, 0xb7c6c9);
       grid.rotation.x = Math.PI / 2;
       grid.position.z = -0.008;
       grid.material.transparent = true;

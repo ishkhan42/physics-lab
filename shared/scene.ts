@@ -105,6 +105,10 @@ export const DecisionSchema = z.strictObject({
   question: z.string().min(1).max(2000).nullable(),
   reason: z.string().min(1).max(3000).nullable(),
   scene: SceneSchema.nullable(),
+  alternative: z.strictObject({
+    label: z.string().trim().min(1).max(60),
+    description: z.string().trim().min(1).max(1600),
+  }).nullable().default(null),
 });
 export type Decision = z.infer<typeof DecisionSchema>;
 export const ProviderSchema = z.enum(['openai', 'anthropic', 'openrouter']);
@@ -198,11 +202,11 @@ export function validateScene(input: unknown): Scene {
 export function validateDecision(input: unknown): Decision {
   const decision = DecisionSchema.parse(input);
   const valid = decision.kind === 'scene'
-    ? decision.scene !== null && decision.question === null && decision.reason === null
+    ? decision.scene !== null && decision.question === null && decision.reason === null && decision.alternative === null
     : decision.kind === 'clarify'
-      ? decision.scene === null && decision.question !== null && decision.reason === null
-      : decision.scene === null && decision.question === null && decision.reason !== null;
-  if (!valid) throw new z.ZodError([{ code: 'custom', path: ['kind'], message: 'Decision payloads must match their kind without mixed or empty alternatives.' }]);
+      ? decision.scene === null && decision.question !== null
+      : decision.scene === null && decision.reason !== null;
+  if (!valid) throw new z.ZodError([{ code: 'custom', path: ['kind'], message: 'Only a complete scene without unresolved questions, limitations or alternatives may be ready. Other decisions must not include a scene.' }]);
   if (decision.scene) decision.scene = validateScene(decision.scene);
   return decision;
 }

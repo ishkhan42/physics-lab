@@ -59,9 +59,9 @@ The required demo video must show the real core journey; the public repository r
 
 Implements `prd.md > Look and Feel` and `prd.md > Screens and Layout`.
 
-One physics-lab Mission Board, Apple-inspired web glassmorphism and kinetic motion. Initial styling translation: dark graphite lab/canvas, cool translucent controls, a restrained cyan accent, readable sans labels and monospaced values. This is a web approximation, not an official Apple component package.
+One physics-lab Mission Board, Apple-inspired web glassmorphism and restrained kinetic motion. The current user-requested palette is soft light grey with dark ink, muted teal controls and a light blue-grey canvas, readable sans labels and monospaced values. This is a web approximation, not an official Apple component package.
 
-Prompt/provider/category controls sit above the dominant simulation canvas. Cards stay below it. Stack controls and cards on narrow screens. Use one coherent theme, sufficient contrast without relying on blur, visible focus, keyboard operation and reduced-motion treatment.
+Prompt/provider/category controls sit beside the simulation on desktop, with object cards directly beneath the canvas. Narrow screens stack the same sections. Use one coherent light theme, sufficient contrast without relying on blur, visible focus, keyboard operation and reduced-motion treatment.
 
 The short themed intro is skippable and has a reduced-motion alternative. It is decorative, not fabricated simulation or progress. Stop decorative animation and unnecessary rendering once the interface/camera is settled. Detailed visual refinement is iterative, while the approved sections and journey remain intact.
 
@@ -90,15 +90,19 @@ Report only real stages, without fabricated percentages or agent-log walls. Prev
 
 Desktop uses a composer beside the simulation and inspection directly below the canvas; narrow screens stack them. A brief CSS entrance never blocks typing and respects reduced motion. Editable prompt starters fill descriptions only. Model settings are secondary, with route/cost warnings. Clarification focuses its answer field; current response and preserved-preview assumptions stay distinguishable. Stop waiting aborts the local fetch/candidate, invalidates stale work and preserves the active model; upstream computation and charges may continue.
 
+Submission focuses and scrolls to a prominent progress panel with an indeterminate indicator, monotonic elapsed time and two actual phases: waiting for interpretation, then native model preparation. No fake percentage or scheduled stage transition is used. Reduced motion keeps a static activity indicator and elapsed updates. Local stop-waiting returns focus to the draft. The presentation uses a coherent light UI and light blue-grey WebGL background; plane reference points, not arbitrary infinite-plane patch extents, contribute to view framing.
+
 ### Model Contract and Catalog
 
 Implements `prd.md > Scenario Prompt and Assembly`, `scope.md > The Unique Kernel`.
 
-`shared/scene.ts` owns strict provider-decision and mechanics-model schemas. The common decision has required `kind: scene|clarify|unsupported`, `summary`, `assumptions`, and nullable `question`, `reason`, `scene`. Only the payload matching the kind may be populated. Scene requires a complete model; clarify requires a focused question; unsupported requires an honest reason. Reject mixed or empty payloads.
+`shared/scene.ts` owns strict provider-decision and mechanics-model schemas. The decision has `kind: scene|clarify|unsupported`, `summary`, `assumptions`, nullable `question`, `reason`, `scene`, and optional nullable `alternative: {label,description}` (limits 60/1600 characters). A ready scene requires a complete physically validated model and null question/reason/alternative. Clarify requires a question and null scene; unsupported requires a reason and null scene. Non-scene explanations, questions and proposals may coexist, but never authorize a replacement model. Proposal acceptance fills a draft, not an executable scene.
 
 `shared/catalog.ts` owns the available physical block vocabulary, parameter descriptions, units, validity limits and observation descriptors. Generate schema/catalog instructions from these definitions rather than maintaining another handwritten response schema. The model selects and parameterizes blocks; it does not supply code, arbitrary formulas, numerical-solver overrides, asset URLs, includes or plugins.
 
 The current mechanics definition contains environment/model assumptions, named bodies and geometry, their initial poses and degrees of freedom, constraints/tendons and loads. Body parenting must form a valid tree; explicitly modeled equality connections handle supported loop closures. Normalize quantities to SI and radians before admission. Use a Z-up world with gravity normally `(0,0,-9.81)` when that assumption is explicitly displayed. State conversions and defaults remain visible in the preview.
+
+Every unspecified physical choice must be clarified or sensibly assumed with exact values/units in the model's assumptions, including initial rest/spin, geometry, gravity, contact/friction/damping when used. Proposals must state changed/dropped conditions, preserve the remaining comparison and choose non-overlapping placement unless contact is requested. This is an interpretation policy, not an automatic proof that natural-language intent was correctly understood; native values and explicit review remain necessary.
 
 Validate unique IDs and names, references, topology, positive masses/dimensions, finite values, nonzero axes, quaternion normalization, material ranges, initial constraint consistency and resource budgets. Normalize representation only where it preserves meaning; do not silently clamp physical values or discard objects. Validate on the server and again before browser allocation. Native model compilation is an additional check, not a replacement for validation.
 
@@ -194,7 +198,7 @@ Safety budgets start at 128 bodies, 128 constraints/tendons, 256 loads and 32 mu
 
 ## External Service Contracts
 
-`server/providers.ts` implements three direct adapters feeding the same decision schema. The compatibility baseline asks for one JSON object using generated schema/catalog instructions plus complete clarification/limitation examples. It does not require tool calling or native constrained output, so free models without those features remain selectable. Validate every response; no automatic repair calls, retry framework or provider/model fallback is added. Schema rejection includes at most four bounded field paths and issue codes, never raw response values or unknown field names.
+`server/providers.ts` implements three direct adapters feeding the same decision schema. The baseline asks for a JSON object with generated schema/catalog guidance and human-facing branch examples. For `openrouter/free`, additionally send `response_format:{type:'json_object'}` and `provider:{require_parameters:true}` to select JSON-capable free endpoints rather than rely only on prompting. Explicit other model IDs retain the text baseline. JSON mode does not prove semantic or physical correctness: validate every response. No automatic repair calls, app retry framework or paid model fallback is added. Schema rejection includes bounded paths/codes, never raw response values.
 
 | Provider | Request | Accept/reject behavior |
 | --- | --- | --- |
@@ -202,6 +206,8 @@ Safety budgets start at 128 bodies, 128 constraints/tendons, 256 loads and 32 mu
 | Anthropic | POST `https://api.anthropic.com/v1/messages`, `x-api-key`, `anthropic-version:2023-06-01`; `{model,max_tokens:8192,system,messages}`. | Collect text content and require completed `end_turn`; reject token/context limits, refusal, tool use or paused termination. |
 | OpenRouter | POST `https://openrouter.ai/api/v1/chat/completions`, Bearer key; `{model,messages,max_tokens:8192}`. | Require a completed text choice; parse `choices[0].message.content` and validate it. Preserve the selected exact model ID. |
 | Discovery | GET `https://openrouter.ai/api/v1/models`. | Read actual IDs/modalities/capabilities. Free means the explicit `openrouter/free` route or an existing `:free` entry, not arbitrary suffixing or zero token prices alone. |
+
+Routing references: [Free Models Router capabilities](https://openrouter.ai/docs/cookbook/get-started/free-models-router-playground), [JSON response formats](https://openrouter.ai/docs/api/reference/overview), [required provider parameters](https://openrouter.ai/docs/guides/routing/provider-selection).
 
 Malformed/truncated output, refusal, HTTP failure, missing key, rate limit or failed validation is an assembly error preserving input/scene. Never turn it into a fabricated physics result. Free inference still needs a key and has changing quotas/availability. Token and time limits do not constitute a guaranteed dollar cap; operator accounts should have provider-side spending controls.
 
@@ -277,7 +283,7 @@ Every build slice gets its mechanical verification. After integration, run the p
 
 ## Decisions and Open Issues
 
-The user approved the build order and fast mode, then supplied early trial feedback about an invalid decision and requested a high-grade usability revision. Production building, 45 behavioral checks and actual Chromium engine/UI checks pass. Authenticated `openrouter/free` generation, paused native preview, both speed endpoints, reset and camera recovery are exercised without interception; the reported elastic/inelastic request returned a valid limitation decision. The historical invalid payload is unavailable, so its exact violation is unknown. The responsive workbench revision is implemented; learner retry/final review and OpenAI/Anthropic live calls are not claimed complete.
+Current production build and 49 behavioral checks pass. Actual Chromium checks cover light desktop/mobile presentation, visible timed progress, reduced motion, cancellation and stale-result preservation. Authenticated free-router requests exercised missing-detail defaults, a concise limitation/proposal for the two-ball request, explicit draft review and a real paused native model of the approved revision, including playback/reset and improved framing. Tests enforce that unresolved explanations/proposals cannot become a ready scene. Free-model output can still be wrong; neither these checks nor JSON mode guarantee natural-language interpretation. Final learner approval and other-provider live calls remain unclaimed.
 
 Source/provider contracts and numerical evidence informed the engineering defaults above. Any discovered change to the product, chosen architecture or supported physical meaning must be discussed, while routine internal corrections are recorded in the checklist's Revisions. A needed new model is not labeled impossible merely because it is absent.
 

@@ -33,7 +33,7 @@ Live model checks require an authorized application API key supplied privately. 
   Learner check: Try a scenario out of curiosity or to check a solution. Run it, change speed, pause at a chosen moment and read the object cards. What did you notice, and what would you change?
   Commit: `Add physical playback and contextual inspection`
 
-- [ ] **3. Finish a coherent Mission Board and production-local core journey**
+- [x] **3. Finish a coherent Mission Board and production-local core journey**
   Becomes usable: The complete app opens through its themed intro into the physics-lab/glass/kinetic workspace, works at narrow widths and with reduced motion, preserves a previous experiment on failed replacement, and runs from the built local server.
   Why now: Earlier feedback can shape the final look and interaction without rebuilding the physics kernel. This step completes the promised product rather than adding another feature family.
   PRD ref: `prd.md > Opening Intro`, `prd.md > Mission Board`, `prd.md > Look and Feel`, `prd.md > Approved Conventional Defaults`, `prd.md > Scenario Prompt and Assembly`.
@@ -55,6 +55,7 @@ Live model checks require an authorized application API key supplied privately. 
 Agreed revisions are implemented and mechanically verified below; leave them unchecked until the learner retries the affected behavior.
 - [ ] Retry the reported two-ball request and review the explicit current elasticity limitation rather than an opaque schema failure.
 - [ ] Try the revised composer/canvas layout, model settings, example prompts, playback/reset/view controls and inspection; confirm or refine the usability.
+- [ ] Retry the brighter interface, prominent progress/elapsed time, concise responses/proposal review and explicit assumed defaults; confirm or refine the experience.
 
 ## Code Tour and App Map
 
@@ -75,5 +76,7 @@ Activity mode: Not started; a focused verification decision is recommended rathe
 - Native integration required explicit erasable TypeScript fields, equality-versus-limit row lookup, `mj_isSparse` layout detection, body/world velocity conversion and active native wrap-range handling. Corrected those internal assumptions without changing the product or replacing missing physics with invented values.
 - The same shared compiler/runtime supplies both functional slices. Early trial feedback then reported invalid model output and requested high-grade UI/UX; that feedback activated the final workbench revision rather than another planning gate.
 - Revised presentation places the composer beside the canvas and inspection directly below it, with secondary model settings, editable prompt starters, focused clarification and preserved-preview context. A brief nonblocking entrance respects reduced motion. Native Reset, Fit view and speed shortcuts support repeated exploration without model calls.
-- Current production build and 45 behavioral checks pass. The reported elastic/inelastic prompt returned a genuine valid unsupported decision through the authorized free route; exact historical schema failure is unknown because its payload was not retained. Genuine two-sphere free fall passed native playback at both endpoints, numerical comparison, reset and view recovery. Synthetic error/delay/clarification probes verified UI recovery only; no fake provider or engine is shipped.
+- The earlier workbench passed production building and 45 behavioral checks. Its elastic/inelastic prompt returned a genuine valid unsupported decision through the authorized free route; exact historical schema failure is unknown because its payload was not retained. Genuine two-sphere free fall passed playback at both endpoints, numerical comparison, reset and view recovery. Synthetic response-boundary probes verified UI recovery only; no fake provider or engine is shipped.
 - Actual desktop and 320px mobile surfaces were checked, including expanded settings/capabilities, reduced motion, zero horizontal overflow and local cancellation. Stop waiting does not promise to cancel upstream processing or billing. Learner retry and final readiness remain open.
+- Further hands-on feedback rejected dead waiting, internal response prose and the dark theme, and required clarification or explicit sensible defaults for missing physical details. The resulting light workbench adds real-phase timed progress and consent-gated supported proposals; explanations/questions can coexist without becoming a scene.
+- Production build and 49 behavioral checks pass. Genuine free-router requests exercised explicit defaults, a supported two-ball proposal, separate review/assembly and native playback/reset. Browser probes checked cancellation, late-response rejection, preserved preview context and fully visible 320px reduced-motion progress. JSON-capable routing was enabled after a live malformed reply; it is not a guarantee of semantic accuracy or an automatic repair.

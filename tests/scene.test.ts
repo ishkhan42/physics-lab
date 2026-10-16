@@ -109,6 +109,63 @@ test('a model cannot mark a mixed explanation and scene payload successful', () 
   }), z.ZodError);
 });
 
+test('legacy decision payloads default the optional alternative to null', () => {
+  for (const decision of [
+    { kind: 'scene', summary: 'A projectile setup.', assumptions: [], question: null, reason: null, scene: projectile() },
+    { kind: 'clarify', summary: 'Your launch speed is missing.', assumptions: [], question: 'What is the initial speed?', reason: null, scene: null },
+    { kind: 'unsupported', summary: 'Your requested law is unavailable.', assumptions: [], question: null, reason: 'This law is not in the supported model.', scene: null },
+  ]) {
+    assert.equal(validateDecision(decision).alternative, null);
+  }
+});
+
+test('questions and supported alternatives may accompany explanations, never a ready scene', () => {
+  const alternative = { label: 'Compare free fall', description: 'Drop 1 kg and 2 kg balls 1 m apart from rest at 1 m; omit prescribed bounce elasticity.' };
+  for (const kind of ['clarify', 'unsupported']) {
+    const decision = validateDecision({
+      kind, summary: 'Your requested rebound is not controllable.', assumptions: [],
+      question: 'Would you like to compare motion before impact instead?',
+      reason: 'The model cannot set a restitution coefficient.', scene: null, alternative,
+    });
+    assert.equal(decision.scene, null);
+    assert.ok(decision.question);
+    assert.deepEqual(decision.alternative, alternative);
+  }
+  assert.throws(() => validateDecision({
+    kind: 'scene', summary: 'A projectile setup.', assumptions: [],
+    question: null, reason: null, scene: projectile(), alternative,
+  }), z.ZodError);
+});
+
+test('alternative labels and descriptions must be nonblank and within their limits', () => {
+  const valid = {
+    kind: 'unsupported', summary: 'Your requested law is unavailable.', assumptions: [],
+    question: null, reason: 'This law is not in the supported model.', scene: null,
+  };
+  const atLimits = validateDecision({
+    ...valid, alternative: { label: 'x'.repeat(60), description: 'x'.repeat(1600) },
+  });
+  assert.equal(atLimits.alternative?.label.length, 60);
+  assert.equal(atLimits.alternative?.description.length, 1600);
+  for (const alternative of [
+    { label: ' ', description: 'A complete proposed scenario.' },
+    { label: 'x'.repeat(61), description: 'A complete proposed scenario.' },
+    { label: 'Supported revision', description: '\t' },
+    { label: 'Supported revision', description: 'x'.repeat(1601) },
+  ]) {
+    assert.throws(() => validateDecision({ ...valid, alternative }), z.ZodError);
+  }
+});
+
+test('decision scenes still receive semantic scene validation', () => {
+  const scene = projectile();
+  scene.bodies[0].mass = null;
+  assert.throws(() => validateDecision({
+    kind: 'scene', summary: 'A projectile setup.', assumptions: [],
+    question: null, reason: null, scene,
+  }), z.ZodError);
+});
+
 test('an inextensible cable cannot silently discard elastic or damping parameters', () => {
   const scene = atwood();
   scene.tendons[0].stiffness = 10;
