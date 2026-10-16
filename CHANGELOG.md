@@ -16,3 +16,8 @@
 - Replace raw limitation dumps with concise feedback, optional supported proposals and explicit draft-review consent. Permit useful questions and explanations together without accepting an unresolved scene.
 - Require omitted physical details to be clarified or explicitly assumed; improve placement guidance and camera framing so arbitrary infinite-plane patch size does not hide small objects.
 - Request JSON-capable free routing, retain strict physical admission and verify the real two-ball proposal-to-native-model journey, cancellation/stale-result safety, narrow-screen focus and all 49 behavioral regressions.
+- Replace the earlier unsupported-elasticity policy with real calibrated MuJoCo restitution targets (elastic/partial/inelastic), independent static/kinetic Coulomb friction and preserved torsional/rolling resistance.
+- Add a real configurable ground by default, explicitly disabled by `ground:null`, with one canonical rendered/inspectable plane and material assumptions.
+- Preserve existing joint/tendon/load composition while substepping collision dynamics, decoupling tangential damping from normal elasticity and respecting native ownership/collision filters.
+- Expose material values including zero, momentum, translational kinetic energy, uniform-gravity potential, contact reactions and joint spring/damping forces; do not pretend these are universal total-energy/net-force measurements.
+- Verify 62 behavioral references and actual provider-generated elastic/inelastic and static/kinetic scenes, both playback endpoints and Reset. Correct the previous claim that lack of a direct restitution scalar made elasticity impossible.

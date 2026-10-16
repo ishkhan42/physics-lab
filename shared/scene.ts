@@ -3,6 +3,18 @@ import { z } from 'zod';
 const number = z.number().finite();
 const positive = number.positive();
 const nonnegative = number.nonnegative();
+const restitution = number.min(0).max(1).describe('Target normal restitution: 1 for elastic, 0 for fully inelastic, strictly between 0 and 1 for partial rebound.');
+const FrictionSchema = z.strictObject({
+  sliding: nonnegative.default(0).describe('Kinetic/sliding friction coefficient.'),
+  torsional: nonnegative.default(0).describe('Torsional friction length in metres.'),
+  rolling: nonnegative.default(0).describe('Rolling friction length in metres.'),
+  static: nonnegative.nullable().default(null).describe('Static friction coefficient; null means the sliding coefficient.'),
+}).default({ sliding: 0, torsional: 0, rolling: 0, static: null });
+const GroundSchema = z.strictObject({
+  height: number.default(0),
+  restitution: restitution.default(1),
+  friction: FrictionSchema,
+});
 const id = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
 export const Vec3Schema = z.tuple([number, number, number]);
 export const QuatSchema = z.tuple([number, number, number, number]);
@@ -47,12 +59,9 @@ export const BodySchema = z.strictObject({
   orientation: QuatSchema.default([1, 0, 0, 0]).describe('World-space reference orientation, quaternion w,x,y,z.'),
   shape: ShapeSchema,
   mass: positive.nullable().describe('Kilograms for moving bodies; null for immobile supports.'),
+  restitution: restitution.default(0),
   motion: MotionSchema,
-  friction: z.strictObject({
-    sliding: nonnegative,
-    torsional: nonnegative.describe('Torsional friction length in metres, not a second sliding coefficient.'),
-    rolling: nonnegative.describe('Rolling friction length in metres.'),
-  }).default({ sliding: 0, torsional: 0, rolling: 0 }),
+  friction: FrictionSchema,
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#67d9ce'),
 });
 export type Body = z.infer<typeof BodySchema>;
@@ -91,6 +100,9 @@ export const SceneSchema = z.strictObject({
   category: z.literal('mechanics'),
   title: z.string().trim().min(1).max(120),
   gravity: Vec3Schema,
+  ground: GroundSchema.nullable().default({
+    height: 0, restitution: 1, friction: { sliding: 0, torsional: 0, rolling: 0, static: null },
+  }),
   bodies: z.array(BodySchema).min(1).max(128),
   sites: z.array(SiteSchema).max(512).default([]),
   tendons: z.array(TendonSchema).max(128).default([]),
@@ -98,6 +110,20 @@ export const SceneSchema = z.strictObject({
   loads: z.array(LoadSchema).max(256).default([]),
 });
 export type Scene = z.infer<typeof SceneSchema>;
+function groundBody(ground: NonNullable<Scene['ground']>): Body {
+  return {
+    id: 'world-ground', label: 'Ground', parentId: null,
+    position: [0, 0, ground.height], orientation: [1, 0, 0, 0],
+    shape: { kind: 'plane', size: [10, 10] }, mass: null,
+    motion: { kind: 'fixed' }, restitution: ground.restitution,
+    friction: ground.friction, color: '#bacbd1',
+  };
+}
+
+export function physicalScene(scene: Scene): Scene {
+  if (scene.ground === null) return scene;
+  return validateScene({ ...scene, bodies: [...scene.bodies, groundBody(scene.ground)], ground: null });
+}
 export const DecisionSchema = z.strictObject({
   kind: z.enum(['scene', 'clarify', 'unsupported']),
   summary: z.string().trim().min(1).max(3000),
@@ -125,17 +151,29 @@ export function validateScene(input: unknown): Scene {
   const scene = SceneSchema.parse(input);
   const issues: z.core.$ZodIssue[] = [];
   const issue = (path: (string | number)[], message: string) => issues.push({ code: 'custom', path, message });
+  const validateFriction = (friction: Body['friction'], path: (string | number)[]) => {
+    if (friction.static !== null && friction.static < friction.sliding) {
+      issue([...path, 'static'], 'Static friction must be greater than or equal to sliding friction.');
+    }
+  };
+  if (scene.bodies.length + (scene.ground === null ? 0 : 1) > 128) {
+    issue(['bodies'], 'The scene including its ground has a maximum of 128 bodies.');
+  }
   const bodies = new Map(scene.bodies.map(body => [body.id, body]));
-  const sites = new Map(scene.sites.map(site => [site.id, site]));
+  if (scene.ground !== null) bodies.set('world-ground', groundBody(scene.ground));
+  const sites = new Set(scene.sites.map(site => site.id));
   const names = new Set<string>();
   for (const [group, entries] of [['bodies', scene.bodies], ['sites', scene.sites], ['tendons', scene.tendons], ['connections', scene.connections]] as const) {
     entries.forEach((item, i) => {
-      if (item.id === 'world' || names.has(item.id)) issue([group, i, 'id'], 'Entity IDs must be unique and cannot be world.');
+      if (item.id === 'world' || (scene.ground !== null && item.id === 'world-ground') || names.has(item.id)) {
+        issue([group, i, 'id'], 'Entity IDs must be unique and cannot be world or the reserved world-ground.');
+      }
       names.add(item.id);
     });
   }
   scene.bodies.forEach((body, i) => {
     const path = ['bodies', i] as (string | number)[];
+    validateFriction(body.friction, [...path, 'friction']);
     if (body.parentId && !bodies.has(body.parentId)) issue([...path, 'parentId'], 'Parent body does not exist.');
     if (Math.abs(Math.hypot(...body.orientation) - 1) > 1e-5) issue([...path, 'orientation'], 'Orientation must be a normalized w,x,y,z quaternion.');
     if (body.motion.kind !== 'fixed' && body.mass === null) issue([...path, 'mass'], 'A moving body needs a positive mass.');
@@ -144,6 +182,10 @@ export function validateScene(input: unknown): Scene {
     if (body.shape.kind === 'plane' && body.motion.kind !== 'fixed') issue([...path, 'shape'], 'An infinite support plane must be fixed.');
     if (body.motion.kind === 'particle' && body.shape.kind !== 'point') issue([...path, 'shape'], 'A point particle must not acquire a collision surface.');
     if (body.shape.kind === 'point' && !['particle', 'fixed'].includes(body.motion.kind)) issue([...path, 'shape'], 'Point markers have no rigid-body rotation or collision shape.');
+    if (body.shape.kind === 'point' && (body.restitution !== 0 || body.friction.sliding > 0
+      || (body.friction.static ?? 0) > 0 || body.friction.torsional > 0 || body.friction.rolling > 0)) {
+      issue([...path, 'shape'], 'Contact materials require a collision surface; a point marker or particle has none.');
+    }
     if (body.motion.kind === 'hinge' || body.motion.kind === 'slide') {
       if (Math.abs(Math.hypot(...body.motion.axis) - 1) > 1e-5) issue([...path, 'motion', 'axis'], 'Joint axis must be a unit vector.');
       if (body.motion.limits && (body.motion.limits[0] >= body.motion.limits[1] || body.motion.position < body.motion.limits[0] || body.motion.position > body.motion.limits[1])) issue([...path, 'motion', 'limits'], 'Limits must be ordered and include the initial coordinate.');
@@ -155,6 +197,7 @@ export function validateScene(input: unknown): Scene {
       chain.add(parent); parent = bodies.get(parent)!.parentId;
     }
   });
+  if (scene.ground !== null) validateFriction(scene.ground.friction, ['ground', 'friction']);
   scene.sites.forEach((site, i) => { if (site.bodyId && !bodies.has(site.bodyId)) issue(['sites', i, 'bodyId'], 'Attachment body does not exist.'); });
   if (scene.connections.length + scene.tendons.length > 128) issue(['connections'], 'The combined constraint/tendon budget is 128.');
   scene.tendons.forEach((tendon, i) => {

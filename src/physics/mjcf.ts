@@ -1,5 +1,7 @@
 import type { Body, Quat, Scene, Vec3 } from '../../shared/scene.ts';
+import { physicalScene } from '../../shared/scene.ts';
 import { FIXED_TIMESTEP } from './clock.ts';
+import { CONTACT_IMPEDANCE, CONTACT_STIFFNESS, FRICTION_REFERENCE, contactDamping, contactSubsteps, materialPairs, staticFriction } from './materials.ts';
 
 export const JOINT_NAME_PREFIX = '_joint_';
 export const GEOM_NAME_PREFIX = '_geom_';
@@ -93,11 +95,11 @@ function rgba(color: string): string {
   return `${number(parseInt(color.slice(1, 3), 16) / 255)} ${number(parseInt(color.slice(3, 5), 16) / 255)} ${number(parseInt(color.slice(5, 7), 16) / 255)} 1`;
 }
 
-function shapeGeom(body: Body): string {
+function shapeGeom(body: Body, damping: number): string {
   const shape = body.shape;
   if (shape.kind === 'point') {
     return body.motion.kind === 'fixed'
-      ? `<geom name="${geomName(body.id)}" type="sphere" size="0.025" contype="0" conaffinity="0" rgba="${rgba(body.color)}"/>`
+      ? `<geom name="${geomName(body.id)}" type="sphere" size="0.025" mass="0" contype="0" conaffinity="0" rgba="${rgba(body.color)}"/>`
       : '';
   }
 
@@ -113,9 +115,10 @@ function shapeGeom(body: Body): string {
   }
 
   const moving = body.motion.kind !== 'fixed';
-  const condim = body.friction.rolling > 0 ? 6 : body.friction.torsional > 0 ? 4 : 3;
-  const mass = moving ? ` mass="${number(body.mass!)}"` : '';
-  return `<geom name="${geomName(body.id)}" type="${type}" size="${vector(size)}" rgba="${rgba(body.color)}" friction="${vector([body.friction.sliding, body.friction.torsional, body.friction.rolling])}" condim="${condim}"${mass}/>`;
+  const sliding = staticFriction(body);
+  const condim = body.friction.rolling > 0 ? 6 : body.friction.torsional > 0 ? 4 : sliding > 0 ? 3 : 1;
+  const mass = moving ? body.mass! : 0;
+  return `<geom name="${geomName(body.id)}" type="${type}" size="${vector(size)}" rgba="${rgba(body.color)}" friction="${vector([sliding, body.friction.torsional, body.friction.rolling])}" condim="${condim}" solref="${vector([-CONTACT_STIFFNESS, -damping])}" solimp="${CONTACT_IMPEDANCE}" mass="${number(mass)}"/>`;
 }
 
 function jointXml(body: Body): string {
@@ -137,7 +140,7 @@ function jointXml(body: Body): string {
   return `<joint name="${jointName(body.id)}" type="${motion.kind}" pos="${vector(anchor)}" axis="${vector(axis)}" stiffness="${number(motion.stiffness)}" damping="${number(motion.damping)}" springref="${number(motion.springReference)}"${limits}/>`;
 }
 
-function bodyXml(body: Body, parent: Body | undefined, children: Map<string, Body[]>, sitesByBody: Map<string, Scene['sites']>): string {
+function bodyXml(body: Body, parent: Body | undefined, children: Map<string, Body[]>, sitesByBody: Map<string, Scene['sites']>, damping: Map<number, number>): string {
   const pose = relativePose(body, parent);
   const inner: string[] = [];
   if (body.motion.kind === 'free') inner.push(`<freejoint name="${jointName(body.id)}"/>`);
@@ -146,11 +149,11 @@ function bodyXml(body: Body, parent: Body | undefined, children: Map<string, Bod
     inner.push(`<inertial pos="0 0 0" mass="${number(body.mass!)}" diaginertia="1e-12 1e-12 1e-12"/>`);
   }
   inner.push(jointXml(body));
-  inner.push(shapeGeom(body));
+  inner.push(shapeGeom(body, damping.get(body.restitution)!));
   for (const site of sitesByBody.get(body.id) ?? []) {
     inner.push(`<site name="${site.id}" pos="${vector(site.position)}" size="0.008"/>`);
   }
-  for (const child of children.get(body.id) ?? []) inner.push(bodyXml(child, body, children, sitesByBody));
+  for (const child of children.get(body.id) ?? []) inner.push(bodyXml(child, body, children, sitesByBody, damping));
   return `<body name="${body.id}" pos="${vector(pose.position)}" quat="${vector(pose.orientation)}">${inner.join('')}</body>`;
 }
 
@@ -200,7 +203,10 @@ function tendonXml(scene: Scene): { tendons: string[]; equalities: string[] } {
   return { tendons, equalities };
 }
 
-export function compileMjcf(scene: Scene): string {
+export function compileMjcf(input: Scene): string {
+  const scene = physicalScene(input);
+  const damping = new Map<number, number>();
+  for (const body of scene.bodies) if (!damping.has(body.restitution)) damping.set(body.restitution, contactDamping(body.restitution));
   const children = new Map<string, Body[]>();
   const roots: Body[] = [];
   for (const body of scene.bodies) {
@@ -222,18 +228,23 @@ export function compileMjcf(scene: Scene): string {
     .filter(site => site.bodyId === null)
     .map(site => `<site name="${site.id}" pos="${vector(site.position)}" size="0.008"/>`);
   const tendon = tendonXml(scene);
-  const bodyXmlLines = roots.map(body => bodyXml(body, undefined, children, sitesByBody));
+  const bodyXmlLines = roots.map(body => bodyXml(body, undefined, children, sitesByBody, damping));
   const equalities = connectionXml(scene).concat(tendon.equalities);
   const bodyLabels = scene.bodies.map(body => `<text name="_label_${body.id}" data="${escapeXml(body.label)}"/>`);
   const siteLabels = scene.sites.map(site => `<text name="_label_${site.id}" data="${escapeXml(site.label)}"/>`);
   const tendonLabels = scene.tendons.map(item => `<text name="_label_${item.id}" data="${escapeXml(item.label)}"/>`);
   const connectionLabels = scene.connections.map(item => `<text name="_label_${item.id}" data="${escapeXml(item.label)}"/>`);
   const attachedLabels = bodyLabels.concat(siteLabels, tendonLabels, connectionLabels).join('');
+  const contacts = materialPairs(scene).map(pair => {
+    const dimension = pair.rolling > 0 ? 6 : pair.torsional > 0 ? 4 : 3;
+    return `<pair geom1="${geomName(pair.first.id)}" geom2="${geomName(pair.second.id)}" condim="${dimension}" friction="${vector([pair.static, pair.static, pair.torsional, pair.rolling, pair.rolling])}" solref="${vector([-CONTACT_STIFFNESS, -damping.get(pair.restitution)!])}" solreffriction="${FRICTION_REFERENCE}" solimp="${CONTACT_IMPEDANCE}"/>`;
+  });
 
   return `<mujoco model="${escapeXml(scene.title)}">
 <compiler angle="radian" autolimits="false"/>
-<option timestep="${number(FIXED_TIMESTEP)}" gravity="${vector(scene.gravity)}" integrator="implicitfast" solver="Newton" iterations="100"/>
+<option timestep="${number(FIXED_TIMESTEP / contactSubsteps(scene))}" gravity="${vector(scene.gravity)}" integrator="implicitfast" cone="elliptic" solver="Newton" iterations="100"/>
 <worldbody>${worldSites.join('')}${bodyXmlLines.join('')}</worldbody>
+${contacts.length ? `<contact>${contacts.join('')}</contact>` : ''}
 ${tendon.tendons.length ? `<tendon>${tendon.tendons.join('')}</tendon>` : ''}
 ${equalities.length ? `<equality>${equalities.join('')}</equality>` : ''}
 <custom>${attachedLabels}</custom>

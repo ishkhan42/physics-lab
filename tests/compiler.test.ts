@@ -20,7 +20,7 @@ test('compiles every native primitive and safely escapes model and object labels
     ['marker', { kind: 'point' }],
   ] as const;
   const scene = validateScene({
-    category: 'mechanics', title: 'Primitives & <trusted> "MJCF"', gravity: [0, 0, 0],
+    category: 'mechanics', title: 'Primitives & <trusted> "MJCF"', gravity: [0, 0, 0], ground: null,
     bodies: primitives.map(([id, shape], index) => fixedBody(id, [index * 3, 0, 0], shape)),
     sites: [], tendons: [], connections: [], loads: [],
   });
@@ -44,7 +44,7 @@ test('maps nested body frames and nonzero hinge reference coordinates into nativ
   const half = Math.SQRT1_2;
   const quarterTurn = [half, 0, 0, half];
   const scene = validateScene({
-    category: 'mechanics', title: 'Nested reference frames', gravity: [0, 0, 0],
+    category: 'mechanics', title: 'Nested reference frames', gravity: [0, 0, 0], ground: null,
     bodies: [
       { id: 'support', label: 'Support', parentId: null, position: [2, 0, 0], orientation: quarterTurn, shape: { kind: 'box', size: [0.2, 0.2, 0.2] }, mass: null, motion: { kind: 'fixed' }, color: '#9cabb5' },
       { id: 'arm', label: 'Hinged cylinder', parentId: 'support', position: [2, 1, 0], orientation: quarterTurn, shape: { kind: 'cylinder', radius: 0.1, length: 2 }, mass: 2,
@@ -76,7 +76,7 @@ test('compiles connect, weld, and scalar coupling constraints in their declared 
     motion: { kind: 'hinge', axis: [0, 0, 1], anchor: position, position: coordinate, velocity: 0, limits: null, stiffness: 0, damping: 0, springReference: 0 }, color: '#f2c178',
   });
   const scene = validateScene({
-    category: 'mechanics', title: 'Native equality connections', gravity: [0, 0, 0],
+    category: 'mechanics', title: 'Native equality connections', gravity: [0, 0, 0], ground: null,
     bodies: [freeBody('connect_a', [0, 0, 0]), freeBody('connect_b', [2, 0, 0]), freeBody('weld_a', [5, 0, 0]), freeBody('weld_b', [7, 0, 0]),
       hingeBody('axis_a', [10, 0, 0], 0.2), hingeBody('axis_b', [12, 0, 0], 0.4)],
     sites: [], tendons: [],
@@ -101,7 +101,7 @@ test('compiles connect, weld, and scalar coupling constraints in their declared 
 });
 test('compiles a spherical wrap and pulley branch as a native spatial tendon', async () => {
   const scene = validateScene({
-    category: 'mechanics', title: 'Wrapped spring cable', gravity: [0, 0, 0],
+    category: 'mechanics', title: 'Wrapped spring cable', gravity: [0, 0, 0], ground: null,
     bodies: [fixedBody('guide', [0, 0, 0], { kind: 'sphere', radius: 0.5 })],
     sites: [
       { id: 'start', label: 'Start', bodyId: null, position: [-1, 0, 0] },

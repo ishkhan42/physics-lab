@@ -35,7 +35,7 @@ function simulate(runtime: MechanicsRuntime, simulatedSeconds: number, speed: nu
 
 function freeSphereScene(title: string, velocity: number[] = [0, 0, 0], loads: unknown[] = [], position: number[] = [0, 0, 0], mass = 2) {
   return validateScene({
-    category: 'mechanics', title, gravity: [0, 0, 0],
+    category: 'mechanics', title, gravity: [0, 0, 0], ground: null,
     bodies: [{ id: 'body', label: 'Test body', parentId: null, position, shape: { kind: 'sphere', radius: 0.1 }, mass,
       motion: { kind: 'free', linearVelocity: velocity, angularVelocity: [0, 0, 0] }, color: '#67d9ce' }],
     sites: [], tendons: [], connections: [], loads,
@@ -134,7 +134,7 @@ test('drag uses current world velocity and uniform mutual gravity attracts point
     { kind: 'drag', bodyId: 'body', coefficient: 2, mediumVelocity: [0, 0, 0] },
   ]));
   const particles = validateScene({
-    category: 'mechanics', title: 'Mutual point gravity', gravity: [0, 0, 0],
+    category: 'mechanics', title: 'Mutual point gravity', gravity: [0, 0, 0], ground: null,
     bodies: [
       { id: 'left', label: 'Left particle', parentId: null, position: [-1, 0, 0], shape: { kind: 'point' }, mass: 1, motion: { kind: 'particle', linearVelocity: [0, 0, 0] }, color: '#67d9ce' },
       { id: 'right', label: 'Right particle', parentId: null, position: [1, 0, 0], shape: { kind: 'point' }, mass: 1, motion: { kind: 'particle', linearVelocity: [0, 0, 0] }, color: '#f2c178' },
@@ -164,7 +164,7 @@ test('world torque and body-local force points map into the correct angular moti
     { kind: 'torque', bodyId: 'body', vector: [0, 0, 1] },
   ]));
   const pointForce = validateScene({
-    category: 'mechanics', title: 'Offset force', gravity: [0, 0, 0],
+    category: 'mechanics', title: 'Offset force', gravity: [0, 0, 0], ground: null,
     bodies: [{ id: 'body', label: 'Box', parentId: null, position: [0, 0, 0], shape: { kind: 'box', size: [1, 1, 1] }, mass: 2,
       motion: { kind: 'free', linearVelocity: [0, 0, 0], angularVelocity: [0, 0, 0] }, color: '#67d9ce' }],
     sites: [], tendons: [], connections: [], loads: [{ kind: 'force', bodyId: 'body', vector: [1, 0, 0], point: [0, 1, 0] }],
@@ -189,7 +189,7 @@ test('cable reaction remains observable with many independent degrees of freedom
     id: `particle_${index}`, label: `Independent particle ${index}`, parentId: null,
     position: [10 + index, 1, 0], orientation: [1, 0, 0, 0], shape: { kind: 'point' },
     mass: 1, motion: { kind: 'particle', linearVelocity: [0, 0, 0] },
-    friction: { sliding: 0, torsional: 0, rolling: 0 }, color: '#67d9ce',
+    restitution: 0, friction: { sliding: 0, torsional: 0, rolling: 0, static: null }, color: '#67d9ce',
   });
   const runtime = await createRuntime(model);
   try {
@@ -215,7 +215,7 @@ test('a slack cable has zero tension and acquires tension when its limit activat
 
 test('articulated cards and drag use each body velocity, not the subtree reference velocity', async () => {
   const model = validateScene({
-    category: 'mechanics', title: 'Rotating articulated pair', gravity: [0, 0, 0],
+    category: 'mechanics', title: 'Rotating articulated pair', gravity: [0, 0, 0], ground: null,
     bodies: [
       { id: 'root', label: 'Root body', position: [0, 0, 0], shape: { kind: 'sphere', radius: 0.1 }, mass: 1,
         motion: { kind: 'free', linearVelocity: [0, 0, 0], angularVelocity: [0, 0, 1] } },

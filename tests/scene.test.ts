@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
-import { AssemblyRequestSchema, validateDecision, validateScene } from '../shared/scene.ts';
+import { ASSEMBLY_INSTRUCTIONS } from '../shared/catalog.ts';
+import { AssemblyRequestSchema, physicalScene, validateDecision, validateScene } from '../shared/scene.ts';
 import { atwood, projectile } from './fixtures.ts';
 
 function rejected(scene: unknown) {
@@ -43,6 +44,15 @@ test('a point particle cannot silently acquire a collision shape', () => {
   const scene = projectile();
   scene.bodies[0].motion = { kind: 'particle', linearVelocity: [0, 0, 0] };
   rejected(scene);
+});
+
+test('point particles cannot silently ignore restitution or friction', () => {
+  for (const material of [{ restitution: 1 }, { friction: { sliding: 0.3, static: 0.5 } }]) {
+    const scene = projectile();
+    scene.bodies[0].shape = { kind: 'point' };
+    scene.bodies[0].motion = { kind: 'particle', linearVelocity: [0, 0, 0] };
+    rejected({ ...scene, bodies: [{ ...scene.bodies[0], ...material }] });
+  }
 });
 
 test('rejects a moving infinite plane instead of treating it as a solid', () => {
@@ -185,4 +195,110 @@ test('a translational point model cannot silently discard rotational loads', () 
     model.loads = [load];
     rejected(model);
   }
+});
+
+test('material schemas default coefficients and enforce physical ranges', () => {
+  const scene = validateScene({ ...projectile(), ground: undefined });
+  assert.deepEqual(scene.ground, {
+    height: 0, restitution: 1,
+    friction: { sliding: 0, torsional: 0, rolling: 0, static: null },
+  });
+  assert.equal(scene.bodies[0].restitution, 0);
+  assert.deepEqual(scene.bodies[0].friction, { sliding: 0, torsional: 0, rolling: 0, static: null });
+
+  const boundary = structuredClone(scene);
+  boundary.bodies[0].restitution = 1;
+  boundary.bodies[0].friction = { sliding: 0.4, static: 0.4, torsional: 0, rolling: 0 };
+  boundary.ground!.restitution = 0;
+  boundary.ground!.friction = { sliding: 0.4, static: null, torsional: 1, rolling: 2 };
+  assert.deepEqual(validateScene(boundary).bodies[0].friction, boundary.bodies[0].friction);
+
+  const partial = validateScene({
+    ...scene, bodies: [{ ...scene.bodies[0], friction: { sliding: 0.2 } }],
+  });
+  assert.deepEqual(partial.bodies[0].friction, { sliding: 0.2, torsional: 0, rolling: 0, static: null });
+
+  for (const coefficient of [-0.01, 1.01]) {
+    const invalidBody = structuredClone(scene);
+    invalidBody.bodies[0].restitution = coefficient;
+    rejected(invalidBody);
+    const invalidGround = structuredClone(scene);
+    invalidGround.ground!.restitution = coefficient;
+    rejected(invalidGround);
+  }
+  for (const field of ['sliding', 'torsional', 'rolling', 'static'] as const) {
+    const invalid = structuredClone(scene);
+    invalid.bodies[0].friction[field] = -0.01;
+    rejected(invalid);
+  }
+  const invalidStatic = structuredClone(scene);
+  invalidStatic.bodies[0].friction.sliding = 0.5;
+  invalidStatic.bodies[0].friction.static = 0.49;
+  rejected(invalidStatic);
+  const invalidGroundFriction = structuredClone(scene);
+  invalidGroundFriction.ground!.friction.sliding = 0.5;
+  invalidGroundFriction.ground!.friction.static = 0.49;
+  rejected(invalidGroundFriction);
+});
+
+test('physical scenes add one canonical ground without mutating or double-expanding', () => {
+  const scene = validateScene({
+    ...projectile(), ground: {
+      height: -0.25, restitution: 0.8,
+      friction: { sliding: 0.3, static: 0.5, torsional: 0.01, rolling: 0.02 },
+    },
+  });
+  const original = structuredClone(scene);
+  const expanded = physicalScene(scene);
+  assert.deepEqual(scene, original);
+  assert.deepEqual(expanded.ground, null);
+  assert.deepEqual(expanded.bodies.at(-1), {
+    id: 'world-ground', label: 'Ground', parentId: null,
+    position: [0, 0, -0.25], orientation: [1, 0, 0, 0],
+    shape: { kind: 'plane', size: [10, 10] }, mass: null,
+    motion: { kind: 'fixed' }, restitution: 0.8,
+    friction: { sliding: 0.3, static: 0.5, torsional: 0.01, rolling: 0.02 },
+    color: '#bacbd1',
+  });
+  assert.equal(physicalScene(expanded), expanded);
+
+  const noGround = projectile();
+  assert.equal(physicalScene(noGround), noGround);
+  assert.equal(physicalScene(noGround).bodies.length, noGround.bodies.length);
+});
+
+test('ground ID is reserved, references resolve, and the body budget includes ground', () => {
+  const scene = validateScene({ ...projectile(), ground: undefined });
+  scene.sites = [{ id: 'ground-site', label: 'Ground attachment', bodyId: 'world-ground', position: [0, 0, 0] }];
+  scene.connections = [{ kind: 'weld', id: 'ground-weld', label: 'Ground connection', bodyA: 'ball', bodyB: 'world-ground' }];
+  assert.equal(validateScene(scene).sites[0].bodyId, 'world-ground');
+  assert.equal(physicalScene(scene).connections[0].bodyB, 'world-ground');
+
+  const reservedBody = validateScene({ ...projectile(), ground: undefined });
+  reservedBody.bodies[0].id = 'world-ground';
+  rejected(reservedBody);
+  const reservedSite = validateScene({ ...projectile(), ground: undefined });
+  reservedSite.sites = [{ id: 'world-ground', label: 'Reserved', bodyId: null, position: [0, 0, 0] }];
+  rejected(reservedSite);
+  const allowedWithoutGround = validateScene({
+    ...projectile(), ground: null, bodies: [{ ...projectile().bodies[0], id: 'world-ground' }],
+  });
+  assert.equal(allowedWithoutGround.bodies[0].id, 'world-ground');
+
+  const oneBody = projectile().bodies[0];
+  const atLimit = validateScene({
+    ...projectile(), ground: undefined,
+    bodies: Array.from({ length: 127 }, (_, i) => ({ ...oneBody, id: `body-${i}` })),
+  });
+  assert.equal(physicalScene(atLimit).bodies.length, 128);
+  rejected({ ...atLimit, bodies: [...atLimit.bodies, { ...oneBody, id: 'body-over-limit' }] });
+});
+
+test('assembly instructions describe supported impacts and default contact materials', () => {
+  assert.match(ASSEMBLY_INSTRUCTIONS, /body restitution defaults to 0/);
+  assert.match(ASSEMBLY_INSTRUCTIONS, /automatic ground defaults to height 0 m, restitution 1/);
+  assert.match(ASSEMBLY_INSTRUCTIONS, /combine restitution conservatively as min/);
+  assert.match(ASSEMBLY_INSTRUCTIONS, /friction as the maximum/);
+  assert.match(ASSEMBLY_INSTRUCTIONS, /calibrated compliant numerical contact model/);
+  assert.doesNotMatch(ASSEMBLY_INSTRUCTIONS, /elastic bounce is not controllable/i);
 });

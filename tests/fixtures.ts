@@ -4,6 +4,7 @@ import type { Scene } from '../shared/scene.ts';
 export function projectile(): Scene {
   return validateScene({
     category: 'mechanics', title: 'Horizontal launch', gravity: [0, 0, -9.81],
+    ground: null,
     bodies: [{ id: 'ball', label: 'Projectile', parentId: null, position: [0, 0, 20],
       shape: { kind: 'sphere', radius: 0.1 }, mass: 2,
       motion: { kind: 'free', linearVelocity: [5, 0, 0], angularVelocity: [0, 0, 0] }, color: '#67d9ce' }],
@@ -14,6 +15,7 @@ export function projectile(): Scene {
 export function atwood(): Scene {
   return validateScene({
     category: 'mechanics', title: 'Two masses and an ideal cable', gravity: [0, 0, -9.81],
+    ground: null,
     bodies: [
       { id: 'beam', label: 'Fixed support', position: [0, 0, 2.2], shape: { kind: 'box', size: [2.4, 0.15, 0.15] }, mass: null, motion: { kind: 'fixed' }, color: '#9cabb5' },
       { id: 'light', label: '1 kg mass', position: [-1, 0, 0], shape: { kind: 'sphere', radius: 0.1 }, mass: 1,
@@ -36,6 +38,7 @@ export function atwood(): Scene {
 export function changingWrap(): Scene {
   return validateScene({
     category: 'mechanics', title: 'Cable loses contact with a guide', gravity: [0, 0, 0],
+    ground: null,
     bodies: [
       { id: 'guide', label: 'Spherical guide', position: [0, 0, 0], shape: { kind: 'sphere', radius: 0.5 }, mass: null, motion: { kind: 'fixed' } },
       { id: 'load', label: 'Moving endpoint', position: [2, 0, 0], shape: { kind: 'sphere', radius: 0.1 }, mass: 1,

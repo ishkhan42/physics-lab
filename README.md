@@ -4,7 +4,7 @@ A web mechanics lab that turns a described situation into a validated MuJoCo mod
 
 ## Development status
 
-The experiment, playback, inspection and responsive light workbench are implemented. The production build and 49 behavioral regressions pass. Chromium/WASM checks include authenticated `openrouter/free` generation, native playback/reset, camera recovery, visible timed progress, review-before-assembly proposals, narrow layout and reduced motion. Further learner feedback requested clearer progress, useful responses, explicit defaults and a brighter palette; final hands-on approval remains in the [build checklist](devpost/checklist.md). OpenAI and Anthropic have not been exercised live.
+The composable mechanics lab, material/contact implementation, physical default ground, playback, inspection and responsive light workbench are implemented. The production build and 62 behavioral regressions pass. Actual browser checks generated the original two-ball request with restitution 1/0, observed rebound versus settling, and exercised a genuine static/kinetic friction comparison, playback/reset and ground reactions. Final learner approval remains in the [build checklist](devpost/checklist.md). OpenAI and Anthropic have not been exercised live.
 
 The application never loads a pretend model when credentials are missing. Earlier browser checks used synthetic assembly responses only at the test boundary; the subsequent authenticated OpenRouter check used no interception or synthetic response. No fake provider is part of the app.
 
@@ -50,6 +50,7 @@ Tests use native Node HTTP and actual MuJoCo WASM, with no live provider calls o
 1. Describe a mechanics situation, or fill an editable example prompt. Examples do not send a request or load a canned simulation.
 2. Press Assemble scene. A prominent activity panel shows elapsed time and the real interpreting/building phases, without a fabricated percentage. The configured free route is selected initially; expand Model settings to choose another provider/model.
 3. Answer a focused question, or review a proposed supported revision. Use this setup only fills the editable draft; Assemble is a separate explicit action. Missing physical details must be clarified or explicitly defaulted with their actual values. Check the paused assumptions, geometry and initial object properties before Run.
+   A physical plane at z=0 is included by default (ideal reference restitution 1, zero friction). Its height/material are explicit; `ground: null` is reserved for an explicitly groundless or custom-support setup. The reference grid is not the ground collider.
 4. Press Run, use the slider or 0.1×/1×/10× shortcuts, and pause to inspect. Reset restores the initial state and view without another model call; Fit view frames the current objects without changing physics.
 5. Submit another situation when needed. Failed or unsupported replacements preserve the previous experiment and prompt. Stop waiting cancels the local wait, not guaranteed upstream processing or billing.
 
@@ -60,10 +61,21 @@ Scene, clarification and limitation decisions share one contract. Questions, exp
 ## Physics and safety boundaries
 
 - Mechanics only: explicit SI quantities and a Z-up reference frame. Other physics categories are future work, not functioning choices.
-- Trusted model blocks include rigid primitives, point particles, articulations, supports, springs, routed tendons/cables, selected constraints and declared forces. The LLM supplies validated data, never unrestricted MJCF, code, plugins or external assets.
-- MuJoCo uses regularized contact; independently chosen surface static/kinetic friction and an exact textbook restitution coefficient are not silently mapped to unrelated parameters.
-- The current profile uses a 1 ms fixed timestep. Speed changes wall-time playback, not that timestep. Very stiff/high-frequency or extreme-scale models need additional numerical validation; this is not a universal accuracy guarantee.
-- Contextual cards read the solver. Force rows, coordinate frames and path buffers are interpreted rather than presented as raw engine internals. Point particles do not acquire invented rotation or collision radii.
+- The LLM supplies validated data, never unrestricted MJCF, code, plugins or external assets. Elasticity/friction requests are modeled rather than downgraded to a no-bounce alternative.
+
+| Mechanics family | Implemented model |
+| --- | --- |
+| Bodies and coordinates | Sphere, box, capsule, cylinder, ellipsoid, infinite plane and point particle; free, hinge, slide, ball and fixed motion; primitive-derived mass/inertia. |
+| Materials and contacts | Elastic/partial/inelastic normal restitution targets; independent static and kinetic sliding friction; torsional/rolling resistance lengths. |
+| Loads | Uniform gravity, force/torque at declared frames, one-time impulses, linear drag and bounded mutual point-particle gravity. |
+| Springs, joints and connections | Joint/tendon springs and damping, limits, connect/weld/scalar couplings, fixed/slack/spring cords, geometric wraps and pulley branches. |
+| Readouts | Native state/inertia, material values (including zero), linear momentum, translational kinetic energy, uniform-gravity potential, instantaneous world contact forces, joint spring/damping force/torque and cable tension. |
+
+Pair restitution is `min(eA,eB)` and friction uses the component-wise maximum; the ideal default ground lets the ball's coefficient govern the requested rebound. A stated elastic body is e=1, not an arbitrary 0.8. Static friction prevents slip; an unconstrained sphere can still roll. Ground and model assumptions are inspectable.
+
+The trusted contact profile maps restitution to MuJoCo's direct spring/damping law, with 16 native substeps inside each 1 ms playback tick when collisions are possible. Contact-free scenes retain 1 ms native stepping. Contact coefficients are numerical targets, not an exact hard-impact or universal accuracy guarantee. Regression cases measure e=0/0.5/1, momentum/energy in an isolated elastic collision, Coulomb deceleration, stiction, and elastic impact with friction. Contact forces are instantaneous; contact jitter and finite-step error can occur. Energy rows distinguish kinetic components and uniform gravity rather than claiming a universally conserved total.
+
+- Broad composition is supported, but deformable bodies, adhesive sticking, continuum fluids, arbitrary force histories and arbitrary user solvers are not advertised. High-speed/small-scale, very stiff/high-frequency and large coupled-contact scenes need additional numerical validation. Point particles have no collision surface; contact materials require a colliding primitive.
 - Reference grids are visual aids, infinite planes display as patches, and point markers are not physical radii. Inspection is read-only; camera movement does not change physics.
 - Oversized, invalid or numerically unstable models fail with an explanation. The app does not delete excess objects, suppress warnings or substitute another experiment.
 - Provider keys stay on the server; prompts go to the selected provider under its policy. No prompt database or default scene persistence is included.
@@ -74,7 +86,7 @@ The official MuJoCo JS bindings are still marked WIP. The version is pinned. The
 
 - `shared/scene.ts`, `shared/catalog.ts`: physical admission, provider decision contract and generated model instructions.
 - `server/`: local API, safe built-file serving and the three real provider adapters.
-- `src/physics/`: trusted MJCF compiler, MuJoCo lifecycle/observations and fixed-step clock.
+- `src/physics/`: trusted MJCF compiler, calibrated material/contact law, MuJoCo lifecycle/observations and playback clock.
 - `src/`: Mission Board, actual Three.js canvas and read-only object cards.
 - `tests/`: deterministic physical references, frame/force/path regressions, HTTP boundaries and provider error parsing.
 

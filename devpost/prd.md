@@ -67,6 +67,8 @@ The user approved the assemble–preview–run flow:
 - Require an explicit Run action; assembly completion does not start motion automatically.
 - Explain unsupported requests honestly. Do not substitute another experiment, silently simplify the model, or invent a result. A proposed simpler model requires the student's agreement.
 - Keep limitation feedback concise and actionable, with technical detail in a disclosure. A question, explanation and supported alternative may coexist without a scene being built. Selecting a proposal fills the draft for review; only a separate Assemble action can request the changed experiment.
+- Default to a real physical ground at z=0, not just the reference grid; expose its height and material assumptions. Omit it only for an explicitly groundless/custom-support setup.
+- Preserve requested elastic/inelastic collisions and friction. Offer restitution targets, static/kinetic coefficients and contact results rather than removing the requested behavior. Static friction prevents slip, not necessarily rolling motion.
 
 Source: `scope.md > The Unique Kernel` and `scope.md > The POC Boundary`.
 
@@ -87,6 +89,8 @@ Source: `scope.md > What "Working" Looks Like`.
 ### Read-Only Object Cards
 
 Cards beneath the canvas list all participating objects and their properties. When paused, their displayed state corresponds to that simulation moment and remains unchanged until the simulation state changes. No object-property editing is included in the initial inspection experience.
+
+Include declared restitution/friction (even zero), linear momentum, translational kinetic energy, uniform-gravity potential, instantaneous contact forces and supported joint spring/damping forces. Do not label these as a complete conserved system energy or net force including every constraint.
 
 The user defines the field-selection rule as “the defining properties of that object in the given context.” Each card exposes the properties relevant to that object, simulation, and physics category rather than a universal field list or a raw engine/debug dump. Physical values must come from the actual model and simulation state, with clear labels and units where applicable; do not fabricate an irrelevant or unmodeled quantity. Exact per-building-block field mappings belong in the technical plan. Dragging, rewind, and historical scrubbing are not implied requirements.
 

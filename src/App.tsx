@@ -24,11 +24,11 @@ const PROVIDER_IDS = Object.keys(PROVIDER_LABELS) as Provider[];
 const PROMPT_STARTERS = [
   {
     label: 'Falling objects',
-    prompt: 'Drop two spheres of radius 0.15 m, with masses 1 kg and 2 kg, from rest at the same height of 5 m, 2 m apart. Use downward gravity of 9.81 m/s², no air resistance and no ground. Compare their vertical positions and velocities during free fall.',
+    prompt: 'Drop two spheres of radius 0.15 m, with masses 1 kg and 2 kg, from rest at the same centre height of 5 m, 2 m apart. The 1 kg sphere is elastic (restitution 1); the 2 kg sphere is inelastic (restitution 0). Use gravity [0, 0, -9.81] m/s² and no air resistance. Use the built-in ground at z = 0 with restitution 1 and zero friction. Compare their falls and rebounds.',
   },
   {
     label: 'A collision',
-    prompt: 'Two spheres of radius 0.2 m and masses 1 kg and 2 kg start at x = -1 m and x = 1 m, with y = z = 0. They move toward each other at 1 m/s. Use zero gravity, zero friction and regularized MuJoCo contact, without prescribing an exact restitution coefficient. Show their positions and velocities.',
+    prompt: 'Two spheres of radius 0.2 m and masses 1 kg and 2 kg start at [-1, 0, 1] m and [1, 0, 1] m. They move toward each other along x at 1 m/s each with zero spin. Both have restitution 1 and zero friction. Use zero gravity and keep the built-in ground at z = 0. Show collision velocities, linear momentum and translational kinetic energy.',
   },
   {
     label: 'Spring motion',
@@ -616,6 +616,9 @@ export default function App() {
               <div className="assumed-defaults">
                 <strong>Assumed defaults and idealizations</strong>
                 <p>Check any values you didn’t specify before pressing Run. Initial values for every object are shown below the canvas.</p>
+                {interpretation.scene?.ground ? (
+                  <p>Physical ground: z = {interpretation.scene.ground.height} m; target restitution {interpretation.scene.ground.restitution}; static friction {interpretation.scene.ground.friction.static ?? interpretation.scene.ground.friction.sliding}, sliding friction {interpretation.scene.ground.friction.sliding}.</p>
+                ) : <p>Built-in ground is explicitly disabled. Any separately modeled surfaces are listed in the object cards.</p>}
                 {interpretation.assumptions.length > 0 ? (
                   <ul>{interpretation.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
                 ) : <p>No additional physical assumptions were reported by the model. Verify the interpreted setup against your description.</p>}
@@ -627,7 +630,8 @@ export default function App() {
             <summary>What this lab can model</summary>
             <div className="capabilities-copy">
               <p>Classical mechanics with rigid bodies and point particles, gravity and applied loads, collisions and contacts, joints, and cable or spring connections.</p>
-              <p><strong>Limits:</strong> the solver does not expose an exact textbook coefficient of restitution or separate static and kinetic friction coefficients. If either is essential, state that clearly; the model should clarify or mark it unsupported rather than silently substitute.</p>
+              <p>Contacts include elastic, partially elastic and inelastic restitution targets, static and kinetic sliding friction, and torsional/rolling resistance. Pair restitution uses the lower coefficient; pair friction uses the higher. Ground is a real physical surface by default.</p>
+              <p><strong>Model boundaries:</strong> rigid bodies and compliant numerical contacts, not deformation or fluid fields. Material coefficients are numerical targets with finite-step error; inspect the declared assumptions and actual results.</p>
             </div>
           </details>
         </section>

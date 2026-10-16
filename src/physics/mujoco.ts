@@ -1,8 +1,9 @@
 import type { DoubleBuffer, MainModule, MjData, MjModel } from '@mujoco/mujoco';
-import { validateScene } from '../../shared/scene.ts';
+import { physicalScene, validateScene } from '../../shared/scene.ts';
 import type { Body, Quat, Scene, Vec3 } from '../../shared/scene.ts';
 import { FixedStepClock, FIXED_TIMESTEP } from './clock.ts';
 import { compileMjcf, fixedTendonEqualityName, jointName, PARTICLE_JOINT_SUFFIXES } from './mjcf.ts';
+import { ContactFriction, contactSubsteps, staticFriction } from './materials.ts';
 import type { AdvanceResult, EntityObservation, InspectionSnapshot, MechanicsRuntime, Observation, RenderItem } from './types.ts';
 
 const INITIAL_CONSTRAINT_TOLERANCE = 1e-4;
@@ -217,6 +218,7 @@ function initializeImpulses(
 
 function warningCounts(data: MjData): number[] {
   const counts: number[] = [];
+  // This vector is borrowed from MjData; only get() results are owned copies.
   const warnings = data.warning;
   for (let index = 0; index < warnings.size(); index++) {
     const warning = warnings.get(index);
@@ -314,6 +316,10 @@ class MuJoCoRuntime implements MechanicsRuntime {
   private readonly warningBaseline: number[];
   private readonly initialQpos: Float64Array;
   private readonly initialQvel: Float64Array;
+  private readonly contactMaterials: ContactFriction;
+  private readonly contactForces: Float64Array;
+  private readonly substeps: number;
+  private readonly geometryBodies: Int32Array;
   private disposed = false;
   private constraintObservationsValid = false;
 
@@ -343,6 +349,10 @@ class MuJoCoRuntime implements MechanicsRuntime {
     this.renderItems = bodyBindings.map(binding => binding.renderItem)
       .concat(tendonItems, connectionBindings.map(binding => binding.renderItem));
     this.warningBaseline = warningBaseline;
+    this.contactMaterials = new ContactFriction(mujoco, model, bodyBindings);
+    this.contactForces = new Float64Array(model.nbody * 3);
+    this.substeps = contactSubsteps(scene);
+    this.geometryBodies = new Int32Array(model.geom_bodyid as ArrayLike<number>);
     const refreshReason = this.refreshCurrentState();
     if (refreshReason) throw new Error(refreshReason);
     this.initialQpos = data.qpos.slice();
@@ -363,6 +373,7 @@ class MuJoCoRuntime implements MechanicsRuntime {
 
   snapshot(): InspectionSnapshot {
     this.assertLive();
+    this.readContactForces();
     const entities: EntityObservation[] = [];
     const positions = this.data.xipos;
     const quaternions = this.data.xquat;
@@ -380,6 +391,13 @@ class MuJoCoRuntime implements MechanicsRuntime {
       ];
       if (body.mass !== null) {
         properties.push({ label: 'Mass', value: this.model.body_mass[id], unit: 'kg' });
+        const mass = this.model.body_mass[id];
+        properties.push({ label: 'Linear momentum', value: [mass * velocity[3], mass * velocity[4], mass * velocity[5]], unit: 'kg·m/s' });
+        properties.push({ label: 'Translational kinetic energy', value: mass * (velocity[3] ** 2 + velocity[4] ** 2 + velocity[5] ** 2) / 2, unit: 'J' });
+        if (this.scene.gravity.some(value => value !== 0)) properties.push({
+          label: 'Uniform-gravity potential (world origin)', unit: 'J',
+          value: -mass * (this.scene.gravity[0] * positions[id * 3] + this.scene.gravity[1] * positions[id * 3 + 1] + this.scene.gravity[2] * positions[id * 3 + 2]),
+        });
         if (body.motion.kind !== 'particle') {
           const inertiaOffset = id * 3;
           const inertia = this.model.body_inertia;
@@ -402,10 +420,20 @@ class MuJoCoRuntime implements MechanicsRuntime {
           properties.push({ label: 'Spring reference', value: body.motion.springReference, unit });
         }
         if (body.motion.damping > 0) properties.push({ label: 'Joint damping', value: body.motion.damping, unit: angular ? 'N·m·s/rad' : 'N·s/m' });
+        if (body.motion.stiffness > 0 || body.motion.damping > 0) properties.push({
+          label: angular ? 'Joint spring/damping torque' : 'Joint spring/damping force',
+          value: -body.motion.stiffness * (qpos[coordinate.qpos] - body.motion.springReference) - body.motion.damping * qvel[coordinate.dof],
+          unit: angular ? 'N·m' : 'N',
+        });
       } else if (body.motion.kind === 'ball' && body.motion.damping > 0) {
         properties.push({ label: 'Rotational damping', value: body.motion.damping, unit: 'N·m·s/rad' });
       }
-      if (body.friction.sliding > 0) properties.push({ label: 'Sliding friction coefficient', value: body.friction.sliding });
+      if (body.shape.kind !== 'point') {
+        properties.push({ label: 'Target restitution', value: body.restitution });
+        properties.push({ label: 'Static friction coefficient', value: staticFriction(body) });
+        properties.push({ label: 'Sliding friction coefficient', value: body.friction.sliding });
+        properties.push({ label: 'Contact force', value: this.constraintObservationsValid ? vecAt(this.contactForces, id * 3) : 'Unavailable', unit: 'N' });
+      }
       if (body.friction.torsional > 0) properties.push({ label: 'Torsional friction length', value: body.friction.torsional, unit: 'm' });
       if (body.friction.rolling > 0) properties.push({ label: 'Rolling friction length', value: body.friction.rolling, unit: 'm' });
       for (const load of this.scene.loads) {
@@ -476,7 +504,11 @@ class MuJoCoRuntime implements MechanicsRuntime {
       }
       entities.push({ id: connection.id, label: connection.label, kind: 'connection', color: binding.bodyA.body.color, properties });
     }
-    const notes: string[] = [];
+    const notes: string[] = [
+      'Contact restitution is a numerical target; pair restitution uses the minimum and friction the maximum.',
+      'Contact forces are instantaneous, not averaged; compliant contact can have small numerical jitter.',
+      `Native timestep ${FIXED_TIMESTEP / this.substeps} s; static/kinetic switching tolerance 0.001 m/s. Energy rows distinguish kinetic components and uniform gravity, not a universal conserved total.`,
+    ];
     if (this.scene.bodies.some(body => body.motion.kind === 'particle')) notes.push(PARTICLE_INERTIA_NOTE);
     if (!this.constraintObservationsValid) notes.push('Constraint-force observations are unavailable after a singular or numerically invalid step.');
     return { time: this.data.time, entities, notes };
@@ -571,16 +603,19 @@ class MuJoCoRuntime implements MechanicsRuntime {
   }
 
   private step(): { advanced: boolean; pauseReason: string | null } {
-    this.mujoco.mj_step1(this.model, this.data);
-    this.clearCustomForces();
-    const singular = this.gravitySingularity();
-    if (singular) {
+    for (let substep = 0; substep < this.substeps; substep++) {
+      this.mujoco.mj_step1(this.model, this.data);
+      this.contactMaterials.update(this.data);
+      this.clearCustomForces();
+      const singular = this.gravitySingularity();
+      if (singular) {
+        this.constraintObservationsValid = false;
+        return { advanced: substep > 0, pauseReason: singular };
+      }
       this.constraintObservationsValid = false;
-      return { advanced: false, pauseReason: singular };
+      this.applyLoads();
+      this.mujoco.mj_step2(this.model, this.data);
     }
-    this.constraintObservationsValid = false;
-    this.applyLoads();
-    this.mujoco.mj_step2(this.model, this.data);
     const warning = this.newWarning();
     if (warning) return { advanced: true, pauseReason: warning };
     if (nonfiniteState(this.data)) return { advanced: true, pauseReason: 'MuJoCo produced a non-finite state; simulation paused.' };
@@ -607,6 +642,33 @@ class MuJoCoRuntime implements MechanicsRuntime {
     this.mujoco.mj_objectVelocity(this.model, this.data, this.mujoco.mjtObj.mjOBJ_BODY.value, bodyId, this.velocityBuffer, 0);
     if (!this.velocityView || this.velocityView.byteLength === 0) this.velocityView = this.velocityBuffer.GetView() as Float64Array;
     return this.velocityView;
+  }
+
+  private readContactForces(): void {
+    this.contactForces.fill(0);
+    if (!this.constraintObservationsValid || !this.data.ncon) return;
+    const contacts = this.data.contact;
+    const geomBodies = this.geometryBodies;
+    try {
+      for (let index = 0; index < this.data.ncon; index++) {
+        const contact = contacts.get(index);
+        if (!contact) continue;
+        try {
+          this.mujoco.mj_contactForce(this.model, this.data, index, this.velocityBuffer);
+          const force = this.velocityBuffer.GetView() as Float64Array;
+          const frame = contact.frame;
+          for (let axis = 0; axis < 3; axis++) {
+            const component = frame[axis] * force[0] + frame[3 + axis] * force[1] + frame[6 + axis] * force[2];
+            this.contactForces[geomBodies[contact.geom1] * 3 + axis] -= component;
+            this.contactForces[geomBodies[contact.geom2] * 3 + axis] += component;
+          }
+        } finally {
+          contact.delete();
+        }
+      }
+    } finally {
+      contacts.delete();
+    }
   }
 
   private applyLoads(): void {
@@ -706,6 +768,7 @@ class MuJoCoRuntime implements MechanicsRuntime {
 
   private refreshCurrentState(): string | null {
     this.mujoco.mj_step1(this.model, this.data);
+    this.contactMaterials.update(this.data);
     this.clearCustomForces();
     const singular = this.gravitySingularity();
     if (singular) {
@@ -713,7 +776,7 @@ class MuJoCoRuntime implements MechanicsRuntime {
       return singular;
     }
     this.applyLoads();
-    this.mujoco.mj_forward(this.model, this.data);
+    this.mujoco.mj_forwardSkip(this.model, this.data, this.mujoco.mjtStage.mjSTAGE_VEL.value, 0);
     const warning = this.newWarning();
     if (warning) return warning;
     if (nonfiniteState(this.data)) return 'MuJoCo produced a non-finite state; simulation paused.';
@@ -770,7 +833,7 @@ class MuJoCoRuntime implements MechanicsRuntime {
 }
 
 export async function createRuntime(input: Scene): Promise<MechanicsRuntime> {
-  const scene = validateScene(input);
+  const scene = physicalScene(validateScene(input));
   const mujoco = await engine();
   let model: MjModel | undefined;
   let data: MjData | undefined;
