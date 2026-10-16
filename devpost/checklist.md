@@ -13,7 +13,7 @@ Live model checks require an authorized application API key supplied privately. 
 
 ## Slices
 
-- [ ] **1. Describe a mechanics situation and inspect a real paused experiment**
+- [x] **1. Describe a mechanics situation and inspect a real paused experiment**
   Becomes usable: A local Mission Board accepts a description through a configured provider, asks a consequential clarification if needed, compiles the resulting mechanics data with actual MuJoCo, and shows a paused 3D scene with initial object properties and assumptions.
   Why now: Proves the unique kernel early: description to composed physics model, not a generic interface waiting for its core feature. Project bootstrapping is included here.
   PRD ref: `prd.md > The Core Journey`, `prd.md > Scenario Prompt and Assembly`, `prd.md > Mission Board`, `prd.md > Read-Only Object Cards`.
@@ -72,3 +72,4 @@ Activity mode: Not started; a focused verification decision is recommended rathe
 - Initial browser checks used synthetic assembly responses only at the network boundary; no fake provider or interception is shipped. After the user supplied a private application key, an authenticated `openrouter/free` request passed scene generation, native paused preview, Run/Pause, both speed endpoints and frozen inspection without interception. The live-provider mechanical gate is cleared; learner hands-on reviews remain pending.
 - Native integration required explicit erasable TypeScript fields, equality-versus-limit row lookup, `mj_isSparse` layout detection, body/world velocity conversion and active native wrap-range handling. Corrected those internal assumptions without changing the product or replacing missing physics with invented values.
 - The same shared compiler/runtime supplies both functional slices. Their mechanical verification is now complete, including the real provider path. Final presentation work waits for the planned early learner feedback.
+- Live verification also exercised the same genuinely generated scene at 1×, 0.1× and 10×, then froze the body properties while orbiting the camera. Position and velocity agreed with the declared projectile conditions within the integration/display tolerance. Slice-two mechanical verification is complete; the next step is the learner's early hands-on checkpoint, not final presentation work.
