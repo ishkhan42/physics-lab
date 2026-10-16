@@ -21,6 +21,21 @@ const OPENROUTER_FREE_ROUTE: ModelOption = {
   contextLength: null,
 };
 const PROVIDER_IDS = Object.keys(PROVIDER_LABELS) as Provider[];
+const PROMPT_STARTERS = [
+  {
+    label: 'Falling objects',
+    prompt: 'Drop two spheres of radius 0.15 m, with masses 1 kg and 2 kg, from rest at the same height of 5 m, 2 m apart. Use downward gravity of 9.81 m/s², no air resistance and no ground. Compare their vertical positions and velocities during free fall.',
+  },
+  {
+    label: 'A collision',
+    prompt: 'Two spheres of radius 0.2 m and masses 1 kg and 2 kg start at x = -1 m and x = 1 m, with y = z = 0. They move toward each other at 1 m/s. Use zero gravity, zero friction and regularized MuJoCo contact, without prescribing an exact restitution coefficient. Show their positions and velocities.',
+  },
+  {
+    label: 'Spring motion',
+    prompt: 'Attach a 1 kg point mass to a fixed anchor at the origin with a massless spring of rest length 1 m and stiffness 10 N/m, with zero damping and zero gravity. Start the mass at (2, 0, 0) m at rest and constrain it to move along the x-axis. Show its motion and the spring force.',
+  },
+] as const;
+
 
 
 function isProvider(value: unknown): value is Provider {
@@ -114,6 +129,13 @@ export default function App() {
   const requestController = useRef<AbortController | null>(null);
   const candidateRef = useRef<CanvasExperiment | null>(null);
   const activeRef = useRef<CanvasExperiment | null>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const answerRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (question && flow.kind === 'clarification') answerRef.current?.focus();
+  }, [flow.kind, question]);
+
 
   activeRef.current = activeExperiment;
   candidateRef.current = pendingExperiment;
@@ -184,15 +206,16 @@ export default function App() {
     requestController.current?.abort();
   }, []);
 
-  const invalidateWork = useCallback(() => {
+  const invalidateWork = useCallback((message = 'The draft changed. Its previous request or preparation was canceled.') => {
     const wasWorking = requestController.current !== null || candidateRef.current !== null;
     generation.current += 1;
     requestController.current?.abort();
     requestController.current = null;
     candidateRef.current = null;
     setPendingExperiment(null);
-    if (wasWorking) setFlow({ kind: 'idle', message: 'The draft changed. Its previous request or preparation was canceled.' });
+    setFlow({ kind: 'idle', message: wasWorking ? message : '' });
   }, []);
+
 
   const handleDescriptionChange = (value: string) => {
     if (value !== description) {
@@ -222,6 +245,8 @@ export default function App() {
   };
 
   const selectedModel = provider === 'openrouter' ? modelInput.trim() || freeModel : modelInput.trim();
+  const selectedProviderLabel = config?.providers.find(item => item.id === provider)?.label
+    ?? (provider ? PROVIDER_LABELS[provider] : 'Choose provider and model');
   const availableProviders = config?.providers.filter(item => item.available) ?? [];
   const isBusy = flow.kind === 'requesting' || flow.kind === 'preparing';
 
@@ -324,6 +349,10 @@ export default function App() {
   const interpretation = responseDecision ?? activeExperiment?.decision ?? null;
   const noProvidersAvailable = config !== null && availableProviders.length === 0;
   const canSubmit = !isBusy && !configError && provider !== '' && selectedModel.length > 0 && description.trim().length >= 3;
+  const settingsSummary = provider
+    ? `${selectedProviderLabel} · ${selectedModel || 'model not selected'}`
+    : 'Choose provider and model';
+
 
   return (
     <div className="lab-shell">
@@ -343,105 +372,136 @@ export default function App() {
           <div className="setup-heading">
             <div>
               <p className="eyebrow">Experiment workspace</p>
-              <h1 id="setup-title">Describe the mechanics.</h1>
+              <h1 id="setup-title">Build a mechanics preview</h1>
             </div>
             <span className="category-stamp">CLASSICAL · SI UNITS</span>
           </div>
 
           <form className="assembly-form" onSubmit={handleSubmit}>
             <label className="field description-field">
-              <span className="field-label">Scenario</span>
+              <span className="field-label">Describe your experiment</span>
               <textarea
+                ref={descriptionRef}
                 value={description}
                 onChange={event => handleDescriptionChange(event.target.value)}
-                placeholder="Describe the setup, what you want to know, and any known conditions."
+                placeholder="What is moving or touching? Include masses, heights, initial speeds, and contacts."
                 minLength={3}
                 maxLength={16000}
                 required
                 rows={4}
                 aria-describedby="description-hint"
               />
-              <span className="field-hint" id="description-hint">Use your own experiment description. No sample scene is loaded.</span>
+              <span className="field-hint" id="description-hint">Include the objects, masses, starting heights or positions, initial speeds, and contacts. State what you want to compare.</span>
             </label>
 
-            <div className="provider-fields">
-              <label className="field">
-                <span className="field-label">Model provider</span>
-                <select
-                  value={provider}
-                  onChange={event => handleProviderChange(event.target.value)}
-                  disabled={!config || availableProviders.length === 0 || isBusy}
-                  required
-                >
-                  <option value="" disabled>{config ? 'Choose a configured provider' : 'Loading providers…'}</option>
-                  {config?.providers.map(item => (
-                    <option value={item.id} disabled={!item.available} key={item.id}>
-                      {item.label}{item.available ? '' : ' · not configured'}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="prompt-starters" role="group" aria-label="Fill the editable prompt with a starter">
+              <span className="field-label">Start with</span>
+              <div className="prompt-starters__buttons">
+                {PROMPT_STARTERS.map(starter => (
+                  <button
+                    className="starter-button"
+                    type="button"
+                    key={starter.label}
+                    onClick={() => {
+                      handleDescriptionChange(starter.prompt);
+                      descriptionRef.current?.focus();
+                    }}
+                  >
+                    {starter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              {provider === 'openrouter' ? (
-                <>
+            <details className="settings-details">
+              <summary className="settings-summary">
+                <span className="settings-summary__title">Model settings</span>
+                <span className="settings-summary__selection">{settingsSummary}</span>
+              </summary>
+              <div className="settings-content">
+                <p className="settings-intro">These choices apply when you assemble. Changing settings never sends an assembly request.</p>
+                <div className="provider-fields">
                   <label className="field">
-                    <span className="field-label">OpenRouter free model</span>
+                    <span className="field-label">Model provider</span>
                     <select
-                      value={freeModel}
-                      onChange={event => { invalidateWork(); setFreeModel(event.target.value); setModelInput(''); }}
-                      disabled={isBusy}
+                      value={provider}
+                      onChange={event => handleProviderChange(event.target.value)}
+                      disabled={!config || availableProviders.length === 0 || isBusy}
+                      required
                     >
-                      <option value="" disabled>Choose a free route or enter a model ID</option>
-                      {[OPENROUTER_FREE_ROUTE, ...models.filter(item => item.free && item.id !== OPENROUTER_FREE_ROUTE.id)].map(item => (
-                        <option value={item.id} key={item.id}>{`${item.name} · ${item.id} · free`}</option>
+                      <option value="" disabled>{config ? 'Choose a configured provider' : 'Loading providers…'}</option>
+                      {config?.providers.map(item => (
+                        <option value={item.id} disabled={!item.available} key={item.id}>
+                          {item.label}{item.available ? '' : ' · not configured'}
+                        </option>
                       ))}
                     </select>
-                    <span className="field-hint">Free routes can still have changing quotas and availability.</span>
                   </label>
-                  <label className="field">
-                    <span className="field-label">Or enter another current model ID</span>
-                    <input
-                      value={modelInput}
-                      onChange={event => handleModelInput(event.target.value)}
-                      list="openrouter-model-list"
-                      maxLength={200}
-                      placeholder="Search current model IDs or enter one"
-                      disabled={isBusy}
-                    />
-                    <datalist id="openrouter-model-list">
-                      {models.map(item => <option value={item.id} label={item.name} key={item.id} />)}
-                    </datalist>
+
+                  {provider === 'openrouter' ? (
+                    <>
+                      <label className="field">
+                        <span className="field-label">OpenRouter free model</span>
+                        <select
+                          value={freeModel}
+                          onChange={event => { invalidateWork(); setFreeModel(event.target.value); setModelInput(''); }}
+                          disabled={isBusy}
+                        >
+                          <option value="" disabled>Choose a free route or enter a model ID</option>
+                          {[OPENROUTER_FREE_ROUTE, ...models.filter(item => item.free && item.id !== OPENROUTER_FREE_ROUTE.id)].map(item => (
+                            <option value={item.id} key={item.id}>{`${item.name} · ${item.id} · free`}</option>
+                          ))}
+                        </select>
+                        <span className="field-hint">Free routes can have changing quotas and availability.</span>
+                      </label>
+                      <label className="field">
+                        <span className="field-label">Or enter another current model ID</span>
+                        <input
+                          value={modelInput}
+                          onChange={event => handleModelInput(event.target.value)}
+                          list="openrouter-model-list"
+                          maxLength={200}
+                          placeholder="Search current model IDs or enter one"
+                          disabled={isBusy}
+                        />
+                        <datalist id="openrouter-model-list">
+                          {models.map(item => <option value={item.id} label={item.name} key={item.id} />)}
+                        </datalist>
+                        <span className="field-hint field-hint--warning">Custom model IDs may cost money. Check the route’s current pricing.</span>
+                      </label>
+                    </>
+                  ) : (
+                    <label className="field">
+                      <span className="field-label">Model ID</span>
+                      <input
+                        value={modelInput}
+                        onChange={event => handleModelInput(event.target.value)}
+                        maxLength={200}
+                        placeholder="Enter a current provider model ID"
+                        disabled={!provider || isBusy}
+                        required
+                      />
+                      <span className="field-hint field-hint--warning">Custom model IDs may incur charges. Check your provider’s current pricing.</span>
+                    </label>
+                  )}
+                </div>
+
+                {provider === 'openrouter' && modelsLoading ? <p className="inline-note">Loading the current OpenRouter catalog…</p> : null}
+                {provider === 'openrouter' && modelsError ? (
+                  <p className="inline-note inline-note--warning" role="status">Current model suggestions could not be loaded. The free route remains selectable, and you can enter another model ID.</p>
+                ) : null}
+
+                <div className="category-row">
+                  <label className="field category-field">
+                    <span className="field-label">Physics category</span>
+                    <select defaultValue="mechanics" aria-label="Physics category">
+                      <option value="mechanics">Mechanics</option>
+                    </select>
                   </label>
-                </>
-              ) : (
-                <label className="field">
-                  <span className="field-label">Model ID</span>
-                  <input
-                    value={modelInput}
-                    onChange={event => handleModelInput(event.target.value)}
-                    maxLength={200}
-                    placeholder="Enter a current provider model ID"
-                    disabled={!provider || isBusy}
-                    required
-                  />
-                </label>
-              )}
-            </div>
-
-            {provider === 'openrouter' && modelsLoading ? <p className="inline-note">Loading the current OpenRouter catalog…</p> : null}
-            {provider === 'openrouter' && modelsError ? (
-              <p className="inline-note inline-note--warning" role="status">Current model suggestions could not be loaded. The free route remains selectable, and you can enter another model ID.</p>
-            ) : null}
-
-            <div className="category-row">
-              <label className="field category-field">
-                <span className="field-label">Physics category</span>
-                <select defaultValue="mechanics" aria-label="Physics category">
-                  <option value="mechanics">Mechanics</option>
-                </select>
-              </label>
-              <p className="category-description">Only mechanics is active in this lab. Other physics categories are not offered as working choices.</p>
-            </div>
+                  <p className="category-description">Only mechanics is active in this lab.</p>
+                </div>
+              </div>
+            </details>
 
             {question ? (
               <div className="clarification-panel" aria-labelledby="clarification-question">
@@ -450,6 +510,7 @@ export default function App() {
                 <label className="field">
                   <span className="field-label">Your answer</span>
                   <textarea
+                    ref={answerRef}
                     value={answer}
                     onChange={event => setAnswer(event.target.value)}
                     maxLength={4000}
@@ -474,17 +535,34 @@ export default function App() {
             {formError ? <div className="notice notice--error" role="alert">{formError}</div> : null}
 
             <div className="submit-row">
-              <button className="primary-button" type="submit" disabled={!canSubmit || (question !== '' && answer.trim().length === 0)}>
-                {flow.kind === 'requesting' ? 'Waiting for model…' : flow.kind === 'preparing' ? 'Preparing preview…' : question ? 'Answer and continue' : 'Assemble scene'}
-              </button>
-              <p className="privacy-note">The selected provider receives your scenario and clarification replies. API keys remain on the local server.</p>
+              <div className="submit-actions">
+                <button className="primary-button" type="submit" disabled={!canSubmit || (question !== '' && answer.trim().length === 0)}>
+                  {flow.kind === 'requesting' ? 'Waiting for model…' : flow.kind === 'preparing' ? 'Preparing preview…' : question ? 'Answer and continue' : 'Assemble scene'}
+                </button>
+                {isBusy ? (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => invalidateWork('Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.')}
+                  >
+                    Stop waiting
+                  </button>
+                ) : null}
+              </div>
+              <p className="privacy-note">The selected provider receives your scenario and clarification replies. API keys stay on the local server.</p>
             </div>
           </form>
 
           {flow.message ? (
-            <div className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live="polite">
+            <div className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live={flow.kind === 'error' ? 'assertive' : 'polite'} aria-busy={isBusy}>
               <span className="flow-message__line" aria-hidden="true" />
-              <p>{flow.message}</p>
+              <div className="flow-message__content">
+                <p>{flow.message}</p>
+                {flow.kind === 'clarification' ? <p className="flow-message__next">Answer the question above; your original scenario stays editable.</p> : null}
+                {flow.kind === 'ready' ? <p className="flow-message__next">Review the model summary and assumptions, then run the preview when they match your intent.</p> : null}
+                {flow.kind === 'unsupported' ? <p className="flow-message__next">Refine the scenario around supported mechanics or make the essential condition explicit, then assemble again.</p> : null}
+                {flow.kind === 'error' ? <p className="flow-message__next">Check the provider or model settings, or refine the prompt, then assemble again. No request is retried automatically.</p> : null}
+              </div>
             </div>
           ) : null}
 
@@ -494,6 +572,7 @@ export default function App() {
                 <span className="eyebrow">{responseDecision ? 'Current response' : 'Preview interpretation'}</span>
                 {responseDecision?.kind === 'unsupported' ? <span className="state-label state-label--warning">Unsupported</span> : null}
               </div>
+              {interpretation.kind === 'scene' ? <p className="interpretation-guide">Check what the model included and assumed before running.</p> : null}
               <p>{interpretation.summary}</p>
               {interpretation.kind === 'unsupported' && interpretation.reason ? <p className="interpretation-reason">{interpretation.reason}</p> : null}
               {interpretation.assumptions.length > 0 ? (
@@ -504,12 +583,35 @@ export default function App() {
               ) : null}
             </aside>
           ) : null}
+          {responseDecision && activeExperiment ? (
+            <aside className="interpretation-panel interpretation-panel--preserved" aria-label="Existing preview interpretation">
+              <div className="interpretation-heading">
+                <span className="eyebrow">Existing preview</span>
+              </div>
+              <p className="interpretation-guide">This is the unchanged scene currently shown in the canvas.</p>
+              <p>{activeExperiment.decision.summary}</p>
+              {activeExperiment.decision.assumptions.length > 0 ? (
+                <div className="assumption-list">
+                  <span className="field-label">Assumptions and idealizations</span>
+                  <ul>{activeExperiment.decision.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
+                </div>
+              ) : null}
+            </aside>
+          ) : null}
+
+          <details className="capabilities-details">
+            <summary>What this lab can model</summary>
+            <div className="capabilities-copy">
+              <p>Classical mechanics with rigid bodies and point particles, gravity and applied loads, collisions and contacts, joints, and cable or spring connections.</p>
+              <p><strong>Limits:</strong> the solver does not expose an exact textbook coefficient of restitution or separate static and kinetic friction coefficients. If either is essential, state that clearly; the model should clarify or mark it unsupported rather than silently substitute.</p>
+            </div>
+          </details>
         </section>
 
         <section className="simulation-section" aria-labelledby="simulation-title">
           <div className="section-heading simulation-heading">
             <div>
-              <p className="eyebrow">Mechanics playback</p>
+              <p className="eyebrow">Preview and playback</p>
               <h2 id="simulation-title">Simulation canvas</h2>
             </div>
             <span className="simulation-unit">Z-up · metres · seconds</span>
@@ -537,3 +639,4 @@ export default function App() {
     </div>
   );
 }
+

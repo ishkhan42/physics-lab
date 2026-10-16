@@ -41,5 +41,6 @@ export interface MechanicsRuntime {
   /** Independent coherent values at the current simulation time. */
   snapshot(): InspectionSnapshot;
   advance(wallSeconds: number, speed: number): AdvanceResult;
+  reset(): void;
   dispose(): void;
 }

@@ -23,7 +23,7 @@ Live model checks require an authorized application API key supplied privately. 
   Learner check: Open the Mission Board, describe a mechanics situation, and inspect the paused setup. Tell us whether the scene represents the intended experiment and whether its initial assumptions/properties are understandable. In fast mode, the planned early hands-on checkpoint follows slice two, so the whole journey can be tried together.
   Commit: `Add prompt-to-paused MuJoCo experiments`
 
-- [ ] **2. Run, change speed, pause and inspect the actual physical state**
+- [x] **2. Run, change speed, pause and inspect the actual physical state**
   Becomes usable: A prepared experiment runs only after Run, supports 0.1x–10x playback, and can be paused to inspect every participating object's context-relevant state, including validated cable/constraint observations.
   Why now: Closes the functional learning loop before final presentation polish and exposes numerical/timing problems while the implementation is still easy to change.
   PRD ref: `prd.md > Simulation and Playback`, `prd.md > Read-Only Object Cards`, `prd.md > Observable Acceptance Criteria Already Established`.
@@ -45,14 +45,16 @@ Live model checks require an authorized application API key supplied privately. 
 
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — after slice two, try the complete describe–preview–Run–pause–inspect journey and use feedback to shape the final presentation.
+- [x] Early trial attempted and feedback received — the learner encountered a model-decision error before completing the journey and requested a high-grade usability revision. This is not a claim that the full journey worked for them.
 - [ ] Final kick-the-tires exploration and feedback completed — after slice three and any agreed revisions.
 
 ## Final Review
 
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship.
 
-Agreed revision tasks will be recorded here as unchecked items when actual feedback exists. No feedback or readiness confirmation has happened yet.
+Agreed revisions are implemented and mechanically verified below; leave them unchecked until the learner retries the affected behavior.
+- [ ] Retry the reported two-ball request and review the explicit current elasticity limitation rather than an opaque schema failure.
+- [ ] Try the revised composer/canvas layout, model settings, example prompts, playback/reset/view controls and inspection; confirm or refine the usability.
 
 ## Code Tour and App Map
 
@@ -71,5 +73,7 @@ Activity mode: Not started; a focused verification decision is recommended rathe
 - Functional code for the first two slices is implemented. Production build and 43 behavioral checks pass; Chromium checks exercised real MuJoCo, both playback endpoints, read-only observations, native-invalid/unsupported replacement preservation, changing wrap geometry, responsive layout and built WASM serving.
 - Initial browser checks used synthetic assembly responses only at the network boundary; no fake provider or interception is shipped. After the user supplied a private application key, an authenticated `openrouter/free` request passed scene generation, native paused preview, Run/Pause, both speed endpoints and frozen inspection without interception. The live-provider mechanical gate is cleared; learner hands-on reviews remain pending.
 - Native integration required explicit erasable TypeScript fields, equality-versus-limit row lookup, `mj_isSparse` layout detection, body/world velocity conversion and active native wrap-range handling. Corrected those internal assumptions without changing the product or replacing missing physics with invented values.
-- The same shared compiler/runtime supplies both functional slices. Their mechanical verification is now complete, including the real provider path. Final presentation work waits for the planned early learner feedback.
-- Live verification also exercised the same genuinely generated scene at 1×, 0.1× and 10×, then froze the body properties while orbiting the camera. Position and velocity agreed with the declared projectile conditions within the integration/display tolerance. Slice-two mechanical verification is complete; the next step is the learner's early hands-on checkpoint, not final presentation work.
+- The same shared compiler/runtime supplies both functional slices. Early trial feedback then reported invalid model output and requested high-grade UI/UX; that feedback activated the final workbench revision rather than another planning gate.
+- Revised presentation places the composer beside the canvas and inspection directly below it, with secondary model settings, editable prompt starters, focused clarification and preserved-preview context. A brief nonblocking entrance respects reduced motion. Native Reset, Fit view and speed shortcuts support repeated exploration without model calls.
+- Current production build and 45 behavioral checks pass. The reported elastic/inelastic prompt returned a genuine valid unsupported decision through the authorized free route; exact historical schema failure is unknown because its payload was not retained. Genuine two-sphere free fall passed native playback at both endpoints, numerical comparison, reset and view recovery. Synthetic error/delay/clarification probes verified UI recovery only; no fake provider or engine is shipped.
+- Actual desktop and 320px mobile surfaces were checked, including expanded settings/capabilities, reduced motion, zero horizontal overflow and local cancellation. Stop waiting does not promise to cancel upstream processing or billing. Learner retry and final readiness remain open.

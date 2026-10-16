@@ -88,6 +88,8 @@ Implements `prd.md > Mission Board`, `prd.md > Scenario Prompt and Assembly`.
 
 Report only real stages, without fabricated percentages or agent-log walls. Prevent duplicate in-flight submissions and stale responses replacing newer state. Pause the current experiment while preparing its replacement; retain it if replacement fails. State is in browser memory, so refresh starts a new session. No database, login, saved-scene service or conversation logging is added.
 
+Desktop uses a composer beside the simulation and inspection directly below the canvas; narrow screens stack them. A brief CSS entrance never blocks typing and respects reduced motion. Editable prompt starters fill descriptions only. Model settings are secondary, with route/cost warnings. Clarification focuses its answer field; current response and preserved-preview assumptions stay distinguishable. Stop waiting aborts the local fetch/candidate, invalidates stale work and preserves the active model; upstream computation and charges may continue.
+
 ### Model Contract and Catalog
 
 Implements `prd.md > Scenario Prompt and Assembly`, `scope.md > The Unique Kernel`.
@@ -158,6 +160,8 @@ Implements `prd.md > Simulation and Playback`.
 
 Pause stops stepping and preserves time/state; resume continues rather than recreating the model. Pause when hidden or when a wall-frame gap exceeds 0.25 s instead of accumulating unseen catch-up work. Bound work to 512 steps per frame, retaining the remainder; if more than one simulated second remains queued, pause and explain the resource limit rather than drop physics steps or pretend to sustain 10×. These are implementation safety defaults to validate against real scenes, not universal performance guarantees.
 
+`MechanicsRuntime.reset()` uses native `mj_resetData`, restores captured initial generalized positions and post-impulse velocities, clears the clock remainder and warning baseline, and recomputes current forces/observations. It reuses the compiled model, does not reapply impulses, remains paused and refits the camera. Fit view uses current geometry, including moving cable vertices, without altering the solver.
+
 ### Three.js Canvas and Read-Only Cards
 
 Implements `prd.md > Mission Board`, `prd.md > Simulation and Playback`, `prd.md > Read-Only Object Cards`.
@@ -190,7 +194,7 @@ Safety budgets start at 128 bodies, 128 constraints/tendons, 256 loads and 32 mu
 
 ## External Service Contracts
 
-`server/providers.ts` implements three direct adapters feeding the same decision schema. The initial compatibility baseline asks for exactly one JSON object using generated schema/catalog instructions. It does not require tool calling or native constrained output, so free models without those features remain selectable. Validate every response; no automatic repair calls, retry framework or provider/model fallback is added.
+`server/providers.ts` implements three direct adapters feeding the same decision schema. The compatibility baseline asks for one JSON object using generated schema/catalog instructions plus complete clarification/limitation examples. It does not require tool calling or native constrained output, so free models without those features remain selectable. Validate every response; no automatic repair calls, retry framework or provider/model fallback is added. Schema rejection includes at most four bounded field paths and issue codes, never raw response values or unknown field names.
 
 | Provider | Request | Accept/reject behavior |
 | --- | --- | --- |
@@ -273,7 +277,7 @@ Every build slice gets its mechanical verification. After integration, run the p
 
 ## Decisions and Open Issues
 
-The user approved the build order and fast mode. Production building, 43 behavioral checks and actual Chromium engine/UI checks pass. An authenticated `openrouter/free` request now passes model generation, paused native preview, Run/Pause and both speed endpoints with no interception. The learner's early hands-on feedback remains open; OpenAI/Anthropic live calls and final presentation/review are not claimed complete.
+The user approved the build order and fast mode, then supplied early trial feedback about an invalid decision and requested a high-grade usability revision. Production building, 45 behavioral checks and actual Chromium engine/UI checks pass. Authenticated `openrouter/free` generation, paused native preview, both speed endpoints, reset and camera recovery are exercised without interception; the reported elastic/inelastic request returned a valid limitation decision. The historical invalid payload is unavailable, so its exact violation is unknown. The responsive workbench revision is implemented; learner retry/final review and OpenAI/Anthropic live calls are not claimed complete.
 
 Source/provider contracts and numerical evidence informed the engineering defaults above. Any discovered change to the product, chosen architecture or supported physical meaning must be discussed, while routine internal corrections are recorded in the checklist's Revisions. A needed new model is not labeled impossible merely because it is absent.
 

@@ -21,6 +21,10 @@ export class FixedStepClock {
     this.stepSeconds = stepSeconds;
   }
 
+  reset(): void {
+    this.remainder = 0;
+  }
+
   advance(wallSeconds: number, speed: number, step: () => ClockStepResult, visible = true): AdvanceResult {
     if (!Number.isFinite(wallSeconds) || wallSeconds < 0) throw new RangeError('Elapsed wall time must be finite and nonnegative.');
     if (!Number.isFinite(speed) || speed < MIN_SPEED || speed > MAX_SPEED) throw new RangeError(`Playback speed must be between ${MIN_SPEED}× and ${MAX_SPEED}×.`);

@@ -142,6 +142,17 @@ export function extractOpenRouterText(value: unknown): string {
   return choice.message.content;
 }
 
+function schemaIssueSummary(error: z.ZodError): string {
+  const details = error.issues.slice(0, 4).map(({ code, path }) => {
+    const location = path.slice(0, 6).map(part => typeof part === 'number'
+      ? String(part)
+      : typeof part === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(part) ? part : '<field>').join('.');
+    const safeCode = /^[a-z_]{1,24}$/.test(code) ? code : 'validation';
+    return `${location || '<root>'} (${safeCode})`;
+  });
+  return details.length ? ` Schema issues: ${details.join(', ')}.` : '';
+}
+
 export function parseDecisionText(text: string): Decision {
   let value: unknown;
   try {
@@ -151,8 +162,13 @@ export function parseDecisionText(text: string): Decision {
   }
   try {
     return validateDecision(value);
-  } catch {
-    throw new ProviderError('invalid_model_response', 'The selected model returned a decision outside the supported physics schema.', 502);
+  } catch (error) {
+    const diagnostics = error instanceof z.ZodError ? schemaIssueSummary(error) : '';
+    throw new ProviderError(
+      'invalid_model_response',
+      `The selected model returned a decision outside the supported physics schema.${diagnostics}`,
+      502,
+    );
   }
 }
 

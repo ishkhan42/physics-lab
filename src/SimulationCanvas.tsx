@@ -177,7 +177,7 @@ function applyFrame(items: RenderItem[], visuals: VisualSet): void {
 }
 
 function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, group: Group): void {
-  const bounds = new Box3().setFromObject(group);
+  const bounds = new Box3().setFromObject(group, true);
   const center = bounds.getCenter(new Vector3());
   const size = bounds.getSize(new Vector3());
   const extent = Math.max(size.x, size.y, size.z, 4);
@@ -558,10 +558,39 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
     scheduleRef.current?.();
   };
 
+  const resetSimulation = () => {
+    const runtime = runtimeRef.current;
+    const visuals = visualSetRef.current;
+    const id = activeIdRef.current;
+    if (!runtime || !visuals || id === null) return;
+    stopSimulation('Reset to the initial conditions. Press Run to repeat the experiment.', false);
+    try {
+      runtime.reset();
+      applyFrame(runtime.frame(), visuals);
+      publishSnapshot(id, runtime);
+      setCandidateError('');
+      fitView();
+    } catch (error) {
+      setCandidateError(`Could not reset the model: ${describeError(error)}`);
+    }
+  };
+
+  const fitView = () => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const visuals = visualSetRef.current;
+    if (!camera || !controls || !visuals) return;
+    fitCamera(camera, controls, visuals.group);
+    scheduleRef.current?.();
+  };
+
   return (
     <div className="simulation-frame">
       <div className="simulation-viewport" ref={viewportRef}>
         <div className="canvas-orientation" aria-hidden="true">Z UP <span>·</span> SI</div>
+        <div className="canvas-tools">
+          <button className="secondary-button" type="button" onClick={fitView} disabled={!runtimeRef.current || preparing} title="Frame all objects without changing the simulation">Fit view</button>
+        </div>
         {!runtimeRef.current ? (
           <div className="canvas-empty-state" role="status">
             <span className="empty-orbit" aria-hidden="true"><i /><b /></span>
@@ -575,16 +604,22 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
       </div>
       <div className="simulation-controls">
         <div className="playback-control">
-          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={toggleRunning} disabled={!runtimeRef.current || preparing || Boolean(canvasIssue)}>
+          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={toggleRunning} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)}>
             {running ? 'Pause' : 'Run'}
           </button>
+          <button className="secondary-button" type="button" onClick={resetSimulation} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)} title="Return to the original positions and velocities without another model request">Reset</button>
           <span className={`run-state ${running ? 'run-state--active' : ''}`}><i aria-hidden="true" />{running ? 'RUNNING' : runtimeRef.current ? 'PAUSED' : 'NO MODEL'}</span>
         </div>
-        <label className="speed-control">
-          <span>Playback speed</span>
-          <input type="range" min="0.1" max="10" step="0.1" value={speed} onChange={event => updateSpeed(event.target.value)} aria-label="Playback speed from 0.1 to 10 times" />
+        <div className="speed-control">
+          <label htmlFor="playback-speed">Playback speed</label>
+          <input id="playback-speed" type="range" min="0.1" max="10" step="0.1" value={speed} onChange={event => updateSpeed(event.target.value)} aria-label="Playback speed from 0.1 to 10 times" />
           <output>{speed.toFixed(1)}×</output>
-        </label>
+          <span className="speed-presets" role="group" aria-label="Playback speed shortcuts">
+            {[0.1, 1, 10].map(preset => (
+              <button className="secondary-button" type="button" key={preset} value={preset} aria-pressed={speed === preset} onClick={event => updateSpeed(event.currentTarget.value)}>{preset}×</button>
+            ))}
+          </span>
+        </div>
         <output className="simulation-clock" aria-live="off"><span>SIM TIME</span><strong>{TIME_FORMAT.format(time)} <small>s</small></strong></output>
       </div>
       <p className="canvas-disclosure">Reference grid and 1 m axes are visual aids, not a generated floor. Infinite planes render as visible patches; point markers are not physical radii.</p>

@@ -23,7 +23,7 @@ function formatValue(value: Observation['value']): string {
 
 function ObjectCard({ entity }: { entity: EntityObservation }) {
   return (
-    <article className="object-card">
+    <article className="object-card" aria-label={`${ENTITY_LABELS[entity.kind]}: ${entity.label}`}>
       <header className="object-card__header">
         <span className="object-card__swatch" style={{ backgroundColor: entity.color }} aria-hidden="true" />
         <div className="object-card__title">

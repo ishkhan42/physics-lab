@@ -108,6 +108,27 @@ test('initial impulse is applied once and continuous force is recomputed instead
   }
 });
 
+test('reset restores the initial impulse state and discards queued fractional time', async () => {
+  const runtime = await createRuntime(freeSphereScene('Replay an impulse', [1, 0, 0], [
+    { kind: 'impulse', bodyId: 'body', linear: [4, 0, 0], angular: [0, 0, 0] },
+    { kind: 'force', bodyId: 'body', vector: [2, 0, 0], point: null },
+  ]));
+  try {
+    const initial = runtime.snapshot();
+    simulate(runtime, 0.1, 1);
+    runtime.advance(0.0009, 1);
+    runtime.reset();
+    assert.deepEqual(runtime.snapshot(), initial);
+    assert.equal(runtime.advance(0.0002, 1).steps, 0);
+    assert.equal(runtime.advance(0.0008, 1).steps, 1);
+    assert.ok(Math.abs(vectorValue(runtime.snapshot(), 'body', 'Velocity')[0] - 3.001) < 1e-10);
+    runtime.reset();
+    assert.deepEqual(runtime.snapshot(), initial);
+  } finally {
+    runtime.dispose();
+  }
+});
+
 test('drag uses current world velocity and uniform mutual gravity attracts point particles', async () => {
   const drag = await createRuntime(freeSphereScene('Linear drag', [1, 0, 0], [
     { kind: 'drag', bodyId: 'body', coefficient: 2, mediumVelocity: [0, 0, 0] },

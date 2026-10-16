@@ -26,7 +26,7 @@ Source: `scope.md > The Core Loop` and `scope.md > What "Working" Looks Like`.
 
 ### Opening Intro
 
-A thematic animated introduction leads into the Mission Board. This is an entrance to the lab, not a separate marketing site or an additional application workflow. Exact visual treatment, duration, and transition behavior remain to be defined.
+A brief thematic panel entrance leads directly into the Mission Board without a splash gate or delay to typing. Reduced motion bypasses decorative movement. This is an entrance to the lab, not a separate marketing site or additional workflow.
 
 ### Mission Board
 
@@ -37,7 +37,7 @@ One main page with these logical sections:
 - **Simulation canvas:** the scene and simulated motion.
 - **Object cards below the canvas:** every participating object is listed with its properties.
 
-The user specified the cards' placement below the simulation. Precise placement of the prompt and selector, responsive rearrangement, and relative section sizes are not yet chosen.
+The implementation places the composer beside the canvas on desktop, with object cards directly below the canvas so long interpretations do not bury the measurements. Narrow screens stack the same sections. Provider/category controls remain accessible in a secondary model-settings disclosure.
 
 Source: `scope.md > The POC Boundary`.
 
@@ -45,7 +45,7 @@ Source: `scope.md > The POC Boundary`.
 
 User direction: physics-lab character, Apple-inspired glassmorphism, and “kintict style UI/UX.”
 
-“Kinetic” interface motion is the working interpretation of “kintict,” not a confirmed reference to a particular product or design system. The themed intro is an explicit animation requirement. Exact colors, typography, and remaining motion language are not yet specified.
+“Kinetic” interface motion is the working interpretation of “kintict,” not a confirmed reference to a particular product or design system. The implementation uses graphite surfaces, a restrained cyan accent, frosted panels, system typography and a brief nonblocking entrance; motion yields to inspection and reduced-motion preferences.
 
 Apple-inspired glass is an aesthetic reference, not a claim of an official Apple web component system. This is an interactive laboratory workspace, not a marketing landing page; do not introduce pricing, testimonials, scroll-pinned promotional sections, or unrelated decoration.
 
@@ -78,6 +78,8 @@ Source: `scope.md > Explicitly Cut`.
 ### Simulation and Playback
 
 The canvas shows the assembled scene and its simulated behavior. Playback must support 0.1× through 10× and pausing at any simulation moment.
+
+Reset restores the original paused positions and post-impulse velocities, clears queued playback time and reframes the scene without a provider request. Fit view changes only the camera. Speed shortcuts supplement the continuous range control.
 
 Source: `scope.md > What "Working" Looks Like`.
 

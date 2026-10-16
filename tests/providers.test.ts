@@ -17,6 +17,27 @@ const validClarification = {
   scene: null,
 };
 
+test('invalid model diagnostics expose only bounded schema paths and issue codes', () => {
+  const sentinel = 'SENSITIVE_PROMPT_SENTINEL';
+  const malformed = {
+    ...validClarification,
+    question: 42,
+    summary: sentinel,
+    private_prompt_field: sentinel,
+  };
+  assert.throws(() => parseDecisionText(JSON.stringify(malformed)), error => {
+    assert.ok(error instanceof ProviderError);
+    assert.equal(error.code, 'invalid_model_response');
+    assert.match(error.message, /question \(invalid_type\)/);
+    assert.match(error.message, /<root> \(unrecognized_keys\)/);
+    assert.ok(!error.message.includes(sentinel));
+    assert.ok(!error.message.includes('private_prompt_field'));
+    assert.ok(error.message.length < 1024);
+    return true;
+  });
+});
+
+
 function assertProviderError(action: () => unknown, code: string): void {
   assert.throws(action, error => error instanceof ProviderError && error.code === code);
 }

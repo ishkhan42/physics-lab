@@ -312,6 +312,8 @@ class MuJoCoRuntime implements MechanicsRuntime {
   private readonly bodyById: Map<string, BodyBinding>;
   private readonly renderItems: RenderItem[];
   private readonly warningBaseline: number[];
+  private readonly initialQpos: Float64Array;
+  private readonly initialQvel: Float64Array;
   private disposed = false;
   private constraintObservationsValid = false;
 
@@ -343,6 +345,8 @@ class MuJoCoRuntime implements MechanicsRuntime {
     this.warningBaseline = warningBaseline;
     const refreshReason = this.refreshCurrentState();
     if (refreshReason) throw new Error(refreshReason);
+    this.initialQpos = data.qpos.slice();
+    this.initialQvel = data.qvel.slice();
     this.updateFrame();
   }
 
@@ -487,6 +491,18 @@ class MuJoCoRuntime implements MechanicsRuntime {
       if (refreshReason) result.pauseReason = result.pauseReason ? `${result.pauseReason} ${refreshReason}` : refreshReason;
     }
     return result;
+  }
+
+  reset(): void {
+    this.assertLive();
+    this.mujoco.mj_resetData(this.model, this.data);
+    this.data.qpos.set(this.initialQpos);
+    this.data.qvel.set(this.initialQvel);
+    this.clock.reset();
+    this.warningBaseline.fill(0);
+    const reason = this.refreshCurrentState();
+    if (reason) throw new Error(reason);
+    this.updateFrame();
   }
 
   dispose(): void {

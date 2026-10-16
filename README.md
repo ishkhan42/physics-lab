@@ -4,7 +4,7 @@ A web mechanics lab that turns a described situation into a validated MuJoCo mod
 
 ## Development status
 
-The functional experiment, playback and inspection code is implemented. The production build, 43 behavioral regressions and actual Chromium/WASM checks pass. An authenticated `openrouter/free` description-to-preview-to-playback journey has also passed. Presentation finishing and the learner's hands-on reviews remain in the [build checklist](devpost/checklist.md); the app is not declared ready to ship. OpenAI and Anthropic have not been exercised live.
+The experiment, playback, inspection and responsive workbench are implemented. The production build and 45 behavioral regressions pass. Actual Chromium/WASM checks include authenticated `openrouter/free` generation, native playback/reset, camera recovery, narrow layout and reduced motion. The learner reported an early assembly failure and requested the usability revision; their retry and final hands-on review remain in the [build checklist](devpost/checklist.md). The app is not declared ready to ship. OpenAI and Anthropic have not been exercised live.
 
 The application never loads a pretend model when credentials are missing. Earlier browser checks used synthetic assembly responses only at the test boundary; the subsequent authenticated OpenRouter check used no interception or synthetic response. No fake provider is part of the app.
 
@@ -47,13 +47,15 @@ Tests use native Node HTTP and actual MuJoCo WASM, with no live provider calls o
 
 ## Use
 
-1. Select a configured provider and model. OpenRouter's `openrouter/free` route and current free variants are supported; other model IDs can be entered explicitly.
-2. Describe the mechanics situation and known conditions. Answer a consequential clarification if requested.
-3. Inspect the paused interpretation, assumptions, geometry and initial object properties.
-4. Press Run, select playback from 0.1× through 10×, and pause to inspect the current state.
-5. Submit another situation when needed. Failed or unsupported replacements preserve the previous experiment and prompt.
+1. Describe a mechanics situation, or fill an editable example prompt. Examples do not send a request or load a canned simulation.
+2. Press Assemble scene. The configured free route is selected initially; expand Model settings to choose another provider/model. Answer a focused clarification if requested.
+3. Check the paused interpretation, assumptions, geometry and initial object properties. Desktop inspection sits directly below the canvas; mobile stacks the workbench.
+4. Press Run, use the slider or 0.1×/1×/10× shortcuts, and pause to inspect. Reset restores the initial state and view without another model call; Fit view frames the current objects without changing physics.
+5. Submit another situation when needed. Failed or unsupported replacements preserve the previous experiment and prompt. Stop waiting cancels the local wait, not guaranteed upstream processing or billing.
 
-Free models still require a key and have changing quotas, availability and output reliability. Paid models may charge the operator. There are no hidden repair calls, retries or paid fallbacks. Malformed or unsupported output is an error, not an invented simulation.
+Free models still require a key and have changing quotas, availability and output reliability. Paid models may charge the operator. There are no hidden repair calls, retries or paid fallbacks. Malformed output is rejected and unsupported physical requests are explained, never replaced with an invented simulation.
+
+Complete scene, clarification and limitation decisions share one strict contract. Instructions include explicit branch examples; rejected schema output reports bounded field paths and issue codes, not response values. An elastic-versus-inelastic bounce request is explained as a current modeling limitation rather than silently dropping elasticity. The original reported invalid payload was not retained, so its exact violation is unknown.
 
 ## Physics and safety boundaries
 
