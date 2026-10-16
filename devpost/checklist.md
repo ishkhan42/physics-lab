@@ -1,0 +1,74 @@
+---
+doc: checklist
+status: approved
+---
+
+# Build Checklist
+
+Build mode: fast. The learner approved the presented build order and fast mode. Verification, commits, early hands-on feedback and final review remain required.
+
+Scope, PRD, the MuJoCo technical direction and this build order are approved. Each slice leaves usable behavior rather than a hidden layer. No public deployment or submission is included.
+
+Live model checks require an authorized application API key supplied privately. Missing credentials are an external prerequisite, never permission to substitute a fake model. Do not copy coding-agent credentials or publish personal learner context.
+
+## Slices
+
+- [ ] **1. Describe a mechanics situation and inspect a real paused experiment**
+  Becomes usable: A local Mission Board accepts a description through a configured provider, asks a consequential clarification if needed, compiles the resulting mechanics data with actual MuJoCo, and shows a paused 3D scene with initial object properties and assumptions.
+  Why now: Proves the unique kernel early: description to composed physics model, not a generic interface waiting for its core feature. Project bootstrapping is included here.
+  PRD ref: `prd.md > The Core Journey`, `prd.md > Scenario Prompt and Assembly`, `prd.md > Mission Board`, `prd.md > Read-Only Object Cards`.
+  Spec ref: `spec.md > Model Contract and Catalog`, `spec.md > MuJoCo Model Builder`, `spec.md > Provider API and Local Security`, `spec.md > Three.js Canvas and Read-Only Cards`, `spec.md > File Structure`.
+  Build: Install the pinned UI/rendering/MuJoCo/validation dependencies and native Node tooling; add runnable commands, the shared strict model contract/catalog, trusted MJCF compiler, actual WASM lifecycle, three provider adapters, secure local API, minimal styled Mission Board, paused canvas and contextual initial cards. Advertise only implemented physical blocks. Preserve prompt/scene on a real error, and provide honest missing-key guidance.
+  Verify (mechanical): Run the production build and available behavioral checks. Start the documented local services and exercise one real configured-provider prompt in the browser through interpretation, any necessary clarification, native compilation and paused preview. Independently verify trusted compiler/frame/constraint behavior with synthetic numerical cases. Verify model output never supplies unrestricted XML/code and a missing key is not a fabricated success.
+  Learner check: Open the Mission Board, describe a mechanics situation, and inspect the paused setup. Tell us whether the scene represents the intended experiment and whether its initial assumptions/properties are understandable. In fast mode, the planned early hands-on checkpoint follows slice two, so the whole journey can be tried together.
+  Commit: `Add prompt-to-paused MuJoCo experiments`
+
+- [ ] **2. Run, change speed, pause and inspect the actual physical state**
+  Becomes usable: A prepared experiment runs only after Run, supports 0.1x–10x playback, and can be paused to inspect every participating object's context-relevant state, including validated cable/constraint observations.
+  Why now: Closes the functional learning loop before final presentation polish and exposes numerical/timing problems while the implementation is still easy to change.
+  PRD ref: `prd.md > Simulation and Playback`, `prd.md > Read-Only Object Cards`, `prd.md > Observable Acceptance Criteria Already Established`.
+  Spec ref: `spec.md > MuJoCo Runtime and Observations`, `spec.md > Playback Clock`, `spec.md > Three.js Canvas and Read-Only Cards`, `spec.md > Verification and Prior Evidence`.
+  Build: Complete fixed-step advancement, correctly ordered state-dependent loads and exactly-once impulses, native constraint/readout mappings, consistent render/card snapshots, pause/resume, speed controls and resource/numerical-failure handling. Keep raw engine views private and refresh derived data at the actual displayed time. Use defined profiles rather than silently changing requested physical laws or coefficients.
+  Verify (mechanical): Run behavioral regressions and the production build. Exercise a real generated experiment in the browser at both speed endpoints, Run, pause, resume and inspection. Check analytical free flight and the routed-tendon Atwood reference, timestep convergence, equal-time states across speeds, signed force mapping, no cumulative load/duplicate impulse, and no mutation of a paused published snapshot. Verify requested unavailable models/observables are explained rather than invented.
+  Learner check: Try a scenario out of curiosity or to check a solution. Run it, change speed, pause at a chosen moment and read the object cards. What did you notice, and what would you change?
+  Commit: `Add physical playback and contextual inspection`
+
+- [ ] **3. Finish a coherent Mission Board and production-local core journey**
+  Becomes usable: The complete app opens through its themed intro into the physics-lab/glass/kinetic workspace, works at narrow widths and with reduced motion, preserves a previous experiment on failed replacement, and runs from the built local server.
+  Why now: Earlier feedback can shape the final look and interaction without rebuilding the physics kernel. This step completes the promised product rather than adding another feature family.
+  PRD ref: `prd.md > Opening Intro`, `prd.md > Mission Board`, `prd.md > Look and Feel`, `prd.md > Approved Conventional Defaults`, `prd.md > Scenario Prompt and Assembly`.
+  Spec ref: `spec.md > Look and Feel`, `spec.md > Mission Board and Assembly State`, `spec.md > Provider API and Local Security`, `spec.md > Where It Runs and How Someone Tries It`, `spec.md > Data Ownership and Future Physics`.
+  Build: Complete the themed/skippable intro, accessible responsive presentation, truthful assembly states, robust replacement/disposal, provider/free-model controls, safe static production serving, documented private credential setup, actual run instructions and changelog. Preserve all agreed sections and read-only inspection. No placeholder future physics engines, database, account system, public proxy or fake sample results.
+  Verify (mechanical): Run the current production build and full behavioral suite, then launch npm start and exercise the real browser core journey from intro to paused inspection using an authorized configured provider. Check reduced motion, keyboard/focus/contrast, narrow layout, actual WASM asset loading, free selection without paid fallback, unsupported/invalid inputs, failed replacement preserving data, and repeated scene disposal. Use isolated local error cases rather than deliberately exhausting paid API quotas. Inspect intended staged changes for secrets and unrelated work before committing.
+  Learner check: Explore the completed running app freely, including awkward prompts, simulation controls and inspection. Identify anything broken, confusing or worth changing; agree refinements before they are implemented. Confirm readiness only after the agreed changes have been tried and verified.
+  Commit: `Complete the Mission Board experience`
+
+## Hands-on Checkpoints
+
+- [ ] Early usable behavior explored — after slice two, try the complete describe–preview–Run–pause–inspect journey and use feedback to shape the final presentation.
+- [ ] Final kick-the-tires exploration and feedback completed — after slice three and any agreed revisions.
+
+## Final Review
+
+- [ ] Final review complete — feedback resolved and learner confirms ready to ship.
+
+Agreed revision tasks will be recorded here as unchecked items when actual feedback exists. No feedback or readiness confirmation has happened yet.
+
+## Code Tour and App Map
+
+- [ ] Learning activity complete — connect a real model-to-observable or numerical-validation decision to a reusable practice.
+- [ ] Optional edit and transfer reflection addressed — offered, declined, already covered or not applicable, without inventing a new learning goal.
+- [ ] `devpost/app-map.html` generated from finished code, checked and shown, including a project-grounded practice to reuse.
+
+Activity and evidence: No activity has taken place; use actual implementation and verification evidence after final revisions.
+Route and stops: No code route has been selected before the application exists; record actual paths/symbols when complete.
+Edit outcome: No optional edit offered or performed yet.
+Reflection: Not yet offered; any personal answer belongs in the private learner profile.
+Activity mode: Not started; a focused verification decision is recommended rather than a redundant beginner tour.
+
+## Revisions
+
+- Functional code for the first two slices is implemented. Production build and 43 behavioral checks pass; Chromium checks exercised real MuJoCo, both playback endpoints, read-only observations, native-invalid/unsupported replacement preservation, changing wrap geometry, responsive layout and built WASM serving.
+- Those browser checks supplied a synthetic assembly response at the network boundary because no authorized application keyfile is configured. No fake model or interception is shipped. A real provider-to-scene call is still required before treating either slice as fully verified; their boxes remain unchecked and hands-on reviews remain pending.
+- Native integration required explicit erasable TypeScript fields, equality-versus-limit row lookup, `mj_isSparse` layout detection, body/world velocity conversion and active native wrap-range handling. Corrected those internal assumptions without changing the product or replacing missing physics with invented values.
+- The same shared compiler/runtime supplies both functional slices; the pending live-provider gate is not bypassed by the successful independent engine/UI checks. Final presentation work waits for the planned early feedback.

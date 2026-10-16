@@ -1,0 +1,51 @@
+import type { AdvanceResult } from './types.ts';
+
+export const FIXED_TIMESTEP = 0.001;
+const MAX_FRAME_GAP = 0.25;
+const MAX_STEPS_PER_FRAME = 512;
+const MAX_QUEUED_TIME = 1;
+const MIN_SPEED = 0.1;
+const MAX_SPEED = 10;
+
+export interface ClockStepResult {
+  advanced: boolean;
+  pauseReason: string | null;
+}
+
+export class FixedStepClock {
+  readonly stepSeconds: number;
+  private remainder = 0;
+
+  constructor(stepSeconds = FIXED_TIMESTEP) {
+    if (!Number.isFinite(stepSeconds) || stepSeconds <= 0) throw new RangeError('The fixed timestep must be finite and positive.');
+    this.stepSeconds = stepSeconds;
+  }
+
+  advance(wallSeconds: number, speed: number, step: () => ClockStepResult, visible = true): AdvanceResult {
+    if (!Number.isFinite(wallSeconds) || wallSeconds < 0) throw new RangeError('Elapsed wall time must be finite and nonnegative.');
+    if (!Number.isFinite(speed) || speed < MIN_SPEED || speed > MAX_SPEED) throw new RangeError(`Playback speed must be between ${MIN_SPEED}× and ${MAX_SPEED}×.`);
+    if (!visible) return { steps: 0, pauseReason: 'Simulation paused while the page is hidden.' };
+    if (wallSeconds > MAX_FRAME_GAP) return { steps: 0, pauseReason: 'Simulation paused after a long frame gap.' };
+
+    this.remainder += wallSeconds * speed;
+    let steps = 0;
+    let pauseReason: string | null = null;
+    const epsilon = this.stepSeconds * 1e-9;
+    while (steps < MAX_STEPS_PER_FRAME && this.remainder + epsilon >= this.stepSeconds) {
+      const result = step();
+      if (result.advanced) {
+        this.remainder = Math.max(0, this.remainder - this.stepSeconds);
+        steps++;
+      }
+      if (result.pauseReason) {
+        pauseReason = result.pauseReason;
+        break;
+      }
+      if (!result.advanced) break;
+    }
+    if (!pauseReason && this.remainder > MAX_QUEUED_TIME) {
+      pauseReason = 'Simulation paused because more than one simulated second is queued; physics steps were retained.';
+    }
+    return { steps, pauseReason };
+  }
+}
