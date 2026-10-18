@@ -56,6 +56,27 @@ test('free projectile matches analytical horizontal launch', async () => {
   }
 });
 
+test('a browser work budget defers fixed steps but never skips them', async () => {
+  const budgeted = await createRuntime(projectile());
+  const reference = await createRuntime(projectile());
+  try {
+    assert.equal(budgeted.advance(0.1, 1, 0).steps, 1);
+    let total = 1;
+    for (let call = 0; call < 200; call++) {
+      const result = budgeted.advance(0, 1, 0);
+      assert.equal(result.pauseReason, null);
+      total += result.steps;
+      if (result.steps === 0) break;
+    }
+    assert.equal(total, 100);
+    reference.advance(0.1, 1);
+    assert.deepEqual(vectorValue(budgeted.snapshot(), 'ball', 'Position'), vectorValue(reference.snapshot(), 'ball', 'Position'));
+  } finally {
+    budgeted.dispose();
+    reference.dispose();
+  }
+});
+
 test('generated initial world poses use zero joint coordinates without applying the displacement twice', async () => {
   const decision = parseDecisionText(JSON.stringify({ decision: {
     kind: 'scene', summary: 'A guided sphere pulled toward its spring equilibrium.', assumptions: [],

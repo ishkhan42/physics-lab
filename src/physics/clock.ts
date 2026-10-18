@@ -3,7 +3,6 @@ import type { AdvanceResult } from './types.ts';
 export const FIXED_TIMESTEP = 0.001;
 const MAX_FRAME_GAP = 0.25;
 const MAX_STEPS_PER_FRAME = 512;
-const MAX_QUEUED_TIME = 1;
 const MIN_SPEED = 0.1;
 const MAX_SPEED = 10;
 
@@ -47,8 +46,11 @@ export class FixedStepClock {
       }
       if (!result.advanced) break;
     }
-    if (!pauseReason && this.remainder > MAX_QUEUED_TIME) {
-      pauseReason = 'Simulation paused because more than one simulated second is queued; physics steps were retained.';
+    const maxQueued = MAX_STEPS_PER_FRAME * this.stepSeconds;
+    if (!pauseReason && this.remainder > maxQueued) {
+      // The device is slower than the selected speed: keep integrating every fixed step, but stop owing wall time.
+      this.remainder = maxQueued;
+      return { steps, pauseReason, throttled: true };
     }
     return { steps, pauseReason };
   }

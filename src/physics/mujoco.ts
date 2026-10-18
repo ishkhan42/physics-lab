@@ -12,6 +12,7 @@ const WARNING_LABELS: Record<number, string> = {
   0: 'inertia', 1: 'contact capacity', 2: 'constraint capacity', 3: 'position', 4: 'velocity', 5: 'acceleration', 6: 'control',
 };
 const COMPLETED_STEP = { advanced: true, pauseReason: null } as const;
+const DEFERRED_STEP = { advanced: false, pauseReason: null } as const;
 
 const wasmAsset = new URL('../../node_modules/@mujoco/mujoco/mujoco.wasm', import.meta.url);
 let modulePromise: Promise<MainModule> | undefined;
@@ -514,10 +515,17 @@ class MuJoCoRuntime implements MechanicsRuntime {
     return { time: this.data.time, entities, notes };
   }
 
-  advance(wallSeconds: number, speed: number): AdvanceResult {
+  advance(wallSeconds: number, speed: number, workBudgetMs = Infinity): AdvanceResult {
     this.assertLive();
     const visible = typeof document === 'undefined' || !document.hidden;
-    const result = this.clock.advance(wallSeconds, speed, () => this.step(), visible);
+    // Unfinished fixed steps stay queued in the clock when the caller's work budget runs out; none are skipped.
+    const deadline = performance.now() + workBudgetMs;
+    let stepped = 0;
+    const result = this.clock.advance(wallSeconds, speed, () => {
+      if (stepped > 0 && performance.now() > deadline) return DEFERRED_STEP;
+      stepped += 1;
+      return this.step();
+    }, visible);
     if (result.steps > 0) {
       const refreshReason = this.refreshCurrentState();
       if (refreshReason) result.pauseReason = result.pauseReason ? `${result.pauseReason} ${refreshReason}` : refreshReason;

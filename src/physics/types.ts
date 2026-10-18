@@ -32,6 +32,8 @@ export interface InspectionSnapshot {
 export interface AdvanceResult {
   steps: number;
   pauseReason: string | null;
+  /** Set when this device could not keep up with the selected speed; queued wall time was discarded, never physics steps. */
+  throttled?: true;
 }
 export interface MechanicsRuntime {
   readonly scene: Scene;
@@ -40,7 +42,8 @@ export interface MechanicsRuntime {
   frame(): RenderItem[];
   /** Independent coherent values at the current simulation time. */
   snapshot(): InspectionSnapshot;
-  advance(wallSeconds: number, speed: number): AdvanceResult;
+  /** workBudgetMs bounds wall-clock work per call (browser frames); omit it for deterministic stepping. */
+  advance(wallSeconds: number, speed: number, workBudgetMs?: number): AdvanceResult;
   reset(): void;
   dispose(): void;
 }

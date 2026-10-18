@@ -13,17 +13,20 @@ test('fixed clock carries fractional time and consumes only fixed steps', () => 
   assert.equal(steps, 1);
 });
 
-test('clock bounds frame work and retains queued simulation time', () => {
+test('a device slower than the selected speed keeps stepping without pausing or building unbounded debt', () => {
   const clock = new FixedStepClock(0.001);
   let steps = 0;
-  const result = clock.advance(0.25, 10, () => { steps++; return advanceStep; });
-  assert.equal(result.steps, 512);
-  assert.match(result.pauseReason ?? '', /one simulated second is queued/);
-  assert.equal(steps, 512);
-  const resumed = clock.advance(0, 1, () => { steps++; return advanceStep; });
-  assert.equal(resumed.steps, 512);
-  assert.match(resumed.pauseReason ?? '', /one simulated second is queued/);
-  assert.equal(steps, 1024);
+  const step = () => { steps++; return advanceStep; };
+  for (let frame = 0; frame < 20; frame++) {
+    const result = clock.advance(0.2, 10, step);
+    assert.equal(result.pauseReason, null);
+    assert.equal(result.steps, 512);
+    assert.equal(result.throttled, true);
+  }
+  // Queued time is capped, so the next idle frame drains at most one frame of work instead of seconds of hidden catch-up.
+  assert.equal(clock.advance(0, 1, step).steps, 512);
+  assert.deepEqual(clock.advance(0, 1, step), { steps: 0, pauseReason: null });
+  assert.equal(steps, 20 * 512 + 512);
 });
 
 test('clock rejects hidden pages and long frame gaps without adding wall time', () => {

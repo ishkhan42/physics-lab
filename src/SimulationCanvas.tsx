@@ -1,6 +1,7 @@
-import { ArrowCounterClockwise, CornersOut, Pause, Play } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, CornersOut, Crosshair, Pause, Play } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  CanvasTexture,
   AxesHelper,
   Box3,
   BoxGeometry,
@@ -20,6 +21,8 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   PerspectiveCamera,
+  Points,
+  PointsMaterial,
   Scene as ThreeScene,
   SphereGeometry,
   PlaneGeometry,
@@ -51,10 +54,56 @@ interface SimulationCanvasProps {
   groundDisabled: boolean;
   onPhysicalGroundChange: (enabled: boolean) => void;
 }
+
+interface Track {
+  object: Object3D;
+  trail: Line;
+  positions: Float32Array;
+  count: number;
+  bounds: Box3;
+}
+
+interface Marked {
+  object: Object3D;
+  marker: Points;
+  radius: number;
+}
+
 interface VisualSet {
   group: Group;
   objects: Map<string, Object3D>;
   lines: Map<string, Line>;
+  tracks: Track[];
+  marked: Marked[];
+  planes: Mesh[];
+}
+
+const TRAIL_CAPACITY = 2048;
+const GRID_SIZE = 12;
+const GRID_DIVISIONS = 24;
+let markerTextureCache: CanvasTexture | null = null;
+
+// Screen-size ring so small or distant moving bodies stay visible; tinted by the material colour.
+function markerTexture(): CanvasTexture {
+  if (markerTextureCache) return markerTextureCache;
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.strokeStyle = '#ffffff';
+    context.fillStyle = '#ffffff';
+    context.lineWidth = 9;
+    context.beginPath();
+    context.arc(32, 32, 24, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.arc(32, 32, 7, 0, Math.PI * 2);
+    context.fill();
+  }
+  markerTextureCache = new CanvasTexture(canvas);
+  markerTextureCache.colorSpace = SRGBColorSpace;
+  return markerTextureCache;
 }
 
 const initialCameraDirection = new Vector3(1, -1.25, 0.9).normalize();
@@ -66,7 +115,7 @@ function describeError(error: unknown): string {
 
 function disposeGroup(group: Group): void {
   group.traverse(object => {
-    if (!(object instanceof Mesh) && !(object instanceof Line)) return;
+    if (!(object instanceof Mesh) && !(object instanceof Line) && !(object instanceof Points)) return;
     object.geometry.dispose();
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) material.dispose();
@@ -123,11 +172,14 @@ function createVisual(item: RenderItem): Object3D {
   return mesh;
 }
 
-function createVisualSet(items: RenderItem[]): VisualSet {
+function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet {
   if (items.length === 0) throw new Error('The runtime returned no renderable scene items.');
   const group = new Group();
   const objects = new Map<string, Object3D>();
   const lines = new Map<string, Line>();
+  const tracks: Track[] = [];
+  const marked: Marked[] = [];
+  const planes: Mesh[] = [];
   try {
     for (const item of items) {
       if (objects.has(item.id)) throw new Error(`The runtime returned a duplicate render ID: ${item.id}.`);
@@ -139,14 +191,112 @@ function createVisualSet(items: RenderItem[]): VisualSet {
       } else {
         object.position.set(item.position[0], item.position[1], item.position[2]);
         object.quaternion.set(item.quaternion[0], item.quaternion[1], item.quaternion[2], item.quaternion[3]);
+        if (object instanceof Mesh && object.geometry instanceof PlaneGeometry) planes.push(object);
+        else if (object instanceof Mesh) {
+          const markerGeometry = new BufferGeometry();
+          markerGeometry.setAttribute('position', new BufferAttribute(new Float32Array(3), 3));
+          const marker = new Points(markerGeometry, new PointsMaterial({
+            color: item.color, size: 18, sizeAttenuation: false, map: markerTexture(), transparent: true, depthTest: false, depthWrite: false,
+          }));
+          marker.renderOrder = 3;
+          marker.frustumCulled = false;
+          marker.visible = false;
+          object.add(marker);
+          object.geometry.computeBoundingSphere();
+          const radius = (object.geometry.boundingSphere?.radius ?? 0) * Math.max(object.scale.x, object.scale.y, object.scale.z);
+          marked.push({ object, marker, radius });
+          if (movingIds.has(item.entityId)) {
+            const positions = new Float32Array(TRAIL_CAPACITY * 3);
+            const geometry = new BufferGeometry();
+            geometry.setAttribute('position', new BufferAttribute(positions, 3).setUsage(DynamicDrawUsage));
+            geometry.setDrawRange(0, 0);
+            const trail = new Line(geometry, new LineBasicMaterial({ color: item.color, transparent: true, opacity: 0.65 }));
+            trail.frustumCulled = false;
+            group.add(trail);
+            tracks.push({ object, trail, positions, count: 0, bounds: new Box3() });
+          }
+        }
       }
       objects.set(item.id, object);
       group.add(object);
     }
-    return { group, objects, lines };
+    const visuals = { group, objects, lines, tracks, marked, planes };
+    clearTrails(visuals);
+    return visuals;
   } catch (error) {
     disposeGroup(group);
     throw error;
+  }
+}
+
+function recordTrails(visuals: VisualSet): void {
+  for (const track of visuals.tracks) {
+    const { x, y, z } = track.object.position;
+    if (track.count > 0) {
+      const last = (track.count - 1) * 3;
+      if (Math.abs(track.positions[last] - x) + Math.abs(track.positions[last + 1] - y) + Math.abs(track.positions[last + 2] - z) < 1e-5) continue;
+    }
+    if (track.count === TRAIL_CAPACITY) {
+      // Halve resolution instead of dropping the start, so a long flight keeps its whole path.
+      const kept = Math.ceil(track.count / 2);
+      for (let index = 1; index < kept; index += 1) track.positions.copyWithin(index * 3, index * 6, index * 6 + 3);
+      track.count = kept;
+    }
+    track.positions.set([x, y, z], track.count * 3);
+    track.count += 1;
+    track.bounds.expandByPoint(track.object.position);
+    track.trail.geometry.setDrawRange(0, track.count);
+    track.trail.geometry.getAttribute('position').needsUpdate = true;
+  }
+}
+
+function clearTrails(visuals: VisualSet): void {
+  for (const track of visuals.tracks) {
+    track.count = 0;
+    track.bounds.makeEmpty();
+  }
+  recordTrails(visuals);
+}
+
+/** Bodies, cables and recorded paths; infinite planes contribute only their reference point. */
+function sceneBounds(visuals: VisualSet): Box3 {
+  const bounds = new Box3();
+  const point = new Vector3();
+  for (const object of visuals.objects.values()) {
+    if (object instanceof Mesh && object.geometry instanceof PlaneGeometry) bounds.expandByPoint(object.getWorldPosition(point));
+    else bounds.expandByObject(object, true);
+  }
+  for (const track of visuals.tracks) bounds.union(track.bounds);
+  return bounds;
+}
+
+function framing(camera: PerspectiveCamera, bounds: Box3): { center: Vector3; distance: number; radius: number } {
+  const center = bounds.getCenter(new Vector3());
+  const radius = Math.max(bounds.getSize(new Vector3()).length() / 2, 0.75);
+  const verticalHalfAngle = camera.fov * Math.PI / 360;
+  const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * camera.aspect);
+  return { center, radius, distance: radius * 1.2 / Math.sin(Math.min(verticalHalfAngle, horizontalHalfAngle)) };
+}
+
+function applyCameraRange(camera: PerspectiveCamera, distance: number): void {
+  camera.near = Math.max(distance / 5000, 0.001);
+  camera.far = Math.max(distance * 100, 100);
+  camera.updateProjectionMatrix();
+}
+
+/** Grid and infinite-plane patches grow in powers of ten with the scene; returns the grid cell size in metres. */
+function scaleReferences(visuals: VisualSet, grid: Object3D, radius: number): number {
+  const scale = Math.max(1, 10 ** Math.ceil(Math.log10(radius / (GRID_SIZE / 2))));
+  grid.scale.setScalar(scale);
+  for (const plane of visuals.planes) plane.scale.set(scale, scale, 1);
+  return GRID_SIZE / GRID_DIVISIONS * scale;
+}
+
+function updateMarkers(visuals: VisualSet, camera: PerspectiveCamera, viewportHeight: number): void {
+  const pixelsPerUnitAtOne = viewportHeight / 2 / Math.tan(camera.fov * Math.PI / 360);
+  for (const item of visuals.marked) {
+    const distance = Math.max(camera.position.distanceTo(item.object.position), 1e-6);
+    item.marker.visible = item.radius * pixelsPerUnitAtOne / distance < 5;
   }
 }
 
@@ -181,26 +331,28 @@ function applyFrame(items: RenderItem[], visuals: VisualSet): void {
   }
 }
 
-function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, group: Group): void {
-  const bounds = new Box3();
-  const planeOrigin = new Vector3();
-  for (const object of group.children) {
-    // Infinite planes contribute their reference point, not their arbitrary visible patch size.
-    if (object instanceof Mesh && object.geometry instanceof PlaneGeometry) bounds.expandByPoint(object.getWorldPosition(planeOrigin));
-    else bounds.expandByObject(object, true);
-  }
-  const center = bounds.getCenter(new Vector3());
-  const size = bounds.getSize(new Vector3());
-  const radius = Math.max(size.length() / 2, 0.75);
-  const verticalHalfAngle = camera.fov * Math.PI / 360;
-  const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * camera.aspect);
-  const distance = radius * 1.2 / Math.sin(Math.min(verticalHalfAngle, horizontalHalfAngle));
+/** Snaps to the default viewing direction; returns the framed radius. */
+function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, visuals: VisualSet): number {
+  const { center, distance, radius } = framing(camera, sceneBounds(visuals));
   camera.position.copy(center).addScaledVector(initialCameraDirection, distance);
-  camera.near = Math.max(distance / 5000, 0.001);
-  camera.far = Math.max(distance * 100, 100);
-  camera.updateProjectionMatrix();
+  applyCameraRange(camera, distance);
   controls.target.copy(center);
   controls.update();
+  return radius;
+}
+
+/** Eases toward framing everything, keeping the user's viewing direction; returns the framed radius. */
+function followCamera(camera: PerspectiveCamera, controls: OrbitControls, visuals: VisualSet): number {
+  const { center, distance, radius } = framing(camera, sceneBounds(visuals));
+  const direction = camera.position.clone().sub(controls.target);
+  const currentDistance = Math.max(direction.length(), 1e-6);
+  direction.divideScalar(currentDistance);
+  const nextDistance = currentDistance + (distance - currentDistance) * 0.18;
+  controls.target.lerp(center, 0.18);
+  camera.position.copy(controls.target).addScaledVector(direction, nextDistance);
+  applyCameraRange(camera, nextDistance);
+  controls.update();
+  return radius;
 }
 
 
@@ -241,6 +393,24 @@ export default function SimulationCanvas({
   const preparingRef = useRef(preparing);
   const replacementPendingRef = useRef(replacementPending);
   const [pauseReason, setPauseReason] = useState('');
+  const [follow, setFollow] = useState(true);
+  const [throttled, setThrottled] = useState(false);
+  const throttledRef = useRef(false);
+  const lastThrottledAtRef = useRef(-Infinity);
+  const followRef = useRef(true);
+  const [gridCell, setGridCell] = useState(GRID_SIZE / GRID_DIVISIONS);
+  const gridCellRef = useRef(GRID_SIZE / GRID_DIVISIONS);
+  const gridRef = useRef<Object3D | null>(null);
+
+  const rescaleReferences = (visuals: VisualSet, radius: number) => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const cell = scaleReferences(visuals, grid, radius);
+    if (cell !== gridCellRef.current) {
+      gridCellRef.current = cell;
+      setGridCell(cell);
+    }
+  };
 
   callbacksRef.current = { onStatus, onReady, onSnapshot, onFailure };
   experimentRef.current = experiment;
@@ -313,6 +483,7 @@ export default function SimulationCanvas({
       grid.material.opacity = 0.6;
       grid.material.depthWrite = false;
       scene.add(grid);
+      gridRef.current = grid;
       const axes = new AxesHelper(1);
       for (const material of Array.isArray(axes.material) ? axes.material : [axes.material]) {
         material.transparent = true;
@@ -360,8 +531,16 @@ export default function SimulationCanvas({
               const visuals = visualSetRef.current;
               if (runtime && id !== null && visuals) {
                 try {
-                  const result = runtime.advance(wallSeconds, speedRef.current);
+                  const result = runtime.advance(wallSeconds, speedRef.current, 10);
                   applyFrame(runtime.frame(), visuals);
+                  if (result.throttled) lastThrottledAtRef.current = timestamp;
+                  const nowThrottled = timestamp - lastThrottledAtRef.current < 2000;
+                  if (nowThrottled !== throttledRef.current) {
+                    throttledRef.current = nowThrottled;
+                    setThrottled(nowThrottled);
+                  }
+                  recordTrails(visuals);
+                  if (followRef.current) rescaleReferences(visuals, followCamera(camera, controls, visuals));
                   if (result.pauseReason) {
                     stopSimulation(result.pauseReason);
                   } else if (timestamp - lastSnapshotRef.current >= 50) {
@@ -380,18 +559,26 @@ export default function SimulationCanvas({
         const activeCamera = cameraRef.current;
         if (activeRenderer && activeScene && activeCamera) {
           try {
+            if (visualSetRef.current) updateMarkers(visualSetRef.current, activeCamera, viewport.clientHeight);
             activeRenderer.render(activeScene, activeCamera);
           } catch (error) {
             setCanvasIssue(`WebGL could not draw the preview: ${describeError(error)}`);
             if (runningRef.current) stopSimulation('Paused because WebGL could not draw the preview.', false);
           }
         }
-        if (runningRef.current) frameRequestRef.current = requestAnimationFrame(tick);
+        // Camera updates inside this frame can already have scheduled the next one; never run two loops.
+        if (runningRef.current && frameRequestRef.current === null) frameRequestRef.current = requestAnimationFrame(tick);
       };
       scheduleRef.current = () => {
         if (!disposed && frameRequestRef.current === null) frameRequestRef.current = requestAnimationFrame(tick);
       };
       controls.addEventListener('change', () => scheduleRef.current?.());
+      // Any manual orbit, pan or zoom hands the camera back to the user.
+      controls.addEventListener('start', () => {
+        if (!followRef.current) return;
+        followRef.current = false;
+        setFollow(false);
+      });
       scheduleRef.current?.();
 
       const onVisibility = () => {
@@ -476,7 +663,8 @@ export default function SimulationCanvas({
           return;
         }
         callbacksRef.current.onStatus(id, 'Building render meshes from the prepared runtime geometry.');
-        candidateVisuals = createVisualSet(candidateRuntime.frame());
+        const movingIds = new Set(experiment.scene.bodies.filter(body => body.motion.kind !== 'fixed').map(body => body.id));
+        candidateVisuals = createVisualSet(candidateRuntime.frame(), movingIds);
         const initialSnapshot = candidateRuntime.snapshot();
         const renderer = rendererRef.current;
         const scene = sceneRef.current;
@@ -494,7 +682,7 @@ export default function SimulationCanvas({
         const previousFar = camera.far;
         scene.add(candidateVisuals.group);
         try {
-          fitCamera(camera, controls, candidateVisuals.group);
+          rescaleReferences(candidateVisuals, fitCamera(camera, controls, candidateVisuals));
           renderer.render(scene, camera);
           if (previousVisuals) scene.remove(previousVisuals.group);
           renderer.render(scene, camera);
@@ -593,6 +781,7 @@ export default function SimulationCanvas({
     try {
       runtime.reset();
       applyFrame(runtime.frame(), visuals);
+      clearTrails(visuals);
       publishSnapshot(id, runtime);
       setCandidateError('');
       fitView();
@@ -601,12 +790,19 @@ export default function SimulationCanvas({
     }
   };
 
+  const toggleFollow = () => {
+    const next = !followRef.current;
+    followRef.current = next;
+    setFollow(next);
+    if (next && !runningRef.current) fitView();
+  };
+
   const fitView = () => {
     const camera = cameraRef.current;
     const controls = controlsRef.current;
     const visuals = visualSetRef.current;
     if (!camera || !controls || !visuals || preparingRef.current) return;
-    fitCamera(camera, controls, visuals.group);
+    rescaleReferences(visuals, fitCamera(camera, controls, visuals));
     scheduleRef.current?.();
   };
   useEffect(() => {
@@ -647,6 +843,12 @@ export default function SimulationCanvas({
               <span>Ground</span>
             </label>
           ) : null}
+          {runtimeRef.current ? (
+            <button className="tool-button" type="button" onClick={toggleFollow} aria-pressed={follow} aria-label="Follow camera" title="Keep moving bodies and their paths in view while running">
+              <Crosshair size={16} aria-hidden="true" />
+              <span>Follow</span>
+            </button>
+          ) : null}
           <button className="tool-button" type="button" onClick={fitView} disabled={!runtimeRef.current || preparing} title="Frame all objects (F)" aria-label="Fit view" aria-keyshortcuts="F">
             <CornersOut size={16} aria-hidden="true" />
             <span>Fit</span>
@@ -660,7 +862,7 @@ export default function SimulationCanvas({
         ) : null}
         {preparing && runtimeRef.current ? <div className="replacement-indicator" role="status">Preparing replacement. Current preview is paused and preserved.</div> : null}
         {candidateError && runtimeRef.current ? <div className="canvas-warning" role="alert">{candidateError}</div> : null}
-        <p className="canvas-help"><span className="hint-pointer">Drag to orbit. Scroll to zoom. Right-drag or arrow keys to pan.</span><span className="hint-touch">Drag to orbit. Pinch to zoom. Two-finger drag to pan.</span></p>
+        <p className="canvas-help">{runtimeRef.current ? <span className="grid-scale">Grid squares {gridCell} m. </span> : null}<span className="hint-pointer">Drag to orbit. Scroll to zoom. Right-drag or arrow keys to pan.</span><span className="hint-touch">Drag to orbit. Pinch to zoom. Two-finger drag to pan.</span></p>
       </div>
       <div className="simulation-controls">
         <div className="playback-control">
@@ -687,7 +889,7 @@ export default function SimulationCanvas({
       </div>
       <div className="canvas-footer">
         <p className="canvas-status" role="status" aria-live="polite">
-          {canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? 'Running. Values and graphs update about twenty times per second.' : runtimeRef.current ? 'Paused at the initial state. Press Run when the setup looks right.' : 'No scene loaded.')}
+          {canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? (throttled ? 'Running as fast as this device allows, slower than the selected speed. Every physics step is still computed.' : 'Running. Values and graphs update about twenty times per second.') : runtimeRef.current ? 'Paused at the initial state. Press Run when the setup looks right.' : 'No scene loaded.')}
         </p>
         <p className="keyboard-hint" aria-hidden="true"><kbd>Space</kbd> run <kbd>R</kbd> reset <kbd>F</kbd> fit</p>
       </div>
