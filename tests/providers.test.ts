@@ -142,6 +142,34 @@ test('temporary provider recovery shares a two-call budget with validation repai
   }
 });
 
+test('an unsupported verdict gets one same-model review and survives a failed review', async t => {
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OPENROUTER_API_KEY;
+  process.env.OPENROUTER_API_KEY = 'isolated-test-credential';
+  t.after(() => {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = previousKey;
+  });
+  const unsupported = { ...validClarification, kind: 'unsupported', question: null, reason: 'No suitable law was chosen.' };
+  const reply = (decision: unknown) => Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ decision }) } }] });
+  const request = AssemblyRequestSchema.parse({ provider: 'openrouter', model: 'example/model:free', description: 'Drop two balls.' });
+  for (const outcome of ['improved', 'review-unavailable'] as const) {
+    const models: unknown[] = [];
+    const stages: string[] = [];
+    globalThis.fetch = async (input, init) => {
+      if (String(input).endsWith('/models')) return Response.json({ data: [] });
+      models.push(JSON.parse(String(init?.body)).model);
+      if (models.length === 1) return reply(unsupported);
+      return outcome === 'improved' ? reply(validClarification) : new Response('', { status: 503 });
+    };
+    const decision = await assemble(request, event => stages.push(event.stage));
+    assert.deepEqual(models, ['example/model:free', 'example/model:free']);
+    assert.equal(decision.kind, outcome === 'improved' ? 'clarify' : 'unsupported');
+    assert.deepEqual(stages.slice(0, 3), ['generating', 'validating', 'reviewing']);
+  }
+});
+
 test('tuple transport round-trips the complete mechanics intent before local validation', () => {
   const decision: Decision = {
     kind: 'scene',
@@ -217,6 +245,21 @@ test('invalid model diagnostics expose only bounded schema paths and issue codes
     assert.ok(!error.message.includes(sentinel));
     assert.ok(!error.message.includes('private_prompt_field'));
     assert.ok(error.message.length < 1024);
+    return true;
+  });
+});
+
+test('a physics-rule rejection tells the correction call which rule failed without echoing model values', () => {
+  const scene = providerScene();
+  const sentinel = 'SENSITIVE_PROMPT_SENTINEL';
+  assert.throws(() => parseDecisionText(JSON.stringify({ decision: {
+    kind: 'scene', summary: sentinel, assumptions: [], question: null, reason: null, approximation: null, alternative: null,
+    scene: { ...scene, bodies: scene.bodies.map(body => body.id === 'light' ? { ...body, mass: null } : body) },
+  } })), error => {
+    assert.ok(error instanceof ProviderError && error.code === 'invalid_model_response');
+    assert.match(error.repairHint ?? '', /bodies\.1\.mass: A moving body needs a positive mass/);
+    assert.ok(!error.message.includes('positive mass'));
+    assert.ok(!`${error.message}${error.repairHint}`.includes(sentinel));
     return true;
   });
 });

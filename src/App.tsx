@@ -1,17 +1,26 @@
+import { ArrowRight, Atom, ClockCounterClockwise } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ZodError } from 'zod';
-import { MODEL_NOTES, PROVIDER_LABELS, type ModelOption, type ProviderConfig } from '../shared/catalog.ts';
+import { PROVIDER_LABELS, type ModelOption, type ProviderConfig } from '../shared/catalog.ts';
 import { AssemblyRequestSchema, hasGroundPlane, validateScene, type AssemblyRequest, type Decision, type Provider } from '../shared/scene.ts';
 import { readAssemblyResponse, type AssemblyProgress } from '../shared/assembly-stream.ts';
 import ObjectCards from './ObjectCards.tsx';
 import SimulationCanvas, { type CanvasExperiment } from './SimulationCanvas.tsx';
+import TelemetryPanel from './TelemetryPanel.tsx';
 import type { InspectionSnapshot } from './physics/types.ts';
 type SceneDecision = Extract<Decision, { kind: 'scene' }>;
-
-
+type RecentExperiment = {
+  id: number;
+  title: string;
+  summary: string;
+  decision: SceneDecision;
+  scene: SceneDecision['scene'];
+  userGroundChoice?: CanvasExperiment['userGroundChoice'];
+  createdAt: number;
+};
 
 type Flow = {
-  kind: 'idle' | 'requesting' | 'clarification' | 'ground-review' | 'preparing' | 'ready' | 'unsupported' | 'error';
+  kind: 'idle' | 'requesting' | 'clarification' | 'preparing' | 'ready' | 'unsupported' | 'error';
   message: string;
   detail?: string;
 };
@@ -136,10 +145,11 @@ export default function App() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [responseDecision, setResponseDecision] = useState<Decision | null>(null);
-  const [groundReview, setGroundReview] = useState<{ id: number; decision: SceneDecision } | null>(null);
   const [flow, setFlow] = useState<Flow>({ kind: 'idle', message: '' });
   const [activeExperiment, setActiveExperiment] = useState<CanvasExperiment | null>(null);
   const [pendingExperiment, setPendingExperiment] = useState<CanvasExperiment | null>(null);
+  const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
+  const [currentHistoryId, setCurrentHistoryId] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<InspectionSnapshot | null>(null);
   const [formError, setFormError] = useState('');
   const [formErrorDetail, setFormErrorDetail] = useState('');
@@ -153,6 +163,8 @@ export default function App() {
   const requestController = useRef<AbortController | null>(null);
   const candidateRef = useRef<CanvasExperiment | null>(null);
   const activeRef = useRef<CanvasExperiment | null>(null);
+  const selectedHistoryId = useRef<number | null>(null);
+  const activeHistoryId = useRef<number | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLTextAreaElement>(null);
 
@@ -236,8 +248,8 @@ export default function App() {
     requestController.current?.abort();
     requestController.current = null;
     candidateRef.current = null;
+    selectedHistoryId.current = null;
     setPendingExperiment(null);
-    setGroundReview(null);
     setFlow({ kind: 'idle', message: wasWorking ? message : '' });
   }, []);
 
@@ -298,7 +310,7 @@ export default function App() {
   }, [isBusy]);
 
   useEffect(() => {
-    if (flow.kind === 'unsupported' || flow.kind === 'ground-review') {
+    if (flow.kind === 'unsupported') {
       responseRef.current?.scrollIntoView({ block: 'nearest' });
       responseRef.current?.focus({ preventScroll: true });
     }
@@ -311,25 +323,40 @@ export default function App() {
     }
   }, [flow.kind]);
 
-  const preparePreview = (decision: SceneDecision, id: number, userGroundChoice?: CanvasExperiment['userGroundChoice']) => {
+  const preparePreview = (
+    decision: SceneDecision,
+    id: number,
+    userGroundChoice?: CanvasExperiment['userGroundChoice'],
+    scene = decision.scene,
+  ) => {
     if (id !== generation.current) return;
-    const experiment: CanvasExperiment = { id, scene: decision.scene, decision, userGroundChoice };
+    const experiment: CanvasExperiment = { id, scene, decision, userGroundChoice };
     candidateRef.current = experiment;
-    setGroundReview(null);
     setPendingExperiment(experiment);
-    setQuestion('');
-    setAnswer('');
+    setAssemblyProgress(null);
+    requestStartedAt.current = performance.now();
+    setElapsedSeconds(0);
     setFlow({ kind: 'preparing', message: 'Building your paused physics preview.' });
   };
 
-  const chooseGround = (include: boolean) => {
-    if (!groundReview || groundReview.id !== generation.current) return;
+  const loadRecentExperiment = (item: RecentExperiment) => {
+    if (currentHistoryId === item.id && !isBusy) return;
+    invalidateWork('Loading a recent experiment. Any current provider request or preparation was canceled.');
+    selectedHistoryId.current = item.id;
+    preparePreview(item.decision, generation.current, item.userGroundChoice, item.scene);
+  };
+
+  const togglePhysicalGround = (include: boolean) => {
+    const current = activeRef.current;
+    if (!current || current.decision.kind !== 'scene' || isBusy) return;
+    invalidateWork();
+    // A ground change edits the open experiment; it is not a new history entry.
+    selectedHistoryId.current = activeHistoryId.current;
     try {
-      const scene = validateScene({ ...groundReview.decision.scene, ground: include ? undefined : null });
-      requestStartedAt.current = performance.now();
-      setElapsedSeconds(0);
-      preparePreview({ ...groundReview.decision, scene }, groundReview.id, include ? 'default' : 'none');
+      const scene = validateScene({ ...current.scene, ground: include ? undefined : null });
+      preparePreview(current.decision, generation.current, include ? 'default' : 'none', scene);
     } catch (error) {
+      selectedHistoryId.current = null;
       setFlow({ kind: 'error', message: 'This ground choice could not be prepared.', detail: errorMessage(error) });
     }
   };
@@ -363,7 +390,7 @@ export default function App() {
     setFormError('');
     setFormErrorDetail('');
     setResponseDecision(null);
-    setGroundReview(null);
+    selectedHistoryId.current = null;
     setFlow({ kind: 'requesting', message: `Sending this description to ${PROVIDER_LABELS[request.provider]} using ${request.model}.` });
     try {
       const response = await fetch('/api/assemble', {
@@ -390,11 +417,15 @@ export default function App() {
         setAnswer('');
         setFlow({ kind: 'unsupported', message: 'No replacement scene was created. The current preview, if any, is unchanged.' });
       } else if (decision.scene) {
+        setQuestion('');
+        setAnswer('');
         if (!hasGroundPlane(decision.scene)) {
-          setQuestion('');
-          setAnswer('');
-          setGroundReview({ id, decision });
-          setFlow({ kind: 'ground-review', message: '' });
+          try {
+            const scene = validateScene({ ...decision.scene, ground: undefined });
+            preparePreview(decision, id, undefined, scene);
+          } catch (error) {
+            setFlow({ kind: 'error', message: 'The default ground could not be kept with this model.', detail: errorMessage(error) });
+          }
         } else {
           preparePreview(decision, id);
         }
@@ -419,6 +450,28 @@ export default function App() {
     if (experiment.id !== generation.current) return;
     activeRef.current = experiment;
     candidateRef.current = null;
+    const historyId = selectedHistoryId.current ?? experiment.id;
+    selectedHistoryId.current = null;
+    activeHistoryId.current = historyId;
+    setCurrentHistoryId(historyId);
+    const decision = experiment.decision;
+    if (decision.kind === 'scene') {
+      setRecentExperiments(current => {
+        const existing = current.find(item => item.id === historyId);
+        const next: RecentExperiment = {
+          id: historyId,
+          title: experiment.scene.title,
+          summary: decision.summary,
+          decision,
+          scene: experiment.scene,
+          userGroundChoice: experiment.userGroundChoice,
+          createdAt: existing?.createdAt ?? Date.now(),
+        };
+        return existing
+          ? current.map(item => item.id === historyId ? next : item)
+          : [next, ...current].slice(0, 8);
+      });
+    }
     setActiveExperiment(experiment);
     setPendingExperiment(current => current?.id === experiment.id ? null : current);
     setSnapshot(nextSnapshot);
@@ -433,6 +486,7 @@ export default function App() {
   const handleCanvasFailure = useCallback((id: number, message: string) => {
     if (id !== generation.current) return;
     candidateRef.current = null;
+    selectedHistoryId.current = null;
     setPendingExperiment(current => current?.id === id ? null : current);
     setFlow({ kind: 'error', message: 'The paused preview could not be prepared.', detail: message });
   }, []);
@@ -441,16 +495,17 @@ export default function App() {
   const noProvidersAvailable = config !== null && availableProviders.length === 0;
   const canSubmit = !isBusy && !configError && provider !== '' && selectedModel.length > 0 && description.trim().length >= 3;
   const settingsSummary = provider
-    ? `${selectedProviderLabel} · ${selectedModel || 'model not selected'}`
+    ? `${selectedProviderLabel} / ${selectedModel || 'model not selected'}`
     : 'Choose provider and model';
 
 
   return (
     <div className="lab-shell">
       <header className="topbar">
-        <a className="lab-mark" href="#main" aria-label="Physics Lab workbench home">
-          <span className="lab-mark__glyph" aria-hidden="true">M</span>
-          <span><strong>PHYSICS LAB</strong><small>MECHANICS WORKBENCH</small></span>
+        <a className="brand" href="#main" aria-label="Physics Lab home">
+          <Atom className="brand__icon" size={22} aria-hidden="true" />
+          <span className="brand__name">Physics Lab</span>
+          <span className="brand__scope">Mechanics</span>
         </a>
         <div className="service-state" aria-live="polite">
           <span className={`service-state__signal ${config && !configError ? 'is-live' : ''}`} aria-hidden="true" />
@@ -459,18 +514,12 @@ export default function App() {
       </header>
 
       <main id="main" className="mission-board">
-        <section className="setup-panel glass-panel" aria-labelledby="setup-title">
-          <div className="setup-heading">
-            <div>
-              <p className="eyebrow">Experiment workspace</p>
-              <h1 id="setup-title">Set up an experiment</h1>
-            </div>
-            <span className="category-stamp">CLASSICAL · SI UNITS</span>
-          </div>
+        <section className="setup-panel" aria-labelledby="setup-title">
+          <h1 id="setup-title">New experiment</h1>
 
           <form className="assembly-form" onSubmit={handleSubmit}>
             <label className="field description-field">
-              <span className="field-label">Describe your experiment</span>
+              <span className="field-label">Describe the setup</span>
               <textarea
                 ref={descriptionRef}
                 value={description}
@@ -482,11 +531,11 @@ export default function App() {
                 rows={4}
                 aria-describedby="description-hint"
               />
-              <span className="field-hint" id="description-hint">Describe what you know. We’ll ask about missing details or explicitly list the sensible defaults used.</span>
+              <span className="field-hint" id="description-hint">Missing details are asked about, or filled with stated defaults.</span>
             </label>
 
             <div className="prompt-starters" role="group" aria-label="Fill the editable prompt with a starter">
-              <span className="field-label">Start with</span>
+              <span className="field-label">Examples</span>
               <div className="prompt-starters__buttons">
                 {PROMPT_STARTERS.map(starter => (
                   <button
@@ -503,14 +552,20 @@ export default function App() {
                 ))}
               </div>
             </div>
+            <label className="field category-field">
+              <span className="field-label">Physics category</span>
+              <select defaultValue="mechanics">
+                <option value="mechanics">Mechanics</option>
+              </select>
+            </label>
 
             <details className="settings-details">
               <summary className="settings-summary">
-                <span className="settings-summary__title">Model settings</span>
-                <span className="settings-summary__selection">{settingsSummary}</span>
+                <span className="settings-summary__title">Model</span>
+                <span className="settings-summary__selection">{selectedModel || 'Not selected'}</span>
               </summary>
               <div className="settings-content">
-                <p className="settings-intro">These choices apply when you assemble. Changing settings never sends an assembly request.</p>
+                <p className="settings-intro">Changes apply on the next assembly. API keys stay on the local server.</p>
                 <div className="provider-fields">
                   <label className="field">
                     <span className="field-label">Model provider</span>
@@ -523,7 +578,7 @@ export default function App() {
                       <option value="" disabled>{config ? 'Choose a configured provider' : 'Loading providers…'}</option>
                       {config?.providers.map(item => (
                         <option value={item.id} disabled={!item.available} key={item.id}>
-                          {item.label}{item.available ? '' : ' · not configured'}
+                          {item.label}{item.available ? '' : ' (not configured)'}
                         </option>
                       ))}
                     </select>
@@ -540,7 +595,7 @@ export default function App() {
                         >
                           <option value="" disabled>Choose a free route or enter a model ID</option>
                           {[OPENROUTER_FREE_ROUTE, ...models.filter(item => item.free && item.id !== OPENROUTER_FREE_ROUTE.id)].map(item => (
-                            <option value={item.id} key={item.id}>{`${item.name} · ${item.id} · free`}</option>
+                            <option value={item.id} key={item.id}>{`${item.name} (${item.id}, free)`}</option>
                           ))}
                         </select>
                         <span className="field-hint">Free routes can have changing quotas and availability.</span>
@@ -582,15 +637,6 @@ export default function App() {
                   <p className="inline-note inline-note--warning" role="status">Current model suggestions could not be loaded. The free route remains selectable, and you can enter another model ID.</p>
                 ) : null}
 
-                <div className="category-row">
-                  <label className="field category-field">
-                    <span className="field-label">Physics category</span>
-                    <select defaultValue="mechanics" aria-label="Physics category">
-                      <option value="mechanics">Mechanics</option>
-                    </select>
-                  </label>
-                  <p className="category-description">Only mechanics is active in this lab.</p>
-                </div>
               </div>
             </details>
 
@@ -634,22 +680,21 @@ export default function App() {
             ) : null}
 
             <div className="submit-row">
-              <p className="privacy-note">Assembly can make one extra call to the same model to correct an invalid model or recover from a temporary service failure. Provider charges may apply. No paid fallback is selected automatically.</p>
+              <p className="privacy-note">Your description is sent to the selected model. One automatic retry may add a provider charge. No paid fallback is used.</p>
               <div className="submit-actions">
                 <button className="primary-button" type="submit" disabled={!canSubmit || (question !== '' && answer.trim().length === 0)}>
-                  {flow.kind === 'requesting' ? 'Waiting for provider…' : flow.kind === 'preparing' ? 'Preparing paused preview…' : flow.kind === 'error' ? 'Retry same request' : question ? 'Answer and continue' : 'Assemble scene'}
+                  <span>{flow.kind === 'requesting' ? 'Waiting for model' : flow.kind === 'preparing' ? 'Building preview' : flow.kind === 'error' ? 'Retry request' : question ? 'Answer and continue' : 'Assemble scene'}</span>
+                  {isBusy ? null : <ArrowRight size={16} weight="bold" aria-hidden="true" />}
                 </button>
               </div>
-              <p className="privacy-note">The selected provider receives your scenario and clarification replies. API keys stay on the local server.</p>
             </div>
           </form>
 
-          {flow.message && !isBusy && flow.kind !== 'unsupported' && flow.kind !== 'clarification' ? (
+          {flow.message && !isBusy && flow.kind !== 'unsupported' && flow.kind !== 'clarification' && flow.kind !== 'ready' ? (
             <div ref={flow.kind === 'error' ? flowMessageRef : undefined} tabIndex={flow.kind === 'error' ? -1 : undefined} className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live={flow.kind === 'error' ? 'assertive' : 'polite'}>
               <span className="flow-message__line" aria-hidden="true" />
               <div className="flow-message__content">
                 <p>{flow.message}</p>
-                {flow.kind === 'ready' ? <p className="flow-message__next">Review the model summary and assumptions, then run the preview when they match your intent.</p> : null}
                 {flow.kind === 'error' ? <p className="flow-message__next">Your prompt and current preview are unchanged. Retry this request as written, edit the experiment, or review provider settings.</p> : null}
                 {flow.kind === 'error' && flow.detail ? <details className="diagnostic-details"><summary>Technical details</summary><p>{flow.detail}</p></details> : null}
               </div>
@@ -684,37 +729,28 @@ export default function App() {
             </section>
           ) : null}
 
-          {groundReview ? (
-            <section className="response-panel ground-review-panel" ref={responseRef} tabIndex={-1} aria-labelledby="ground-review-title">
-              <h2 id="ground-review-title">Keep a physical ground?</h2>
-              <p>The model proposed no built-in ground. Your lab includes one by default; it will never be removed without your choice.</p>
-              <div className="response-panel__actions">
-                <button className="primary-button" type="button" onClick={() => chooseGround(true)}>Keep default ground</button>
-                <button className="secondary-button" type="button" onClick={() => chooseGround(false)}>Preview without ground</button>
-              </div>
-              <small>This changes only the ground choice. No new model request is sent, and the simulation stays paused.</small>
-            </section>
-          ) : null}
 
-          {interpretation ? (
-            <aside className={`interpretation-panel${responseDecision ? ' interpretation-panel--preserved' : ''}`} aria-label="Preview interpretation">
-              <div className="interpretation-heading">
-                <span className="eyebrow">{responseDecision ? 'Unchanged preview' : 'Current preview'}</span>
-              </div>
-              <p>{interpretation.summary}</p>
-              <p className="interpretation-guide">This is the scene currently shown. Editing your draft does not change it.</p>
-              <div className="assumed-defaults">
-                <strong>Model choices &amp; approximations</strong>
-                <p>Review these values and any modeling substitutions before Run. Initial values for every object are shown below the canvas.</p>
-                {activeExperiment?.userGroundChoice ? <p><strong>Your ground choice takes precedence over the model’s ground suggestion below.</strong></p> : null}
-                {interpretation.scene?.ground ? (
-                  <p>Physical ground: z = {interpretation.scene.ground.height} m; target restitution {interpretation.scene.ground.restitution}; static friction {interpretation.scene.ground.friction.static ?? interpretation.scene.ground.friction.sliding}, sliding friction {interpretation.scene.ground.friction.sliding}.</p>
-                ) : <p>Built-in ground is explicitly disabled. Any separately modeled surfaces are listed in the object cards.</p>}
-                {interpretation.assumptions.length > 0 ? (
-                  <ul>{interpretation.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
-                ) : <p>No other physical assumptions were reported by the model. Verify the interpreted setup against your description.</p>}
-              </div>
-            </aside>
+          {recentExperiments.length > 0 ? (
+            <section className="recent-section" aria-labelledby="recent-title">
+              <h2 id="recent-title">This session</h2>
+              <ul className="recent-list">
+                {recentExperiments.map(item => (
+                  <li key={item.id}>
+                    <button
+                      className="recent-item"
+                      type="button"
+                      onClick={() => loadRecentExperiment(item)}
+                      aria-current={currentHistoryId === item.id ? 'true' : undefined}
+                      title="Reload locally without a model request"
+                    >
+                      <ClockCounterClockwise size={16} aria-hidden="true" />
+                      <strong>{item.title}</strong>
+                      {currentHistoryId === item.id ? <small>Open</small> : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
 
           <details className="capabilities-details">
@@ -723,78 +759,105 @@ export default function App() {
               <p>Classical mechanics with rigid bodies and point particles, gravity and applied loads, collisions and contacts, joints, and cable or spring connections.</p>
               <p>Contacts include elastic, partially elastic and inelastic restitution targets, static and kinetic sliding friction, and torsional/rolling resistance. Pair restitution uses the lower coefficient; pair friction uses the higher. Ground is a real physical surface by default.</p>
               <p><strong>Model boundaries:</strong> rigid bodies and compliant numerical contacts, not deformation or fluid fields. Material coefficients are numerical targets with finite-step error; inspect the declared assumptions and actual results.</p>
+              <p><strong>Display:</strong> the grid and 1 m axes are visual aids, not a floor. Infinite planes render as finite patches, and point markers are not physical radii.</p>
             </div>
           </details>
         </section>
 
         <section className="simulation-section" aria-labelledby="simulation-title">
-          <div className="section-heading simulation-heading">
-            <div>
-              <p className="eyebrow">Preview and playback</p>
-              <h2 id="simulation-title">Simulation canvas</h2>
-            </div>
-            <span className="simulation-unit">Z-up · metres · seconds</span>
-          </div>
+          <h2 id="simulation-title" className="visually-hidden">Simulation</h2>
           {interpretation?.approximation ? (
             <div className="approximation-notice" role="note">
-              <strong>Approximate model · Review before Run</strong>
+              <strong>Approximate model. Review before running.</strong>
               <p>{interpretation.approximation}</p>
             </div>
           ) : null}
-          {isBusy ? (
-            <div className="assembly-progress" data-stage={flow.kind} role="status" aria-live="polite" ref={progressRef} tabIndex={-1}>
-              <div className="assembly-progress__heading">
-                <strong>{flow.kind === 'preparing' ? 'Building a paused preview' : assemblyProgress?.stage === 'retrying' ? 'Reconnecting to the model' : assemblyProgress?.stage === 'repairing' ? 'Correcting the model' : assemblyProgress?.stage === 'validating' ? 'Checking the physics model' : 'Designing your experiment'}</strong>
-                <output aria-label="Elapsed assembly time" aria-live="off">{elapsedSeconds}s elapsed</output>
-              </div>
-              <div className="assembly-progress__track" aria-hidden="true"><span /></div>
-              <ol className="assembly-progress__steps" aria-label="Assembly stages">
-                <li data-state={flow.kind === 'preparing' || assemblyProgress?.stage === 'validating' || assemblyProgress?.stage === 'repairing' ? 'done' : 'active'}>Design model</li>
-                <li data-state={flow.kind === 'preparing' ? 'done' : assemblyProgress?.stage === 'validating' || assemblyProgress?.stage === 'repairing' ? 'active' : 'pending'}>{assemblyProgress?.stage === 'repairing' ? 'Correct validation issues · 1 pass' : 'Validate physics'}</li>
-                <li data-state={flow.kind === 'preparing' ? 'active' : 'pending'}>Prepare paused simulation</li>
-              </ol>
-              <p>{flow.kind === 'requesting'
-                ? assemblyProgress?.message ?? `Connecting to ${selectedProviderLabel}. Waiting for the assembly service to acknowledge your request.`
-                : flow.message}</p>
-              <details className="assembly-progress__request">
-                <summary>Review the request</summary>
-                <div>
-                  <span className="assembly-progress__route">{selectedProviderLabel} · {selectedModel}</span>
-                  <p>{description}</p>
-                  {clarifications.map((item, index) => (
-                    <p key={`${index}-${item.question}`}><strong>Clarification {index + 1}:</strong> {item.question}<br /><strong>Answer:</strong> {item.answer}</p>
-                  ))}
-                  {question ? <p><strong>Clarification:</strong> {question}<br /><strong>Answer:</strong> {answer.trim() || 'Not answered yet.'}</p> : null}
+          <div className="stage">
+            {isBusy ? (
+              <div className="assembly-progress" data-stage={flow.kind} role="status" aria-live="polite" ref={progressRef} tabIndex={-1}>
+                <div className="assembly-progress__heading">
+                  <strong>{flow.kind === 'preparing' ? 'Building the preview' : assemblyProgress?.stage === 'retrying' ? 'Reconnecting to the model' : assemblyProgress?.stage === 'repairing' ? 'Correcting the model' : assemblyProgress?.stage === 'reviewing' ? 'Looking for a buildable model' : assemblyProgress?.stage === 'validating' ? 'Checking the physics' : 'Designing your experiment'}</strong>
+                  <output aria-label="Elapsed assembly time" aria-live="off">{Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}</output>
                 </div>
-              </details>
-              {flow.kind === 'requesting' && elapsedSeconds >= 15 ? <p>Still waiting for the provider, with a two-minute deadline per attempt. Stop waiting at any time without losing your draft or current experiment.</p> : null}
-              <button className="secondary-button" type="button" onClick={() => {
-                invalidateWork(flow.kind === 'requesting'
-                  ? 'Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.'
-                  : 'Preview preparation canceled. Your prompt and current preview are unchanged.');
-                descriptionRef.current?.focus();
-              }}>{flow.kind === 'requesting' ? 'Stop waiting' : 'Cancel preparation'}</button>
-            </div>
+                <div className="assembly-progress__track" aria-hidden="true"><span /></div>
+                <ol className="assembly-progress__steps" aria-label="Assembly stages">
+                  <li data-state={flow.kind === 'preparing' || (assemblyProgress && assemblyProgress.stage !== 'generating' && assemblyProgress.stage !== 'retrying') ? 'done' : 'active'}>Design</li>
+                  <li data-state={flow.kind === 'preparing' ? 'done' : assemblyProgress && assemblyProgress.stage !== 'generating' && assemblyProgress.stage !== 'retrying' ? 'active' : 'pending'}>{assemblyProgress?.stage === 'repairing' ? 'Correct' : assemblyProgress?.stage === 'reviewing' ? 'Review' : 'Validate'}</li>
+                  <li data-state={flow.kind === 'preparing' ? 'active' : 'pending'}>Build</li>
+                </ol>
+                <p>{flow.kind === 'requesting'
+                  ? assemblyProgress?.message ?? `Connecting to ${selectedProviderLabel}.`
+                  : flow.message}</p>
+                {flow.kind === 'requesting' && elapsedSeconds >= 15 ? <p className="assembly-progress__slow">Free models can take up to two minutes per attempt. Your draft and current preview are safe.</p> : null}
+                <details className="assembly-progress__request">
+                  <summary>Request details</summary>
+                  <div>
+                    <span className="assembly-progress__route">{selectedModel}</span>
+                    <p>{description}</p>
+                    {clarifications.map((item, index) => (
+                      <p key={`${index}-${item.question}`}><strong>Clarification {index + 1}:</strong> {item.question}<br /><strong>Answer:</strong> {item.answer}</p>
+                    ))}
+                    {question ? <p><strong>Clarification:</strong> {question}<br /><strong>Answer:</strong> {answer.trim() || 'Not answered yet.'}</p> : null}
+                  </div>
+                </details>
+                <button className="secondary-button" type="button" onClick={() => {
+                  invalidateWork(flow.kind === 'requesting'
+                    ? 'Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.'
+                    : 'Preview preparation canceled. Your prompt and current preview are unchanged.');
+                  descriptionRef.current?.focus();
+                }}>{flow.kind === 'requesting' ? 'Stop waiting' : 'Cancel'}</button>
+              </div>
+            ) : null}
+            <SimulationCanvas
+              experiment={pendingExperiment}
+              replacementPending={isBusy}
+              onStatus={handleCanvasStatus}
+              onReady={handleCanvasReady}
+              onSnapshot={handleCanvasSnapshot}
+              onFailure={handleCanvasFailure}
+              physicalGround={Boolean(activeExperiment?.scene.ground)}
+              groundDisabled={!activeExperiment || isBusy}
+              onPhysicalGroundChange={togglePhysicalGround}
+            />
+          </div>
+          {interpretation ? (
+            <section className={`interpretation-panel${responseDecision ? ' interpretation-panel--preserved' : ''}`} aria-labelledby="interpretation-title">
+              <div className="interpretation-heading">
+                <h2 id="interpretation-title">{interpretation.scene?.title ?? 'This scene'}</h2>
+                {responseDecision ? <span className="interpretation-tag">Unchanged preview</span> : null}
+              </div>
+              <p className="interpretation-summary">{interpretation.summary}</p>
+              <div className="interpretation-body">
+                {interpretation.assumptions.length > 0 ? (
+                  <details className="assumption-list" open>
+                    <summary>Assumptions ({interpretation.assumptions.length})</summary>
+                    <ul>{interpretation.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
+                  </details>
+                ) : <p className="assumption-empty">No additional assumptions reported.</p>}
+                <div className="ground-facts">
+                  {activeExperiment && activeExperiment.scene.ground ? (
+                    <p className="ground-line">
+                      <strong>Ground</strong> at z = {activeExperiment.scene.ground.height} m, restitution {activeExperiment.scene.ground.restitution}, sliding friction {activeExperiment.scene.ground.friction.sliding}.
+                    </p>
+                  ) : <p className="ground-line"><strong>Ground</strong> off. Modeled supports are listed under Objects.</p>}
+                  {activeExperiment
+                    && activeExperiment.decision.kind === 'scene'
+                    && activeExperiment.decision.scene.ground === null
+                    && !hasGroundPlane(activeExperiment.decision.scene)
+                    && activeExperiment.scene.ground
+                    ? <p className="ground-note" role="note">The model proposed no ground, so the default was kept. Switch it off on the canvas if you want free flight.</p>
+                    : null}
+                </div>
+              </div>
+            </section>
           ) : null}
-          <SimulationCanvas
-            experiment={pendingExperiment}
-            replacementPending={isBusy}
-            onStatus={handleCanvasStatus}
-            onReady={handleCanvasReady}
-            onSnapshot={handleCanvasSnapshot}
-            onFailure={handleCanvasFailure}
-          />
+          <TelemetryPanel experimentId={activeExperiment?.id ?? null} snapshot={snapshot} />
+          <ObjectCards snapshot={snapshot} hasExperiment={activeExperiment !== null || pendingExperiment !== null} />
         </section>
 
-        <ObjectCards snapshot={snapshot} hasExperiment={activeExperiment !== null || pendingExperiment !== null} />
-
-        <aside className="lab-notes" aria-label="Model notes">
-          {MODEL_NOTES.map(note => <span key={note}>{note}</span>)}
-        </aside>
       </main>
       <footer className="page-footer">
-        <span>Mechanics only</span>
-        <span>Read-only inspection · local solver · no generated results</span>
+        <span>Mechanics only. SI units, Z up. Results are numerical approximations; inspection is read-only.</span>
       </footer>
     </div>
   );

@@ -1,3 +1,4 @@
+import { ArrowCounterClockwise, CornersOut, Pause, Play } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AxesHelper,
@@ -46,8 +47,10 @@ interface SimulationCanvasProps {
   onSnapshot: (id: number, snapshot: InspectionSnapshot) => void;
   onFailure: (id: number, message: string) => void;
   replacementPending: boolean;
+  physicalGround: boolean;
+  groundDisabled: boolean;
+  onPhysicalGroundChange: (enabled: boolean) => void;
 }
-
 interface VisualSet {
   group: Group;
   objects: Map<string, Object3D>;
@@ -109,7 +112,8 @@ function createVisual(item: RenderItem): Object3D {
     material = new MeshStandardMaterial({ color: item.color, roughness: 0.36, metalness: 0.12 });
   } else if (item.shape.kind === 'plane') {
     geometry = new PlaneGeometry(item.shape.size[0] * 2, item.shape.size[1] * 2);
-    material = new MeshStandardMaterial({ color: item.color, roughness: 0.62, metalness: 0.02, transparent: true, opacity: 0.54, side: 2 });
+    // Translucent and depth-neutral so the reference grid and contact points stay readable through supports.
+    material = new MeshStandardMaterial({ color: item.color, roughness: 0.7, metalness: 0, transparent: true, opacity: 0.42, depthWrite: false, side: 2 });
   } else {
     geometry = new SphereGeometry(0.045, 12, 8);
     material = new MeshBasicMaterial({ color: item.color, transparent: true, opacity: 0.9 });
@@ -200,7 +204,17 @@ function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, group: Gr
 }
 
 
-export default function SimulationCanvas({ experiment, replacementPending, onStatus, onReady, onSnapshot, onFailure }: SimulationCanvasProps) {
+export default function SimulationCanvas({
+  experiment,
+  replacementPending,
+  onStatus,
+  onReady,
+  onSnapshot,
+  onFailure,
+  physicalGround,
+  groundDisabled,
+  onPhysicalGroundChange,
+}: SimulationCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -224,11 +238,15 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
   const [canvasIssue, setCanvasIssue] = useState('');
   const [candidateError, setCandidateError] = useState('');
   const canvasIssueRef = useRef(canvasIssue);
+  const preparingRef = useRef(preparing);
+  const replacementPendingRef = useRef(replacementPending);
   const [pauseReason, setPauseReason] = useState('');
 
   callbacksRef.current = { onStatus, onReady, onSnapshot, onFailure };
   experimentRef.current = experiment;
   canvasIssueRef.current = canvasIssue;
+  preparingRef.current = preparing;
+  replacementPendingRef.current = replacementPending;
 
   const publishSnapshot = useCallback((id: number, runtime: MechanicsRuntime) => {
     const snapshot = runtime.snapshot();
@@ -268,7 +286,7 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
       renderer.domElement.tabIndex = 0;
       renderer.domElement.setAttribute('aria-label', 'Three-dimensional mechanics preview. Focus and use arrow keys to pan; drag to orbit, scroll to zoom, and right-drag to pan.');
       scene = new ThreeScene();
-      scene.background = new Color(0xdbe5e8);
+      scene.background = new Color(0xe4e9e8);
       camera = new PerspectiveCamera(44, 1, 0.01, 1000);
       camera.up.set(0, 0, 1);
       camera.position.set(7, -9, 6);
@@ -287,12 +305,12 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
       const fillLight = new DirectionalLight(0xa5c3c6, 0.8);
       fillLight.position.set(5, 4, 3);
       scene.add(fillLight);
-      const grid = new GridHelper(12, 24, 0x758b90, 0xb7c6c9);
+      const grid = new GridHelper(12, 24, 0x8d9b99, 0xc6cfcd);
       grid.rotation.x = Math.PI / 2;
       grid.renderOrder = 1;
       grid.position.z = 0.002; // Keep the visual reference above z=0 supports, without z-fighting.
       grid.material.transparent = true;
-      grid.material.opacity = 0.42;
+      grid.material.opacity = 0.6;
       grid.material.depthWrite = false;
       scene.add(grid);
       const axes = new AxesHelper(1);
@@ -346,7 +364,7 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
                   applyFrame(runtime.frame(), visuals);
                   if (result.pauseReason) {
                     stopSimulation(result.pauseReason);
-                  } else if (timestamp - lastSnapshotRef.current >= 100) {
+                  } else if (timestamp - lastSnapshotRef.current >= 50) {
                     lastSnapshotRef.current = timestamp;
                     publishSnapshot(id, runtime);
                   }
@@ -550,7 +568,7 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
   const toggleRunning = () => {
     const runtime = runtimeRef.current;
     const id = activeIdRef.current;
-    if (!runtime || id === null) return;
+    if (!runtime || id === null || preparingRef.current || replacementPendingRef.current || canvasIssueRef.current) return;
     if (runningRef.current) {
       stopSimulation('Paused by you. The inspection cards show the current solver state.');
       return;
@@ -570,7 +588,7 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
     const runtime = runtimeRef.current;
     const visuals = visualSetRef.current;
     const id = activeIdRef.current;
-    if (!runtime || !visuals || id === null) return;
+    if (!runtime || !visuals || id === null || preparingRef.current || replacementPendingRef.current || canvasIssueRef.current) return;
     stopSimulation('Reset to the initial conditions. Press Run to repeat the experiment.', false);
     try {
       runtime.reset();
@@ -587,53 +605,92 @@ export default function SimulationCanvas({ experiment, replacementPending, onSta
     const camera = cameraRef.current;
     const controls = controlsRef.current;
     const visuals = visualSetRef.current;
-    if (!camera || !controls || !visuals) return;
+    if (!camera || !controls || !visuals || preparingRef.current) return;
     fitCamera(camera, controls, visuals.group);
     scheduleRef.current?.();
   };
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (event.isComposing || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (target instanceof HTMLElement && (
+        target.isContentEditable || target.closest('input:not([type="range"]), textarea, select, [contenteditable="true"]')
+      )) return;
+      if (event.code === 'Space' && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !canvasIssueRef.current) {
+        event.preventDefault();
+        toggleRunning();
+      } else if (event.code === 'KeyR' && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !canvasIssueRef.current) {
+        event.preventDefault();
+        resetSimulation();
+      } else if (event.code === 'KeyF' && runtimeRef.current && !preparingRef.current) {
+        event.preventDefault();
+        fitView();
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, []);
 
   return (
     <div className="simulation-frame">
       <div className="simulation-viewport" ref={viewportRef}>
-        <div className="canvas-orientation" aria-hidden="true">Z UP <span>·</span> SI</div>
         <div className="canvas-tools">
-          <button className="secondary-button" type="button" onClick={fitView} disabled={!runtimeRef.current || preparing} title="Frame all objects without changing the simulation">Fit view</button>
+          {runtimeRef.current ? (
+            <label className="physical-ground-toggle">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={physicalGround}
+                onChange={event => onPhysicalGroundChange(event.currentTarget.checked)}
+                disabled={groundDisabled || preparing || replacementPending}
+              />
+              <span>Ground</span>
+            </label>
+          ) : null}
+          <button className="tool-button" type="button" onClick={fitView} disabled={!runtimeRef.current || preparing} title="Frame all objects (F)" aria-label="Fit view" aria-keyshortcuts="F">
+            <CornersOut size={16} aria-hidden="true" />
+            <span>Fit</span>
+          </button>
         </div>
         {!runtimeRef.current ? (
           <div className="canvas-empty-state" role="status">
-            <span className="empty-orbit" aria-hidden="true"><i /><b /></span>
-            <strong>{preparing ? 'Preparing your model' : canvasIssue || candidateError ? 'Preview unavailable' : 'Canvas ready for an experiment'}</strong>
-            <p>{canvasIssue || candidateError || 'Assemble an experiment to see your objects and physical ground. The grid is a visual aid.'}</p>
+            <strong>{preparing ? 'Preparing your model' : canvasIssue || candidateError ? 'Preview unavailable' : 'No experiment yet'}</strong>
+            <p>{canvasIssue || candidateError || 'Describe a setup and assemble it. The scene opens here, paused, ready to inspect.'}</p>
           </div>
         ) : null}
-        {preparing && runtimeRef.current ? <div className="replacement-indicator" role="status">Preparing replacement · current preview is paused and preserved</div> : null}
+        {preparing && runtimeRef.current ? <div className="replacement-indicator" role="status">Preparing replacement. Current preview is paused and preserved.</div> : null}
         {candidateError && runtimeRef.current ? <div className="canvas-warning" role="alert">{candidateError}</div> : null}
-        <p className="canvas-help">Focus canvas for arrow-key pan · drag to orbit · scroll to zoom · right-drag to pan</p>
+        <p className="canvas-help"><span className="hint-pointer">Drag to orbit. Scroll to zoom. Right-drag or arrow keys to pan.</span><span className="hint-touch">Drag to orbit. Pinch to zoom. Two-finger drag to pan.</span></p>
       </div>
       <div className="simulation-controls">
         <div className="playback-control">
-          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={toggleRunning} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)}>
-            {running ? 'Pause' : 'Run'}
+          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={toggleRunning} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)} aria-keyshortcuts="Space">
+            {running ? <Pause size={16} weight="fill" aria-hidden="true" /> : <Play size={16} weight="fill" aria-hidden="true" />}
+            <span>{running ? 'Pause' : 'Run'}</span>
           </button>
-          <button className="secondary-button" type="button" onClick={resetSimulation} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)} title="Return to the original positions and velocities without another model request">Reset</button>
-          <span className={`run-state ${running ? 'run-state--active' : ''}`}><i aria-hidden="true" />{running ? 'RUNNING' : runtimeRef.current ? 'PAUSED' : 'NO MODEL'}</span>
+          <button className="tool-button" type="button" onClick={resetSimulation} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)} title="Return to the initial state without a model request (R)" aria-label="Reset" aria-keyshortcuts="R">
+            <ArrowCounterClockwise size={16} aria-hidden="true" />
+            <span>Reset</span>
+          </button>
         </div>
         <div className="speed-control">
-          <label htmlFor="playback-speed">Playback speed</label>
+          <label htmlFor="playback-speed">Speed</label>
           <input id="playback-speed" type="range" min="0.1" max="10" step="0.1" value={speed} onChange={event => updateSpeed(event.target.value)} aria-label="Playback speed from 0.1 to 10 times" />
           <output>{speed.toFixed(1)}×</output>
           <span className="speed-presets" role="group" aria-label="Playback speed shortcuts">
             {[0.1, 1, 10].map(preset => (
-              <button className="secondary-button" type="button" key={preset} value={preset} aria-pressed={speed === preset} onClick={event => updateSpeed(event.currentTarget.value)}>{preset}×</button>
+              <button type="button" key={preset} value={preset} aria-pressed={speed === preset} onClick={event => updateSpeed(event.currentTarget.value)}>{preset}×</button>
             ))}
           </span>
         </div>
-        <output className="simulation-clock" aria-live="off"><span>SIM TIME</span><strong>{TIME_FORMAT.format(time)} <small>s</small></strong></output>
+        <output className="simulation-clock" aria-live="off"><span>t</span><strong>{TIME_FORMAT.format(time)}</strong><small>s</small></output>
       </div>
-      <p className="canvas-disclosure">Reference grid and 1 m axes are visual aids, not a generated floor. Infinite planes render as visible patches; point markers are not physical radii.</p>
-      <p className="canvas-status" role="status" aria-live="polite">
-        {canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? 'Running. Inspection values refresh at 10 Hz.' : runtimeRef.current ? 'Paused. Press Run to advance the actual mechanics model.' : 'No scene is loaded.')}
-      </p>
+      <div className="canvas-footer">
+        <p className="canvas-status" role="status" aria-live="polite">
+          {canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? 'Running. Values and graphs update about twenty times per second.' : runtimeRef.current ? 'Paused at the initial state. Press Run when the setup looks right.' : 'No scene loaded.')}
+        </p>
+        <p className="keyboard-hint" aria-hidden="true"><kbd>Space</kbd> run <kbd>R</kbd> reset <kbd>F</kbd> fit</p>
+      </div>
     </div>
   );
 }

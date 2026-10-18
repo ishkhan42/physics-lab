@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24.12.0 <25" },
+  "engines": {
+    "node": ">=24.12.0 <25"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "api": "node --env-file-if-exists=.env --watch server/index.ts",
@@ -12,7 +14,10 @@
     "start": "node --env-file-if-exists=.env server/index.ts"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
     "@mujoco/mujoco": "3.16.0",
+    "@phosphor-icons/react": "2.1.10",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "three": "0.186.1",

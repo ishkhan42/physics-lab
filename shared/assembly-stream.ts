@@ -3,7 +3,7 @@ import { validateDecision, type Decision } from './scene.ts';
 
 const ProgressSchema = z.strictObject({
   type: z.literal('progress'),
-  stage: z.enum(['generating', 'validating', 'repairing', 'retrying']),
+  stage: z.enum(['generating', 'validating', 'repairing', 'retrying', 'reviewing']),
   message: z.string().min(1).max(2000),
 });
 export type AssemblyProgress = Omit<z.infer<typeof ProgressSchema>, 'type'>;
