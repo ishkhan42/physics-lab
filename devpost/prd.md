@@ -19,6 +19,7 @@ Sources: `scope.md > Who It's For`, `scope.md > The Unique Kernel`, and `scope.m
 6. Present the assembled scene paused, with object cards, initial conditions, assumptions, and a short interpretation summary available for inspection.
 7. Start motion only when the student presses Run, then allow playback from 0.1× to 10×.
 8. Pause at a chosen simulation moment and inspect the properties of all participating objects in the cards below the canvas, read-only.
+9. Keep each ready scene at its own unguessable URL. Refresh or another browser opens the same initial paused setup without another model call.
 
 Source: `scope.md > The Core Loop` and `scope.md > What "Working" Looks Like`.
 
@@ -86,6 +87,13 @@ Reset restores the original paused positions and post-impulse velocities, clears
 
 Source: `scope.md > What "Working" Looks Like`.
 
+### Saved Scenes
+
+Each scene is saved server-side and shareable by URL, including its source prompt, assumptions and actual physical setup. New records have 24 hours; running/resuming and continuing playback renew retention from server-recorded activity. Opening, copying links and paused view/reset controls do not renew it. Expired URLs are unavailable, while a still-open setup may be saved as a new copy. Ground changes create a separate URL, leaving existing shared records unchanged. This feature saves definitions, not mid-flight state.
+
+Source: user's scene URL and 24-hour retention request.
+
+
 ### Read-Only Object Cards
 
 Cards beneath the canvas list all participating objects and their properties. When paused, their displayed state corresponds to that simulation moment and remains unchanged until the simulation state changes. No object-property editing is included in the initial inspection experience.
@@ -109,6 +117,8 @@ Source: `scope.md > What "Working" Looks Like` and `scope.md > Later`.
 - Playback supports both endpoints, 0.1× and 10×, and can be paused.
 - After pausing, each participating object's properties can be inspected at the paused state without editing them.
 - Object cards expose the defining properties relevant to their object and experiment, with values tied to the actual model and simulation state rather than invented fields.
+- Saved links survive refresh and server restart, restore paused, and work in a browser with no cached scene or inference credentials.
+- Retention is 24 hours from creation or last recorded run activity, with no renewal from reading/sharing and no revival of an expired URL.
 
 These criteria are requirements, not claims of an existing implementation or successful verification.
 

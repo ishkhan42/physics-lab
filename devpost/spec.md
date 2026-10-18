@@ -86,7 +86,7 @@ Implements `prd.md > Mission Board`, `prd.md > Scenario Prompt and Assembly`.
 
 `App.tsx` owns prompt, selected provider/model, clarification context, interpretation, immutable model definition and inspection snapshot. Relevant states are intro, empty, waiting-for-model, clarification, preparing-model, ready-paused, running, paused, unsupported and error.
 
-Report only real stages, without fabricated percentages or agent-log walls. Prevent duplicate in-flight submissions and stale responses replacing newer state. Pause the current experiment while preparing its replacement; retain it if replacement fails. State is in browser memory, so refresh starts a new session. No database, login, saved-scene service or conversation logging is added.
+Report only real stages, without fabricated percentages or agent-log walls. Prevent duplicate in-flight submissions and stale responses replacing newer state. Pause the current experiment while preparing its replacement; retain it if replacement fails. Valid scene definitions are persisted privately before native preparation, and only successful native readiness changes the visible scene and URL. Restore opens paused at initial conditions, never by replaying inference or silently resuming a trajectory.
 
 Desktop uses a composer beside the simulation and inspection directly below the canvas; narrow screens stack them. A brief CSS entrance never blocks typing and respects reduced motion. Editable prompt starters fill descriptions only. Model settings are secondary, with route/cost warnings. Clarification focuses its answer field; current response and preserved-preview assumptions stay distinguishable. Stop waiting aborts the local fetch/candidate, invalidates stale work and preserves the active model; upstream computation and charges may continue.
 
@@ -201,6 +201,10 @@ Provider/model controls live in the prompt section. Only configured providers ca
 | `GET /api/config` | Provider availability and safe defaults, never key values. |
 | `GET /api/models?provider=openrouter` | Current text-model IDs, names and capabilities, with actual free/router labels. Direct-provider model IDs can be entered explicitly. |
 | `POST /api/assemble` | `{provider,model,description,clarification:[{question,answer}]}` to a validated scene/clarify/unsupported decision. Default clients retain final JSON and non-success status errors. `Accept: application/x-ndjson` opts into actual `progress` records (`stage`, `message`) followed by exactly one `decision` or `error` record. |
+| `POST /api/scenes` | Validated `{prompt,decision,scene,userGroundChoice?}` to a new immutable saved record; 201 with unguessable UUID, server timestamps, expiry and document. 1 MiB input limit; assembly remains 64 KiB. |
+| `GET /api/scenes/:id` | Read the saved definition without renewal; missing/malformed/expired IDs return safe 404 `scene_not_found`. No listing endpoint. |
+| `POST /api/scenes/:id/run` | Empty JSON object; atomically renew a live record to 24 hours from server activity, returning metadata only. Expired records cannot be revived. |
+| `GET/HEAD /scenes/:id` | Serve the app shell for valid UUID links even when expired, so the browser can explain the unavailable link. Scene routes send noindex/nofollow; API data is no-store. |
 
 Use fixed upstream HTTPS hosts, allowlisted provider values, bounded model IDs, JSON-only requests, allowed local Host/Origin values, size limits and deadlines. No arbitrary proxy URLs, wildcard credentialed CORS, prompt/key logging or raw upstream diagnostic dumps. Serve only files safely resolved inside `dist` with correct MIME types.
 
@@ -231,7 +235,14 @@ References: [OpenAI Responses](https://developers.openai.com/api/reference/resou
 
 ## Data Ownership and Future Physics
 
-Browser memory holds the prompt exchange, immutable model definition, view state and current observations. The native runtime owns its engine-specific state. Node owns configured provider credentials and current request processing, without a scene/conversation database. Submitted descriptions go to the selected provider under that provider's data policy.
+Browser memory owns prompt editing, view state, live observations and unsaved recovery; the native runtime owns solver state. Node privately persists immutable validated scene documents (source prompt, original interpretation, actual scene and ground choice) with creation, last-run and expiry timestamps in SQLite. It does not persist provider settings/credentials, clarification transcripts, runtime handles, trajectories or snapshots. The browser caches up to eight link IDs/titles/expiry hints, verifies records on opening, and never treats cached expiry as authoritative after another viewer runs. Credentials remain server-owned; submitted descriptions still go to the selected provider under its policy.
+
+Saved IDs are random UUID capabilities, with no directory/list or update route. Each setup change creates a new record/link; reading and sharing are non-renewing. Initial lifetime is creation plus 86,400,000 ms. Run/Resume must confirm renewal before physics starts; active playback renews every 60 seconds and at its final Pause. Paused Reset, camera controls and opening links do not extend lifetime. Exact-boundary expiry is enforced in SQL independently of the minute cleanup task, and expired IDs never resurrect. A local definition may explicitly be copied to a fresh ID after expiry.
+
+Scene storage defaults to a private OS app-data file, overridden by `SCENE_DB_PATH` outside the public project tree. Directories are private (0700) and the file 0600; corruption/write/maintenance failures do not fall back to ephemeral success. Production initializes storage and purges expired rows at startup, cleanup runs every minute, and server close releases the database/timer. Test servers use isolated files and injectable clocks. Unlisted links are not authentication: anyone holding one can read/forward/run it. No public deployment or weakening of local Host/Origin guards is implied.
+
+Client URL/candidate generations, Run-start tokens and operation-owned recovery protect stale replies. A late read cannot overwrite a newer lease; Run/heartbeat feedback cannot erase an unsaved setup's Retry action. Requests are bounded to 15 seconds, and save retries reuse the captured document rather than making another model request. A failed renewal blocks playback until recovery. Browser Back/Forward, refresh and local recent links restore actual saved ground/values without a model call.
+
 
 Keep the small presentation boundary model-defined: timestamped observables with units/frames and a suitable visualization description. Do not make native body classes or pose/velocity arrays the mandatory state of all future domains. Each later model supplies its own typed input, assumptions, validity checks, time semantics and observable mapping.
 
@@ -259,6 +270,8 @@ src/
   SimulationCanvas.tsx                 native-scene rendering and view-only camera
   ObjectCards.tsx                      contextual read-only observations
   TelemetryPanel.tsx / telemetry.css   motion graphs from recorded solver snapshots
+  SceneLinkBar.tsx / scene-link.css    save, copy-link and expiry feedback
+  saved-scenes.ts                    persistence requests and recent-link metadata
   physics/
     mjcf.ts                            trusted mechanics data to MJCF compiler
     mujoco.ts                          WASM lifecycle, loads, steps and observations
@@ -267,9 +280,11 @@ src/
 shared/
   scene.ts                             decision/model schemas and semantic admission
   catalog.ts                           supported blocks, units and observation metadata
+  saved-scene.ts                       saved document and retention contracts
 server/
   index.ts                             local API and safe built-static serving
   providers.ts                         direct requests and response extraction
+  scenes.ts                            private SQLite storage and sliding expiry
 tests/
   scene.test.ts                        structural/physical admission invariants
   compiler.test.ts                     physical compilation and frame/constraint behavior
@@ -300,7 +315,7 @@ Every build slice gets its mechanical verification. After integration, run the p
 
 ## Decisions and Open Issues
 
-Current production build and 77 behavioral checks pass. Native references retain default/disabled ground, e=0/0.5/1, unequal-mass elastic conservation, static/kinetic and combined elastic/friction response, contact cadence invariance, point/contact admission and all prior pulley/joint/load cases. Checks cover fragmented/error/oversized assembly streams, decision branches, bounded same-model correction/service recovery/unsupported review, physics-rule correction detail, canceled-client cost protection, canonical initial joint poses, horizontal ground versus walls/ceilings, throttled playback without pause or skipped steps, and budgeted stepping that defers but never skips steps. Actual provider/browser checks covered two-ball rebound versus settling with graphs, frictional slowing, guided spring motion, a lunar pendulum, explicit approximation for requested deformation, a kilometre-scale tank projectile (apex, range and post-impact sliding matching analytic values) with trails, markers, Follow and scaled grid at 10×, the ground switch, session history, shortcuts and Reset. Replayed real responses at the browser boundary were used for visual review only; no fixture provider is shipped. Free-provider variability and interpretation limitations remain; other-provider live calls and final learner approval are not claimed.
+Current production build and 89 behavioral checks pass, retaining all prior native mechanics/provider/clock references. New checks cover durable private records, process reopen, read-versus-run retention, exact 24-hour expiry, non-resurrection, metadata-only renewal, stale cleanup safety, validation/corruption/permissions and bounded client cancellation. Actual browser/API checks prove refresh and process-restart survival, clean-browser read/run with no inference, immutable ground-choice forks, source-prompt preservation, Back/Forward and clipboard fallback at320px. An isolated clock-controlled server proves access1ms before expiry, exact-boundary denial, non-resurrection, active heartbeat/final Pause renewal, stopped renewal after Pause, expired-link recovery and stale-read/Reset races. Response-boundary probes cover failed-save retries that survive running the old scene. A fresh provider request timed out; the prior saved URL/scene remained intact, and no new inference reliability is claimed.
 
 Source/provider contracts and numerical evidence informed the engineering defaults above. Any discovered change to the product, chosen architecture or supported physical meaning must be discussed, while routine internal corrections are recorded in the checklist's Revisions. A needed new model is not labeled impossible merely because it is absent.
 

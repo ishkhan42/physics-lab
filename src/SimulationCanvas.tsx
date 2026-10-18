@@ -49,7 +49,12 @@ interface SimulationCanvasProps {
   onReady: (experiment: CanvasExperiment, snapshot: InspectionSnapshot) => void;
   onSnapshot: (id: number, snapshot: InspectionSnapshot) => void;
   onFailure: (id: number, message: string) => void;
+  onBeforeRun: (id: number) => Promise<boolean>;
+  onPlaybackChange: (id: number, playing: boolean) => void;
   replacementPending: boolean;
+  playbackBlocked: boolean;
+  runToken: number;
+  clearToken: number;
   physicalGround: boolean;
   groundDisabled: boolean;
   onPhysicalGroundChange: (enabled: boolean) => void;
@@ -363,6 +368,11 @@ export default function SimulationCanvas({
   onReady,
   onSnapshot,
   onFailure,
+  onBeforeRun,
+  onPlaybackChange,
+  playbackBlocked,
+  runToken,
+  clearToken,
   physicalGround,
   groundDisabled,
   onPhysicalGroundChange,
@@ -381,9 +391,15 @@ export default function SimulationCanvas({
   const speedRef = useRef(1);
   const lastFrameRef = useRef<number | null>(null);
   const lastSnapshotRef = useRef(0);
-  const callbacksRef = useRef({ onStatus, onReady, onSnapshot, onFailure });
+  const callbacksRef = useRef({ onStatus, onReady, onSnapshot, onFailure, onBeforeRun, onPlaybackChange });
   const experimentRef = useRef(experiment);
   const [running, setRunning] = useState(false);
+  const [runPending, setRunPending] = useState(false);
+  const runPendingRef = useRef(false);
+  const runAttemptRef = useRef(0);
+  const runTokenRef = useRef(runToken);
+  const playbackBlockedRef = useRef(playbackBlocked);
+  const clearTokenRef = useRef(clearToken);
   const [speed, setSpeed] = useState(1);
   const [time, setTime] = useState(0);
   const [preparing, setPreparing] = useState(false);
@@ -412,11 +428,13 @@ export default function SimulationCanvas({
     }
   };
 
-  callbacksRef.current = { onStatus, onReady, onSnapshot, onFailure };
+  callbacksRef.current = { onStatus, onReady, onSnapshot, onFailure, onBeforeRun, onPlaybackChange };
   experimentRef.current = experiment;
   canvasIssueRef.current = canvasIssue;
   preparingRef.current = preparing;
   replacementPendingRef.current = replacementPending;
+  runTokenRef.current = runToken;
+  playbackBlockedRef.current = playbackBlocked;
 
   const publishSnapshot = useCallback((id: number, runtime: MechanicsRuntime) => {
     const snapshot = runtime.snapshot();
@@ -424,20 +442,41 @@ export default function SimulationCanvas({
     callbacksRef.current.onSnapshot(id, snapshot);
   }, []);
 
+  const invalidateRunStart = useCallback(() => {
+    runAttemptRef.current += 1;
+    if (!runPendingRef.current) return;
+    runPendingRef.current = false;
+    setRunPending(false);
+  }, []);
+
   const stopSimulation = useCallback((reason: string, publish = true) => {
+    const wasRunning = runningRef.current;
     runningRef.current = false;
+    invalidateRunStart();
     lastFrameRef.current = null;
     setRunning(false);
     setPauseReason(reason);
     const runtime = runtimeRef.current;
     const id = activeIdRef.current;
     if (publish && runtime && id !== null) publishSnapshot(id, runtime);
+    if (wasRunning && id !== null) callbacksRef.current.onPlaybackChange(id, false);
     scheduleRef.current?.();
-  }, [publishSnapshot]);
+  }, [invalidateRunStart, publishSnapshot]);
 
   useEffect(() => {
-    if (replacementPending && runningRef.current) stopSimulation('Paused while preparing a replacement experiment.');
-  }, [replacementPending, stopSimulation]);
+    if (!replacementPending) return;
+    invalidateRunStart();
+    if (runningRef.current) stopSimulation('Paused while preparing a replacement experiment.');
+  }, [replacementPending, invalidateRunStart, stopSimulation]);
+
+  useEffect(() => {
+    invalidateRunStart();
+  }, [runToken, invalidateRunStart]);
+
+  useEffect(() => {
+    if (playbackBlocked && runningRef.current) stopSimulation('Paused because saved-scene retention could not be confirmed.');
+    else if (playbackBlocked) invalidateRunStart();
+  }, [playbackBlocked, invalidateRunStart, stopSimulation]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -582,15 +621,16 @@ export default function SimulationCanvas({
       scheduleRef.current?.();
 
       const onVisibility = () => {
-        if (document.hidden && runningRef.current) {
-          stopSimulation('Paused because the page became hidden. Resume when you return to the lab.');
-        }
+        if (!document.hidden) return;
+        invalidateRunStart();
+        if (runningRef.current) stopSimulation('Paused because the page became hidden. Resume when you return to the lab.');
       };
       document.addEventListener('visibilitychange', onVisibility);
       const onContextLost = (event: Event) => {
         event.preventDefault();
         const message = 'WebGL context was lost. The preview is unavailable until the page is reloaded.';
         setCanvasIssue(message);
+        invalidateRunStart();
         if (runningRef.current) stopSimulation(message, false);
         const pending = experimentRef.current;
         if (pending) callbacksRef.current.onFailure(pending.id, message);
@@ -604,6 +644,8 @@ export default function SimulationCanvas({
         renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
         if (frameRequestRef.current !== null) cancelAnimationFrame(frameRequestRef.current);
         frameRequestRef.current = null;
+        runAttemptRef.current += 1;
+        runPendingRef.current = false;
         runningRef.current = false;
         controls.dispose();
         runtimeRef.current?.dispose();
@@ -633,15 +675,18 @@ export default function SimulationCanvas({
       if (pending) callbacksRef.current.onFailure(pending.id, message);
       return () => {
         disposed = true;
+        runAttemptRef.current += 1;
+        runPendingRef.current = false;
         rendererRef.current?.dispose();
         rendererRef.current?.domElement.remove();
         rendererRef.current = null;
       };
     }
-  }, [publishSnapshot, stopSimulation]);
+  }, [invalidateRunStart, publishSnapshot, stopSimulation]);
 
   useEffect(() => {
     if (!experiment) return;
+    invalidateRunStart();
     let canceled = false;
     let candidateRuntime: MechanicsRuntime | null = null;
     let candidateVisuals: VisualSet | null = null;
@@ -739,11 +784,39 @@ export default function SimulationCanvas({
 
     return () => {
       canceled = true;
+      invalidateRunStart();
       setPreparing(false);
       candidateRuntime?.dispose();
       if (candidateVisuals) disposeGroup(candidateVisuals.group);
     };
-  }, [experiment, stopSimulation]);
+  }, [experiment, invalidateRunStart, stopSimulation]);
+
+  useEffect(() => {
+    if (clearTokenRef.current === clearToken) return;
+    clearTokenRef.current = clearToken;
+    invalidateRunStart();
+    if (runningRef.current) stopSimulation('Paused because the current scene was closed.', false);
+    setCandidateError('');
+    const visuals = visualSetRef.current;
+    const runtime = runtimeRef.current;
+    activeIdRef.current = null;
+    visualSetRef.current = null;
+    runtimeRef.current = null;
+    if (visuals) {
+      sceneRef.current?.remove(visuals.group);
+      try { disposeGroup(visuals.group); }
+      catch (error) { setCandidateError(`Render resources could not be fully released: ${describeError(error)}`); }
+    }
+    try { runtime?.dispose(); }
+    catch (error) { setCandidateError(`The model runtime could not be fully released: ${describeError(error)}`); }
+    setPreparing(false);
+    setRunning(false);
+    setTime(0);
+    setPauseReason('');
+    setThrottled(false);
+    throttledRef.current = false;
+    scheduleRef.current?.();
+  }, [clearToken, invalidateRunStart, stopSimulation]);
 
   const updateSpeed = (value: string) => {
     const next = Number(value);
@@ -753,23 +826,51 @@ export default function SimulationCanvas({
     }
   };
 
-  const toggleRunning = () => {
+  const toggleRunning = async () => {
     const runtime = runtimeRef.current;
     const id = activeIdRef.current;
-    if (!runtime || id === null || preparingRef.current || replacementPendingRef.current || canvasIssueRef.current) return;
+    if (!runtime || id === null || preparingRef.current || replacementPendingRef.current || playbackBlockedRef.current || canvasIssueRef.current) return;
     if (runningRef.current) {
       stopSimulation('Paused by you. The inspection cards show the current solver state.');
       return;
     }
+    if (runPendingRef.current) return;
     if (document.hidden) {
       setPauseReason('The page is hidden. Return to the lab before running the simulation.');
       return;
     }
-    setPauseReason('');
-    runningRef.current = true;
-    setRunning(true);
-    lastFrameRef.current = null;
-    scheduleRef.current?.();
+    const attempt = ++runAttemptRef.current;
+    const requestToken = runTokenRef.current;
+    runPendingRef.current = true;
+    setRunPending(true);
+    setPauseReason('Checking saved-scene retention before running.');
+    try {
+      const allowed = await callbacksRef.current.onBeforeRun(id);
+      if (attempt !== runAttemptRef.current || requestToken !== runTokenRef.current) return;
+      if (!allowed) {
+        setPauseReason('Scene retention could not be confirmed. Retry the local scene request before running.');
+        return;
+      }
+      if (activeIdRef.current !== id
+        || runtimeRef.current !== runtime
+        || preparingRef.current
+        || replacementPendingRef.current
+        || playbackBlockedRef.current
+        || document.hidden) return;
+      setPauseReason('');
+      runningRef.current = true;
+      setRunning(true);
+      lastFrameRef.current = null;
+      callbacksRef.current.onPlaybackChange(id, true);
+      scheduleRef.current?.();
+    } catch (error) {
+      if (attempt === runAttemptRef.current) setPauseReason(`Could not confirm saved-scene retention: ${describeError(error)}`);
+    } finally {
+      if (attempt === runAttemptRef.current) {
+        runPendingRef.current = false;
+        setRunPending(false);
+      }
+    }
   };
 
   const resetSimulation = () => {
@@ -812,9 +913,9 @@ export default function SimulationCanvas({
       if (target instanceof HTMLElement && (
         target.isContentEditable || target.closest('input:not([type="range"]), textarea, select, [contenteditable="true"]')
       )) return;
-      if (event.code === 'Space' && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !canvasIssueRef.current) {
+      if (event.code === 'Space' && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !playbackBlockedRef.current && !canvasIssueRef.current) {
         event.preventDefault();
-        toggleRunning();
+        void toggleRunning();
       } else if (event.code === 'KeyR' && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !canvasIssueRef.current) {
         event.preventDefault();
         resetSimulation();
@@ -866,9 +967,9 @@ export default function SimulationCanvas({
       </div>
       <div className="simulation-controls">
         <div className="playback-control">
-          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={toggleRunning} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)} aria-keyshortcuts="Space">
+          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={() => { void toggleRunning(); }} disabled={!runtimeRef.current || preparing || replacementPending || runPending || playbackBlocked || Boolean(canvasIssue)} aria-keyshortcuts="Space" aria-busy={runPending}>
             {running ? <Pause size={16} weight="fill" aria-hidden="true" /> : <Play size={16} weight="fill" aria-hidden="true" />}
-            <span>{running ? 'Pause' : 'Run'}</span>
+            <span>{runPending ? 'Checking scene' : running ? 'Pause' : 'Run'}</span>
           </button>
           <button className="tool-button" type="button" onClick={resetSimulation} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)} title="Return to the initial state without a model request (R)" aria-label="Reset" aria-keyshortcuts="R">
             <ArrowCounterClockwise size={16} aria-hidden="true" />

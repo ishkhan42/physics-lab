@@ -3,21 +3,20 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ZodError } from 'zod';
 import { PROVIDER_LABELS, type ModelOption, type ProviderConfig } from '../shared/catalog.ts';
 import { AssemblyRequestSchema, hasGroundPlane, validateScene, type AssemblyRequest, type Decision, type Provider } from '../shared/scene.ts';
+import { SavedSceneIdSchema, type SavedScene, type SavedSceneMetadata, type SceneDocument } from '../shared/saved-scene.ts';
 import { readAssemblyResponse, type AssemblyProgress } from '../shared/assembly-stream.ts';
 import ObjectCards from './ObjectCards.tsx';
 import SimulationCanvas, { type CanvasExperiment } from './SimulationCanvas.tsx';
+import SceneLinkBar from './SceneLinkBar.tsx';
+import { createSavedScene, forgetRecentScene, getSavedScene, readRecentScenes, rememberRecentScene, renewSavedScene, SavedSceneApiError, type RecentScene } from './saved-scenes.ts';
 import TelemetryPanel from './TelemetryPanel.tsx';
 import type { InspectionSnapshot } from './physics/types.ts';
 type SceneDecision = Extract<Decision, { kind: 'scene' }>;
-type RecentExperiment = {
-  id: number;
-  title: string;
-  summary: string;
-  decision: SceneDecision;
-  scene: SceneDecision['scene'];
-  userGroundChoice?: CanvasExperiment['userGroundChoice'];
-  createdAt: number;
-};
+type SceneUrlMode = 'push' | 'pop' | 'initial';
+type SceneOperation = 'idle' | 'saving' | 'loading' | 'renewing';
+type SceneBinding = { saved: SavedScene; urlMode: SceneUrlMode; operationToken: number; restorePrompt: boolean };
+type PendingSceneSave = { runtimeId: number; document: SceneDocument; mode: 'prepare' | 'copy'; urlMode: SceneUrlMode };
+type ActiveSceneBinding = { runtimeId: number; saved: SavedScene };
 
 type Flow = {
   kind: 'idle' | 'requesting' | 'clarification' | 'preparing' | 'ready' | 'unsupported' | 'error';
@@ -127,6 +126,12 @@ function assemblyFailure(error: unknown): { message: string; detail: string } {
     detail: errorMessage(error),
   };
 }
+function sceneIdFromPath(pathname: string): string | null {
+  const match = /^\/scenes\/([^/]+)\/?$/.exec(pathname);
+  if (!match || !SavedSceneIdSchema.safeParse(match[1]).success) return null;
+  return match[1];
+}
+
 
 
 
@@ -148,8 +153,14 @@ export default function App() {
   const [flow, setFlow] = useState<Flow>({ kind: 'idle', message: '' });
   const [activeExperiment, setActiveExperiment] = useState<CanvasExperiment | null>(null);
   const [pendingExperiment, setPendingExperiment] = useState<CanvasExperiment | null>(null);
-  const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
-  const [currentHistoryId, setCurrentHistoryId] = useState<number | null>(null);
+  const [savedScene, setSavedScene] = useState<SavedScene | null>(null);
+  const [sceneOperation, setSceneOperation] = useState<SceneOperation>(() => window.location.pathname.startsWith('/scenes/') ? 'loading' : 'idle');
+  const [sceneError, setSceneError] = useState('');
+  const [recentScenes, setRecentScenes] = useState<RecentScene[]>(() => readRecentScenes());
+  const [currentSceneId, setCurrentSceneId] = useState<string | null>(null);
+  const [clearCanvasToken, setClearCanvasToken] = useState(0);
+  const [playback, setPlayback] = useState<{ id: number; playing: boolean } | null>(null);
+  const [blockedRuntimeId, setBlockedRuntimeId] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<InspectionSnapshot | null>(null);
   const [formError, setFormError] = useState('');
   const [formErrorDetail, setFormErrorDetail] = useState('');
@@ -163,8 +174,20 @@ export default function App() {
   const requestController = useRef<AbortController | null>(null);
   const candidateRef = useRef<CanvasExperiment | null>(null);
   const activeRef = useRef<CanvasExperiment | null>(null);
-  const selectedHistoryId = useRef<number | null>(null);
-  const activeHistoryId = useRef<number | null>(null);
+  const activeSavedRef = useRef<ActiveSceneBinding | null>(null);
+  const activeSceneUrlRef = useRef<string | null>(null);
+  const activeSourcePromptRef = useRef('');
+  const pendingSceneBindingsRef = useRef(new Map<number, SceneBinding>());
+  const pendingSaveRef = useRef<PendingSceneSave | null>(null);
+  const sceneControllerRef = useRef<AbortController | null>(null);
+  const operationTokenRef = useRef(0);
+  const operationRef = useRef<SceneOperation>(sceneOperation);
+  const retryActionRef = useRef<(() => void) | null>(null);
+  const playbackRef = useRef<{ id: number; playing: boolean } | null>(null);
+  const failedRenewalRef = useRef<number | null>(null);
+  const renewalFlightsRef = useRef(new Map<number, Promise<boolean>>());
+  const expiryCheckRef = useRef('');
+  const clearAfterPauseRef = useRef(false);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLTextAreaElement>(null);
 
@@ -240,7 +263,21 @@ export default function App() {
   useEffect(() => () => {
     generation.current += 1;
     requestController.current?.abort();
+    sceneControllerRef.current?.abort();
   }, []);
+
+  const beginSceneOperation = (operation: SceneOperation) => {
+    const token = ++operationTokenRef.current;
+    operationRef.current = operation;
+    setSceneOperation(operation);
+    return token;
+  };
+
+  const finishSceneOperation = (token: number) => {
+    if (operationTokenRef.current !== token) return;
+    operationRef.current = 'idle';
+    setSceneOperation('idle');
+  };
 
   const invalidateWork = useCallback((message = 'The draft changed. Its previous request or preparation was canceled.') => {
     const wasWorking = requestController.current !== null || candidateRef.current !== null;
@@ -248,13 +285,28 @@ export default function App() {
     requestController.current?.abort();
     requestController.current = null;
     candidateRef.current = null;
-    selectedHistoryId.current = null;
     setPendingExperiment(null);
+    const preserveCopyRetry = pendingSaveRef.current?.mode === 'copy' && sceneControllerRef.current === null;
+    if (!preserveCopyRetry && (sceneControllerRef.current || pendingSaveRef.current || pendingSceneBindingsRef.current.size > 0)) {
+      sceneControllerRef.current?.abort();
+      sceneControllerRef.current = null;
+      pendingSaveRef.current = null;
+      pendingSceneBindingsRef.current.clear();
+      operationTokenRef.current += 1;
+      operationRef.current = 'idle';
+      setSceneOperation('idle');
+      retryActionRef.current = null;
+      setSceneError('');
+    }
+    if (!activeSavedRef.current && activeRef.current) {
+      setSceneError('The current setup has no active saved link. Save a new copy to share it.');
+    }
     setFlow({ kind: 'idle', message: wasWorking ? message : '' });
   }, []);
 
 
   const handleDescriptionChange = (value: string) => {
+    if (sceneOperation === 'loading') return;
     if (value !== description) {
       invalidateWork();
       setClarifications([]);
@@ -268,6 +320,7 @@ export default function App() {
   };
 
   const handleAnswerChange = (value: string) => {
+    if (sceneOperation === 'loading') return;
     if (value !== answer) {
       invalidateWork();
       setFormError('');
@@ -277,6 +330,7 @@ export default function App() {
   };
 
   const handleProviderChange = (value: string) => {
+    if (sceneOperation === 'loading') return;
     invalidateWork();
     setProvider(isProvider(value) ? value : '');
     setFreeModel(config?.defaultProvider === 'openrouter' && config.defaultModel ? config.defaultModel : OPENROUTER_FREE_ROUTE.id);
@@ -286,6 +340,7 @@ export default function App() {
   };
 
   const handleModelInput = (value: string) => {
+    if (sceneOperation === 'loading') return;
     invalidateWork();
     setModelInput(value);
     if (provider === 'openrouter') setFreeModel('');
@@ -339,31 +394,163 @@ export default function App() {
     setFlow({ kind: 'preparing', message: 'Building your paused physics preview.' });
   };
 
-  const loadRecentExperiment = (item: RecentExperiment) => {
-    if (currentHistoryId === item.id && !isBusy) return;
-    invalidateWork('Loading a recent experiment. Any current provider request or preparation was canceled.');
-    selectedHistoryId.current = item.id;
-    preparePreview(item.decision, generation.current, item.userGroundChoice, item.scene);
+  const saveSceneDocument = async (pending: PendingSceneSave) => {
+    if (pending.mode === 'prepare' && pending.runtimeId !== generation.current) return;
+    if (pending.mode === 'copy' && activeRef.current?.id !== pending.runtimeId) return;
+    sceneControllerRef.current?.abort();
+    const controller = new AbortController();
+    sceneControllerRef.current = controller;
+    pendingSaveRef.current = pending;
+    const operationToken = beginSceneOperation('saving');
+    setSceneError('');
+    if (pending.mode === 'prepare') {
+      requestStartedAt.current = performance.now();
+      setElapsedSeconds(0);
+      setAssemblyProgress(null);
+      setFlow({ kind: 'preparing', message: 'Saving this scene before building its paused preview.' });
+    }
+    try {
+      const saved = await createSavedScene(pending.document, controller.signal);
+      const stillCurrent = pending.mode === 'prepare'
+        ? pending.runtimeId === generation.current
+        : activeRef.current?.id === pending.runtimeId;
+      if (controller.signal.aborted || !stillCurrent) return;
+      sceneControllerRef.current = null;
+      pendingSaveRef.current = null;
+      setRecentScenes(rememberRecentScene(saved.id, saved.document.scene.title, saved.expiresAt));
+      if (pending.mode === 'copy') {
+        activeSavedRef.current = { runtimeId: pending.runtimeId, saved };
+        activeSceneUrlRef.current = saved.id;
+        setSavedScene(saved);
+        setCurrentSceneId(saved.id);
+        setSceneError('');
+        retryActionRef.current = null;
+        failedRenewalRef.current = null;
+        setBlockedRuntimeId(null);
+        window.history.pushState(null, '', `/scenes/${saved.id}`);
+        finishSceneOperation(operationToken);
+        return;
+      }
+      pendingSceneBindingsRef.current.set(pending.runtimeId, {
+        saved,
+        urlMode: pending.urlMode,
+        operationToken,
+        restorePrompt: false,
+      });
+      preparePreview(saved.document.decision, pending.runtimeId, saved.document.userGroundChoice, saved.document.scene);
+    } catch (error) {
+      if (controller.signal.aborted || pending.runtimeId !== (pending.mode === 'prepare' ? generation.current : activeRef.current?.id)) return;
+      sceneControllerRef.current = null;
+      finishSceneOperation(operationToken);
+      pendingSaveRef.current = pending;
+      setSceneError(`This scene could not be saved. ${errorMessage(error)} Retry the local API without generating the scene again.`);
+      retryActionRef.current = () => { void saveSceneDocument(pending); };
+      if (pending.mode === 'prepare') {
+        setFlow(activeRef.current ? { kind: 'ready', message: 'The existing physics preview is unchanged.' } : { kind: 'idle', message: '' });
+      }
+    }
+  };
+
+  const loadSavedScene = async (id: string, urlMode: SceneUrlMode) => {
+    const previousCandidate = candidateRef.current;
+    const previousBinding = previousCandidate ? pendingSceneBindingsRef.current.get(previousCandidate.id) : undefined;
+    const previousSceneUrlId = activeSavedRef.current?.saved.id ?? activeSceneUrlRef.current;
+    if (urlMode !== 'pop' && previousBinding?.urlMode === 'pop' && previousSceneUrlId) {
+      window.history.replaceState(null, '', `/scenes/${previousSceneUrlId}`);
+    }
+    if (pendingSaveRef.current?.mode === 'copy' && sceneControllerRef.current === null) {
+      pendingSaveRef.current = null;
+      retryActionRef.current = null;
+      setSceneError('');
+    }
+    invalidateWork('Loading a saved scene. The current preview stays available until it is ready.');
+    const runtimeId = generation.current;
+    const controller = new AbortController();
+    sceneControllerRef.current = controller;
+    const operationToken = beginSceneOperation('loading');
+    setSceneError('');
+    retryActionRef.current = () => { void loadSavedScene(id, urlMode === 'initial' ? 'initial' : 'push'); };
+    try {
+      const saved = await getSavedScene(id, controller.signal);
+      if (saved.id !== id) throw new Error('The local API returned a different saved scene.');
+      if (controller.signal.aborted || runtimeId !== generation.current) return;
+      sceneControllerRef.current = null;
+      setRecentScenes(rememberRecentScene(saved.id, saved.document.scene.title, saved.expiresAt));
+      pendingSceneBindingsRef.current.set(runtimeId, {
+        saved,
+        urlMode,
+        operationToken,
+        restorePrompt: true,
+      });
+      preparePreview(saved.document.decision, runtimeId, saved.document.userGroundChoice, saved.document.scene);
+    } catch (error) {
+      if (controller.signal.aborted || runtimeId !== generation.current) return;
+      sceneControllerRef.current = null;
+      finishSceneOperation(operationToken);
+      const unavailable = error instanceof SavedSceneApiError && error.status === 404;
+      if (unavailable) setRecentScenes(forgetRecentScene(id));
+      const current = activeSavedRef.current;
+      if (unavailable && current && current.saved.id === id && activeRef.current?.id === current.runtimeId) {
+        activeSavedRef.current = null;
+        setSavedScene(null);
+        setCurrentSceneId(null);
+        failedRenewalRef.current = current.runtimeId;
+        setBlockedRuntimeId(current.runtimeId);
+        setSceneError('This saved scene expired or is unavailable. Save a new copy of the current setup to create a fresh link.');
+        retryActionRef.current = () => { void loadSavedScene(id, 'push'); };
+      } else {
+        setSceneError(unavailable ? 'This scene link is unavailable or has expired.' : `This saved scene could not be opened. ${errorMessage(error)} Retry the local request.`);
+        retryActionRef.current = () => { void loadSavedScene(id, urlMode === 'initial' ? 'initial' : 'push'); };
+      }
+      const previousSceneUrlId = activeSavedRef.current?.saved.id ?? activeSceneUrlRef.current;
+      if (urlMode === 'pop' && previousSceneUrlId) {
+        window.history.replaceState(null, '', `/scenes/${previousSceneUrlId}`);
+      }
+    }
+  };
+
+  const loadRecentScene = (item: RecentScene) => {
+    void loadSavedScene(item.id, 'push');
+  };
+
+  const saveCurrentCopy = () => {
+    const current = activeRef.current;
+    if (!current || current.decision.kind !== 'scene' || savedScene || pendingSaveRef.current || sceneOperation !== 'idle' || isBusy) return;
+    const document: SceneDocument = {
+      prompt: activeSourcePromptRef.current,
+      decision: current.decision,
+      scene: current.scene,
+      ...(current.userGroundChoice ? { userGroundChoice: current.userGroundChoice } : {}),
+    };
+    void saveSceneDocument({ runtimeId: current.id, document, mode: 'copy', urlMode: 'push' });
   };
 
   const togglePhysicalGround = (include: boolean) => {
     const current = activeRef.current;
-    if (!current || current.decision.kind !== 'scene' || isBusy) return;
+    if (!current || current.decision.kind !== 'scene' || isBusy || sceneOperation === 'loading' || sceneOperation === 'saving') return;
+    if (pendingSaveRef.current?.mode === 'copy' && sceneControllerRef.current === null) {
+      pendingSaveRef.current = null;
+      retryActionRef.current = null;
+      setSceneError('');
+    }
     invalidateWork();
-    // A ground change edits the open experiment; it is not a new history entry.
-    selectedHistoryId.current = activeHistoryId.current;
     try {
       const scene = validateScene({ ...current.scene, ground: include ? undefined : null });
-      preparePreview(current.decision, generation.current, include ? 'default' : 'none', scene);
+      const document: SceneDocument = {
+        prompt: activeSourcePromptRef.current,
+        decision: current.decision,
+        scene,
+        userGroundChoice: include ? 'default' : 'none',
+      };
+      void saveSceneDocument({ runtimeId: generation.current, document, mode: 'prepare', urlMode: 'push' });
     } catch (error) {
-      selectedHistoryId.current = null;
       setFlow({ kind: 'error', message: 'This ground choice could not be prepared.', detail: errorMessage(error) });
     }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isBusy) return;
+    if (isBusy || sceneOperation === 'loading' || sceneOperation === 'saving' || pendingSaveRef.current) return;
     const clarification = question
       ? [...clarifications, { question, answer: answer.trim() }]
       : clarifications;
@@ -390,7 +577,6 @@ export default function App() {
     setFormError('');
     setFormErrorDetail('');
     setResponseDecision(null);
-    selectedHistoryId.current = null;
     setFlow({ kind: 'requesting', message: `Sending this description to ${PROVIDER_LABELS[request.provider]} using ${request.model}.` });
     try {
       const response = await fetch('/api/assemble', {
@@ -419,15 +605,14 @@ export default function App() {
       } else if (decision.scene) {
         setQuestion('');
         setAnswer('');
-        if (!hasGroundPlane(decision.scene)) {
-          try {
-            const scene = validateScene({ ...decision.scene, ground: undefined });
-            preparePreview(decision, id, undefined, scene);
-          } catch (error) {
-            setFlow({ kind: 'error', message: 'The default ground could not be kept with this model.', detail: errorMessage(error) });
-          }
-        } else {
-          preparePreview(decision, id);
+        try {
+          const scene = hasGroundPlane(decision.scene)
+            ? decision.scene
+            : validateScene({ ...decision.scene, ground: undefined });
+          const document: SceneDocument = { prompt: request.description, decision, scene };
+          void saveSceneDocument({ runtimeId: id, document, mode: 'prepare', urlMode: 'push' });
+        } catch (error) {
+          setFlow({ kind: 'error', message: 'The default ground could not be kept with this model.', detail: errorMessage(error) });
         }
       } else {
         throw new Error('The validated scene decision did not contain a scene.');
@@ -446,54 +631,356 @@ export default function App() {
     if (id === generation.current) setFlow({ kind: 'preparing', message });
   }, []);
 
-  const handleCanvasReady = useCallback((experiment: CanvasExperiment, nextSnapshot: InspectionSnapshot) => {
+  const handleCanvasReady = (experiment: CanvasExperiment, nextSnapshot: InspectionSnapshot) => {
     if (experiment.id !== generation.current) return;
+    const binding = pendingSceneBindingsRef.current.get(experiment.id);
+    pendingSceneBindingsRef.current.delete(experiment.id);
     activeRef.current = experiment;
     candidateRef.current = null;
-    const historyId = selectedHistoryId.current ?? experiment.id;
-    selectedHistoryId.current = null;
-    activeHistoryId.current = historyId;
-    setCurrentHistoryId(historyId);
-    const decision = experiment.decision;
-    if (decision.kind === 'scene') {
-      setRecentExperiments(current => {
-        const existing = current.find(item => item.id === historyId);
-        const next: RecentExperiment = {
-          id: historyId,
-          title: experiment.scene.title,
-          summary: decision.summary,
-          decision,
-          scene: experiment.scene,
-          userGroundChoice: experiment.userGroundChoice,
-          createdAt: existing?.createdAt ?? Date.now(),
-        };
-        return existing
-          ? current.map(item => item.id === historyId ? next : item)
-          : [next, ...current].slice(0, 8);
-      });
-    }
     setActiveExperiment(experiment);
     setPendingExperiment(current => current?.id === experiment.id ? null : current);
     setSnapshot(nextSnapshot);
     setResponseDecision(null);
+    setBlockedRuntimeId(null);
+    clearAfterPauseRef.current = false;
+    failedRenewalRef.current = null;
+    if (binding) {
+      activeSavedRef.current = { runtimeId: experiment.id, saved: binding.saved };
+      activeSceneUrlRef.current = binding.saved.id;
+      activeSourcePromptRef.current = binding.saved.document.prompt;
+      setSavedScene(binding.saved);
+      setCurrentSceneId(binding.saved.id);
+      setRecentScenes(rememberRecentScene(binding.saved.id, binding.saved.document.scene.title, binding.saved.expiresAt));
+      setSceneError('');
+      retryActionRef.current = null;
+      if (binding.restorePrompt) {
+        setDescription(binding.saved.document.prompt);
+        setClarifications([]);
+        setQuestion('');
+        setAnswer('');
+      }
+      const path = `/scenes/${binding.saved.id}`;
+      if (binding.urlMode === 'push' && window.location.pathname !== path) {
+        window.history.pushState(null, '', path);
+      } else if (binding.urlMode !== 'push' && window.location.pathname !== path) {
+        window.history.replaceState(null, '', path);
+      }
+      finishSceneOperation(binding.operationToken);
+    } else {
+      activeSavedRef.current = null;
+      activeSceneUrlRef.current = null;
+      activeSourcePromptRef.current = '';
+      setSavedScene(null);
+      setCurrentSceneId(null);
+      setSceneError('The preview is ready, but its saved scene record is unavailable. Save a new copy before running.');
+      retryActionRef.current = null;
+    }
+    document.title = `${experiment.scene.title} | Physics Lab`;
     setFlow({ kind: 'ready', message: 'Physics preview ready. Use the controls below to run or pause the solver.' });
-  }, []);
+  };
 
   const handleCanvasSnapshot = useCallback((id: number, nextSnapshot: InspectionSnapshot) => {
     if (activeRef.current?.id === id) setSnapshot(nextSnapshot);
   }, []);
 
-  const handleCanvasFailure = useCallback((id: number, message: string) => {
+  const handleCanvasFailure = (id: number, message: string) => {
     if (id !== generation.current) return;
+    const binding = pendingSceneBindingsRef.current.get(id);
+    pendingSceneBindingsRef.current.delete(id);
     candidateRef.current = null;
-    selectedHistoryId.current = null;
     setPendingExperiment(current => current?.id === id ? null : current);
+    finishSceneOperation(binding?.operationToken ?? -1);
     setFlow({ kind: 'error', message: 'The paused preview could not be prepared.', detail: message });
+    if (!binding) {
+      if (activeRef.current && !savedScene) {
+        setSceneError('This setup has no active saved link. Save a new copy before running it.');
+        retryActionRef.current = () => saveCurrentCopy();
+      }
+      return;
+    }
+    setSceneError(`The saved scene could not be prepared locally. ${message} Retry without another model request.`);
+    const retryMode = binding.urlMode === 'initial' ? 'initial' : 'push';
+    retryActionRef.current = () => { void loadSavedScene(binding.saved.id, retryMode); };
+    const previousSceneUrlId = activeSavedRef.current?.saved.id ?? activeSceneUrlRef.current;
+    if (binding.urlMode === 'pop' && previousSceneUrlId) {
+      window.history.replaceState(null, '', `/scenes/${previousSceneUrlId}`);
+    }
+  };
+  const cancelCurrentWork = (message: string) => {
+    const candidate = candidateRef.current;
+    const binding = candidate ? pendingSceneBindingsRef.current.get(candidate.id) : undefined;
+    invalidateWork(message);
+    if (!binding) {
+      if (activeRef.current && !savedScene) {
+        setSceneError('This setup has no active saved link. Save a new copy before running it.');
+        retryActionRef.current = () => saveCurrentCopy();
+      }
+      return;
+    }
+    const previousSceneUrlId = activeSavedRef.current?.saved.id ?? activeSceneUrlRef.current;
+    if (binding.urlMode === 'pop' && previousSceneUrlId) {
+      window.history.replaceState(null, '', `/scenes/${previousSceneUrlId}`);
+    }
+    setSceneError('Scene preparation was canceled. Retry to open the saved record without another model request.');
+    const retryMode = binding.urlMode === 'initial' ? 'initial' : 'push';
+    retryActionRef.current = () => { void loadSavedScene(binding.saved.id, retryMode); };
+  };
+
+  const renewForRun = (runtimeId: number, showOperation = true): Promise<boolean> => {
+    const inFlight = renewalFlightsRef.current.get(runtimeId);
+    if (inFlight) return inFlight;
+    const active = activeSavedRef.current;
+    if (!active || active.runtimeId !== runtimeId) return Promise.resolve(false);
+    const savedId = active.saved.id;
+    const operationToken = showOperation ? beginSceneOperation('renewing') : null;
+    const ownsFeedback = () => operationToken !== null && operationTokenRef.current === operationToken && !pendingSaveRef.current;
+    if (activeRef.current?.id === runtimeId && ownsFeedback()) setSceneError('');
+    let request: Promise<boolean>;
+    request = (async () => {
+      try {
+        const metadata: SavedSceneMetadata = await renewSavedScene(savedId);
+        if (metadata.id !== savedId) throw new Error('The local API returned retention metadata for a different scene.');
+        const current = activeSavedRef.current;
+        if (current?.runtimeId !== runtimeId || current.saved.id !== savedId) return false;
+        const saved: SavedScene = { ...current.saved, ...metadata };
+        activeSavedRef.current = { runtimeId, saved };
+        setRecentScenes(rememberRecentScene(saved.id, saved.document.scene.title, saved.expiresAt));
+        if (activeRef.current?.id === runtimeId) {
+          setSavedScene(saved);
+          setCurrentSceneId(saved.id);
+          setBlockedRuntimeId(null);
+          if (ownsFeedback()) {
+            setSceneError('');
+            retryActionRef.current = null;
+          }
+        }
+        failedRenewalRef.current = null;
+        return true;
+      } catch (error) {
+        const current = activeSavedRef.current;
+        const isCurrent = current?.runtimeId === runtimeId && current.saved.id === savedId;
+        const expired = error instanceof SavedSceneApiError && error.status === 404;
+        if (expired) setRecentScenes(forgetRecentScene(savedId));
+        if (isCurrent && activeRef.current?.id === runtimeId) {
+          failedRenewalRef.current = runtimeId;
+          setBlockedRuntimeId(runtimeId);
+          if (expired) {
+            activeSavedRef.current = null;
+            setSavedScene(null);
+            setCurrentSceneId(null);
+            if (!pendingSaveRef.current) {
+              setSceneError('This saved scene expired or is unavailable. Save a new copy of the current setup to create a fresh link.');
+              retryActionRef.current = () => { void loadSavedScene(savedId, 'push'); };
+            }
+          } else if (ownsFeedback()) {
+            setSceneError(`The scene could not be renewed before playback. ${errorMessage(error)} Retry the local API, then run again.`);
+            retryActionRef.current = () => { void renewForRun(runtimeId); };
+          }
+        }
+        return false;
+      } finally {
+        if (operationToken !== null) finishSceneOperation(operationToken);
+        if (clearAfterPauseRef.current && activeRef.current?.id !== runtimeId && activeSavedRef.current?.runtimeId === runtimeId) {
+          activeSavedRef.current = null;
+          activeSourcePromptRef.current = '';
+          clearAfterPauseRef.current = false;
+        }
+      }
+    })().finally(() => {
+      if (renewalFlightsRef.current.get(runtimeId) === request) renewalFlightsRef.current.delete(runtimeId);
+    });
+    renewalFlightsRef.current.set(runtimeId, request);
+    return request;
+  };
+
+  const handleBeforeRun = (runtimeId: number): Promise<boolean> => {
+    if (activeSavedRef.current?.runtimeId !== runtimeId) {
+      if (activeRef.current?.id === runtimeId) {
+        setBlockedRuntimeId(runtimeId);
+        setSceneError('Save a new copy of this setup before running it.');
+        retryActionRef.current = () => saveCurrentCopy();
+      }
+      return Promise.resolve(false);
+    }
+    return renewForRun(runtimeId);
+  };
+
+  const handlePlaybackChange = (runtimeId: number, playing: boolean) => {
+    if (playing) {
+      playbackRef.current = { id: runtimeId, playing: true };
+      setPlayback({ id: runtimeId, playing: true });
+      return;
+    }
+    if (playbackRef.current?.id === runtimeId) {
+      playbackRef.current = null;
+      setPlayback(null);
+    }
+    if (clearAfterPauseRef.current) {
+      if (activeSavedRef.current?.runtimeId === runtimeId && failedRenewalRef.current !== runtimeId) {
+        void renewForRun(runtimeId, false);
+      } else {
+        activeSavedRef.current = null;
+        activeSourcePromptRef.current = '';
+        clearAfterPauseRef.current = false;
+      }
+      return;
+    }
+    if (activeSavedRef.current?.runtimeId === runtimeId && failedRenewalRef.current !== runtimeId) {
+      const showOperation = operationRef.current !== 'loading' && operationRef.current !== 'saving';
+      void renewForRun(runtimeId, showOperation);
+    }
+  };
+
+  useEffect(() => {
+    if (!playback?.playing) return;
+    const interval = window.setInterval(() => {
+      if (playbackRef.current?.id === playback.id && playbackRef.current.playing) {
+        const showOperation = operationRef.current !== 'loading' && operationRef.current !== 'saving';
+        void renewForRun(playback.id, showOperation);
+      }
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [playback?.id, playback?.playing]);
+
+  const refreshActiveSavedScene = async (runtimeId: number, savedId: string) => {
+    const requested = activeSavedRef.current;
+    if (requested?.runtimeId !== runtimeId || requested.saved.id !== savedId) return;
+    const operationToken = operationTokenRef.current;
+    const beganIdle = operationRef.current === 'idle';
+    const ownsFeedback = () => beganIdle && operationTokenRef.current === operationToken && !pendingSaveRef.current;
+    try {
+      const saved = await getSavedScene(savedId);
+      if (saved.id !== savedId) throw new Error('The local API returned a different saved scene.');
+      const current = activeSavedRef.current;
+      if (current?.runtimeId !== runtimeId || current.saved.id !== savedId || activeRef.current?.id !== runtimeId) return;
+      // A Run may have renewed the lease while this read was in flight.
+      if (current.saved.expiresAt !== requested.saved.expiresAt || current.saved.lastRunAt !== requested.saved.lastRunAt) return;
+      activeSavedRef.current = { runtimeId, saved };
+      setSavedScene(saved);
+      setCurrentSceneId(saved.id);
+      setRecentScenes(rememberRecentScene(saved.id, saved.document.scene.title, saved.expiresAt));
+      setBlockedRuntimeId(null);
+      failedRenewalRef.current = null;
+      if (ownsFeedback()) {
+        setSceneError('');
+        retryActionRef.current = null;
+      }
+    } catch (error) {
+      const current = activeSavedRef.current;
+      if (current?.runtimeId !== runtimeId || current.saved.id !== savedId || activeRef.current?.id !== runtimeId) return;
+      if (current.saved.expiresAt !== requested.saved.expiresAt || current.saved.lastRunAt !== requested.saved.lastRunAt) return;
+      if (error instanceof SavedSceneApiError && error.status === 404) {
+        activeSavedRef.current = null;
+        setSavedScene(null);
+        setCurrentSceneId(null);
+        setRecentScenes(forgetRecentScene(savedId));
+        failedRenewalRef.current = runtimeId;
+        setBlockedRuntimeId(runtimeId);
+        if (!pendingSaveRef.current) {
+          setSceneError('This saved scene expired or is unavailable. Save a new copy of the current setup to create a fresh link.');
+          retryActionRef.current = () => { void loadSavedScene(savedId, 'push'); };
+        }
+      } else if (ownsFeedback()) {
+        setSceneError(`The saved scene's current expiry could not be confirmed. ${errorMessage(error)} Retry the local API before running.`);
+        retryActionRef.current = () => { void refreshActiveSavedScene(runtimeId, savedId); };
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!savedScene) return;
+    const savedId = savedScene.id;
+    const runtimeId = activeSavedRef.current?.runtimeId;
+    if (runtimeId === undefined) return;
+    const expiryKey = `${savedId}:${savedScene.expiresAt}`;
+    if (expiryCheckRef.current === expiryKey) return;
+    const refresh = () => {
+      expiryCheckRef.current = expiryKey;
+      void refreshActiveSavedScene(runtimeId, savedId);
+    };
+    const delay = Date.parse(savedScene.expiresAt) - Date.now();
+    if (delay <= 0) {
+      refresh();
+      return;
+    }
+    const timer = window.setTimeout(refresh, delay + 1);
+    return () => window.clearTimeout(timer);
+  }, [savedScene]);
+
+  const retryPersistence = () => {
+    if (retryActionRef.current) retryActionRef.current();
+    else if (activeRef.current && !savedScene && !pendingSaveRef.current && !isBusy && sceneOperation === 'idle') saveCurrentCopy();
+  };
+
+  const clearToHome = () => {
+    const wasPlaying = playbackRef.current?.playing === true;
+    invalidateWork('The saved scene was closed.');
+    sceneControllerRef.current?.abort();
+    sceneControllerRef.current = null;
+    operationTokenRef.current += 1;
+    operationRef.current = 'idle';
+    setSceneOperation('idle');
+    retryActionRef.current = null;
+    pendingSaveRef.current = null;
+    setSceneError('');
+    clearAfterPauseRef.current = wasPlaying;
+    if (!wasPlaying) {
+      activeSavedRef.current = null;
+      activeSourcePromptRef.current = '';
+      playbackRef.current = null;
+      setPlayback(null);
+    }
+    activeRef.current = null;
+    activeSceneUrlRef.current = null;
+    candidateRef.current = null;
+    pendingSceneBindingsRef.current.clear();
+    setActiveExperiment(null);
+    setPendingExperiment(null);
+    setSavedScene(null);
+    setCurrentSceneId(null);
+    setSnapshot(null);
+    setResponseDecision(null);
+    setBlockedRuntimeId(null);
+    setClearCanvasToken(current => current + 1);
+    setFlow({ kind: 'idle', message: '' });
+    document.title = 'Physics Lab';
+  };
+
+  useEffect(() => {
+    const initialPath = window.location.pathname;
+    const initialId = sceneIdFromPath(initialPath);
+    if (initialId) {
+      void loadSavedScene(initialId, 'initial');
+    } else if (initialPath !== '/') {
+      operationRef.current = 'idle';
+      setSceneOperation('idle');
+      setSceneError('This scene link is invalid or unavailable. Start a new experiment at /.');
+    }
+    const onPopState = () => {
+      const path = window.location.pathname;
+      const id = sceneIdFromPath(path);
+      if (path === '/') {
+        clearToHome();
+      } else if (id) {
+        void loadSavedScene(id, 'pop');
+      } else {
+        invalidateWork('The invalid scene navigation was canceled.');
+        operationRef.current = 'idle';
+        setSceneOperation('idle');
+        setSceneError('This scene link is invalid or unavailable. Start a new experiment at /.');
+        retryActionRef.current = null;
+        const previousSceneUrlId = activeSavedRef.current?.saved.id ?? activeSceneUrlRef.current;
+        if (previousSceneUrlId) window.history.replaceState(null, '', `/scenes/${previousSceneUrlId}`);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const interpretation = activeExperiment?.decision ?? null;
   const noProvidersAvailable = config !== null && availableProviders.length === 0;
-  const canSubmit = !isBusy && !configError && provider !== '' && selectedModel.length > 0 && description.trim().length >= 3;
+  const sceneTransitionBusy = sceneOperation === 'loading' || sceneOperation === 'saving';
+  const canSubmit = !isBusy && !sceneTransitionBusy && !pendingSaveRef.current && !configError && provider !== '' && selectedModel.length > 0 && description.trim().length >= 3;
   const settingsSummary = provider
     ? `${selectedProviderLabel} / ${selectedModel || 'model not selected'}`
     : 'Choose provider and model';
@@ -590,7 +1077,14 @@ export default function App() {
                         <span className="field-label">OpenRouter free model</span>
                         <select
                           value={freeModel}
-                          onChange={event => { invalidateWork(); setFreeModel(event.target.value); setModelInput(''); setFormError(''); setFormErrorDetail(''); }}
+                          onChange={event => {
+                            if (sceneOperation === 'loading') return;
+                            invalidateWork();
+                            setFreeModel(event.target.value);
+                            setModelInput('');
+                            setFormError('');
+                            setFormErrorDetail('');
+                          }}
                           disabled={isBusy}
                         >
                           <option value="" disabled>Choose a free route or enter a model ID</option>
@@ -730,22 +1224,22 @@ export default function App() {
           ) : null}
 
 
-          {recentExperiments.length > 0 ? (
+          {recentScenes.length > 0 ? (
             <section className="recent-section" aria-labelledby="recent-title">
-              <h2 id="recent-title">This session</h2>
+              <h2 id="recent-title">Recent scenes</h2>
               <ul className="recent-list">
-                {recentExperiments.map(item => (
+                {recentScenes.map(item => (
                   <li key={item.id}>
                     <button
                       className="recent-item"
                       type="button"
-                      onClick={() => loadRecentExperiment(item)}
-                      aria-current={currentHistoryId === item.id ? 'true' : undefined}
-                      title="Reload locally without a model request"
+                      onClick={() => loadRecentScene(item)}
+                      aria-current={currentSceneId === item.id ? 'true' : undefined}
+                      title="Load the saved scene without a model request"
                     >
                       <ClockCounterClockwise size={16} aria-hidden="true" />
                       <strong>{item.title}</strong>
-                      {currentHistoryId === item.id ? <small>Open</small> : null}
+                      {currentSceneId === item.id ? <small>Open</small> : null}
                     </button>
                   </li>
                 ))}
@@ -772,6 +1266,13 @@ export default function App() {
               <p>{interpretation.approximation}</p>
             </div>
           ) : null}
+          <SceneLinkBar
+            saved={savedScene}
+            operation={sceneOperation}
+            error={sceneError}
+            onRetry={retryPersistence}
+            onSaveCopy={activeExperiment && !savedScene && !pendingSaveRef.current && sceneOperation === 'idle' && !isBusy ? saveCurrentCopy : undefined}
+          />
           <div className="stage">
             {isBusy ? (
               <div className="assembly-progress" data-stage={flow.kind} role="status" aria-live="polite" ref={progressRef} tabIndex={-1}>
@@ -801,7 +1302,7 @@ export default function App() {
                   </div>
                 </details>
                 <button className="secondary-button" type="button" onClick={() => {
-                  invalidateWork(flow.kind === 'requesting'
+                  cancelCurrentWork(flow.kind === 'requesting'
                     ? 'Stopped waiting. Your prompt and current preview are unchanged. The provider may continue processing; charges may still apply.'
                     : 'Preview preparation canceled. Your prompt and current preview are unchanged.');
                   descriptionRef.current?.focus();
@@ -810,13 +1311,18 @@ export default function App() {
             ) : null}
             <SimulationCanvas
               experiment={pendingExperiment}
-              replacementPending={isBusy}
+              replacementPending={isBusy || sceneTransitionBusy}
               onStatus={handleCanvasStatus}
               onReady={handleCanvasReady}
               onSnapshot={handleCanvasSnapshot}
               onFailure={handleCanvasFailure}
+              onBeforeRun={handleBeforeRun}
+              onPlaybackChange={handlePlaybackChange}
+              playbackBlocked={blockedRuntimeId === activeExperiment?.id}
+              runToken={generation.current}
+              clearToken={clearCanvasToken}
               physicalGround={Boolean(activeExperiment?.scene.ground)}
-              groundDisabled={!activeExperiment || isBusy}
+              groundDisabled={!activeExperiment || isBusy || sceneTransitionBusy}
               onPhysicalGroundChange={togglePhysicalGround}
             />
           </div>

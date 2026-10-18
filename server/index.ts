@@ -6,10 +6,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AssemblyRequestSchema } from '../shared/scene.ts';
+import { SavedSceneIdSchema } from '../shared/saved-scene.ts';
+import { InvalidSceneDocumentError, SceneStore } from './scenes.ts';
 import { assemble, getProviderConfig, listOpenRouterModels, ProviderError } from './providers.ts';
 
 const PORT = 3001;
 const MAX_ASSEMBLY_BYTES = 64 * 1024;
+const MAX_SCENE_BYTES = 1024 * 1024;
 const MAX_API_RESPONSE_BYTES = 8 * 1024 * 1024;
 const PROJECT_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const DIST_ROOT = resolve(PROJECT_ROOT, 'dist');
@@ -91,25 +94,30 @@ function enforceLocalRequest(request: IncomingMessage): void {
   if (origin && !Object.hasOwn(ALLOWED_ORIGINS, origin)) throw new ApiError(403, 'forbidden_origin', 'Requests must come from the local application.');
 }
 
-async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+async function readJsonBody(
+  request: IncomingMessage,
+  maxBytes = MAX_ASSEMBLY_BYTES,
+  label = 'assembly',
+): Promise<unknown> {
   const contentType = request.headers['content-type']?.split(';', 1)[0].trim().toLowerCase();
   if (contentType !== 'application/json') {
     request.resume();
-    throw new ApiError(415, 'unsupported_media_type', 'Send the assembly request as application/json.', true);
+    throw new ApiError(415, 'unsupported_media_type', `Send the ${label} request as application/json.`, true);
   }
   const declaredLength = Number(request.headers['content-length']);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSEMBLY_BYTES) {
+  const limitMessage = label === 'assembly' ? 'Assembly requests are limited to 64 KiB.' : 'Saved-scene requests are limited to 1 MiB.';
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     request.resume();
-    throw new ApiError(413, 'payload_too_large', 'Assembly requests are limited to 64 KiB.', true);
+    throw new ApiError(413, 'payload_too_large', limitMessage, true);
   }
   const chunks: Buffer[] = [];
   let size = 0;
   try {
     for await (const chunk of request.iterator({ destroyOnReturn: false })) {
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      if (size + bytes.length > MAX_ASSEMBLY_BYTES) {
+      if (size + bytes.length > maxBytes) {
         request.resume();
-        throw new ApiError(413, 'payload_too_large', 'Assembly requests are limited to 64 KiB.', true);
+        throw new ApiError(413, 'payload_too_large', limitMessage, true);
       }
       size += bytes.length;
       chunks.push(bytes);
@@ -182,6 +190,7 @@ async function serveStatic(
 async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
+  sceneStore: SceneStore,
 ): Promise<void> {
   let streaming = false;
   try {
@@ -192,6 +201,9 @@ async function handleRequest(
       url = new URL(request.url, 'http://127.0.0.1');
     } catch {
       throw new ApiError(400, 'invalid_path', 'The requested path is invalid.');
+    }
+    if (url.pathname === '/api/scenes' || url.pathname.startsWith('/api/scenes/') || /^\/scenes\/[^/]+$/.test(url.pathname)) {
+      response.setHeader('x-robots-tag', 'noindex, nofollow');
     }
     if (url.pathname === '/api/config') {
       if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed', 'Use GET for provider configuration.');
@@ -205,6 +217,41 @@ async function handleRequest(
         throw new ApiError(400, 'invalid_provider', 'The model catalog is available for provider=openrouter.');
       }
       sendJson(response, 200, { models: await listOpenRouterModels() });
+      return;
+    }
+    if (url.pathname === '/api/scenes' && request.method === 'POST') {
+      const input = await readJsonBody(request, MAX_SCENE_BYTES, 'saved-scene');
+      const saved = await sceneStore.create(input).catch(error => {
+        if (error instanceof InvalidSceneDocumentError) {
+          throw new ApiError(400, 'invalid_request', 'The saved scene document does not match the supported format.');
+        }
+        throw error;
+      });
+      sendJson(response, 201, saved);
+      return;
+    }
+    const sceneMatch = url.pathname.match(/^\/api\/scenes\/([^/]+)$/);
+    if (sceneMatch) {
+      if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed', 'Use GET to read a saved scene.');
+      const id = sceneMatch[1];
+      if (!SavedSceneIdSchema.safeParse(id).success) throw new ApiError(404, 'scene_not_found', 'This saved scene is unavailable or has expired.');
+      const saved = await sceneStore.get(id);
+      if (!saved) throw new ApiError(404, 'scene_not_found', 'This saved scene is unavailable or has expired.');
+      sendJson(response, 200, saved);
+      return;
+    }
+    const runMatch = url.pathname.match(/^\/api\/scenes\/([^/]+)\/run$/);
+    if (runMatch) {
+      if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use POST to run a saved scene.');
+      const id = runMatch[1];
+      if (!SavedSceneIdSchema.safeParse(id).success) throw new ApiError(404, 'scene_not_found', 'This saved scene is unavailable or has expired.');
+      const body = await readJsonBody(request);
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+        throw new ApiError(400, 'invalid_request', 'The run request must be an empty JSON object.');
+      }
+      const saved = await sceneStore.run(id);
+      if (!saved) throw new ApiError(404, 'scene_not_found', 'This saved scene is unavailable or has expired.');
+      sendJson(response, 200, saved);
       return;
     }
     if (url.pathname === '/api/assemble') {
@@ -239,6 +286,11 @@ async function handleRequest(
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       throw new ApiError(404, 'not_found', 'The requested endpoint was not found.');
     }
+    const sharedSceneMatch = url.pathname.match(/^\/scenes\/([^/]+)$/);
+    if (sharedSceneMatch && SavedSceneIdSchema.safeParse(sharedSceneMatch[1]).success) {
+      await serveStatic(request, response, '/index.html');
+      return;
+    }
     await serveStatic(request, response, url.pathname);
   } catch (error) {
     const safeError = error instanceof ApiError
@@ -256,17 +308,35 @@ async function handleRequest(
   }
 }
 
-export function createApiServer() {
+export type ApiServerOptions = {
+  sceneDbPath?: string;
+  now?: () => number;
+  initializeSceneStore?: boolean;
+};
+
+export function createApiServer(options: ApiServerOptions = {}) {
+  const sceneStore = new SceneStore({ path: options.sceneDbPath, now: options.now });
   const server = createHttpServer((request, response) => {
-    void handleRequest(request, response).catch(() => response.destroy());
+    void handleRequest(request, response, sceneStore).catch(() => response.destroy());
   });
+  server.on('close', () => sceneStore.close());
+  if (options.initializeSceneStore) {
+    server.on('listening', () => {
+      void sceneStore.initialize().catch(() => {
+        if (!server.listening) return;
+        console.error('Could not initialize private saved-scene storage.');
+        process.exitCode = 1;
+        server.close();
+      });
+    });
+  }
   server.headersTimeout = 10_000;
   server.requestTimeout = 255_000;
   return server;
 }
 
 export function startServer() {
-  const server = createApiServer();
+  const server = createApiServer({ initializeSceneStore: true });
   server.on('error', () => {
     console.error('Could not start the local physics-lab server on port 3001.');
     process.exitCode = 1;
