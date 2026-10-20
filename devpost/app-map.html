@@ -184,7 +184,7 @@ npm run build
 npm start</code></pre>
         <p><code>npm start</code> runs the prestart hook to build/cache the sandbox image and serves the built app at <code>http://127.0.0.1:3001</code>. First sandbox setup needs registry access to fetch the Node base image and pinned packages. The worker container itself has no network access.</p>
         <p>For an authorized provider, use the secret-free <a href="../.env.example"><code>.env.example</code></a> as the server-side template; keep real credentials in a private file outside this public checkout. The map contains no credentials or private data. See <a href="../README.md">README.md</a> for configuration details.</p>
-        <p class="snapshot"><strong>Source snapshot:</strong> this map describes the current release working tree based on <code>14a119b</code>, including local release changes; those changes are not attributed to that older commit. The map will be versioned with the source and can drift as code changes.</p>
+        <p class="snapshot"><strong>Source snapshot:</strong> the runtime, tools and source references in this map match the reviewed release checkpoint <a href="https://github.com/ishkhan42/physics-lab/tree/273d074"><code>273d074</code></a>. The map is versioned with the source and can drift as code changes.</p>
       </section>
     </main>
     <footer>Standalone technical reference · no scripts, remote fonts, CDN, or network resources required for this page.</footer>
