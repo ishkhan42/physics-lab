@@ -2,6 +2,24 @@
 
 A web mechanics lab that turns a described situation into a validated MuJoCo model, previews it paused, then runs and inspects the actual simulation. `physics-lab` is the working repository name; Mission Board names the workspace.
 
+## Devpost Learn Skill Pack evidence
+
+The development workflow uses the official [Devpost Learn Skill Pack](https://github.com/challengepost/learn-ai-basics). The [six installed skills](.agents/skills/), [source hashes](skills-lock.json) and [upstream license](.agents/skills/LICENSE) are included; the project-specific outputs are:
+
+| Artifact | What it records |
+| --- | --- |
+| [Scope](devpost/scope.md) | The compositional mechanics kernel, intended audience, success conditions and scope cuts. |
+| [Product requirements](devpost/prd.md) | User decisions, the describe–preview–run–inspect journey, visual direction and acceptance criteria. |
+| [Technical specification](devpost/spec.md) | Implementation choices, physical-model boundaries, validation and verification, linked to the requirements. |
+| [Build checklist](devpost/checklist.md) | Fast-mode build slices, hands-on feedback, revisions, verification evidence and remaining readiness checks. |
+| [Technical app map](devpost/app-map.html) | An offline source reference and project-grounded practice to reuse, not a claim of a completed hands-on tour. Download/open locally to view it. |
+
+**History:** the [first implementation commit, `4b37d3c`](https://github.com/ishkhan42/physics-lab/tree/4b37d3cea77344c715521a480de15f9655c0de4c), already contains the skills and substantive planning documents. Plans and implementation were committed together; this is not a separate pre-code approval record.
+
+**Current status:** planning documents and build order are approved; the checklist records the implemented slices and technical checks. Final learner readiness remains open. This index does not claim completion of all six steps or Devpost submission.
+
+The personal learner profile is private and ignored; an ignore rule does not make AI conversations private or remove previously tracked material.
+
 ## Development status
 
 The mechanics lab supports real contacts, friction, recoil, scheduled launches/releases, timed impulses and continuous-load switching. The light workbench uses compact chat and a visual action timeline; saved scenes retain their 24-hour sliding lifetime. Pi works only with trusted lab tools inside a no-network sandbox. Native checks validate execution, not every natural-language interpretation or long-term physical outcome. Final learner approval remains in the [build checklist](devpost/checklist.md).
@@ -211,10 +229,6 @@ The official MuJoCo JS bindings are still marked WIP. The version is pinned. The
 - `src/physics/`: trusted MJCF compiler, calibrated material/contact law, MuJoCo lifecycle/observations and playback clock.
 - `src/`: Mission Board, actual Three.js canvas and read-only object cards.
 - `tests/`: deterministic physical references, frame/force/path regressions, HTTP boundaries and provider error parsing.
-
-Work follows the official [Devpost Learn Skill Pack](https://github.com/challengepost/learn-ai-basics), installed in `.agents/skills/` with source hashes in `skills-lock.json` and its MIT license preserved. [Scope](devpost/scope.md), [PRD](devpost/prd.md), [spec](devpost/spec.md) and [checklist](devpost/checklist.md) carry the decisions/progress. The personal learner profile is private and ignored; an ignore rule does not make AI conversations private or remove previously tracked material.
-
-Open [the technical app map](devpost/app-map.html) as a local HTML file for a standalone, offline three-stop source reference and an evidence-based practice to reuse. It is a reference guide, not a claim of a completed hands-on tour; final learner readiness remains separate from technical checks.
 
 ## License
 

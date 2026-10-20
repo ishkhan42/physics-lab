@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Surface the existing Devpost Learn Skill Pack artifacts near the top of the README, with direct planning/build/map links, the first implementation checkpoint and explicit unfinished readiness status; remove the buried duplicate.
+
 - Prepare the current app for authorized public source release with an MIT application license, preserved third-party notices and an offline technical app map. Keep technical verification separate from the learner's final readiness confirmation.
 - Verify a clean dependency install, production/inspection/Docker builds and 182 behavioral checks; strengthen the real isolated-renderer regression to compare texture on/off on the same material.
 - Add a saved Reference grid switch under Appearance / Guides, defaulting on for older records and remaining independent of the physical ground.
