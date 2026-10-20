@@ -1,0 +1,22 @@
+Ground textures and thumbnails
+
+CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+Provider terms: https://polyhaven.com/license and https://docs.ambientcg.com/license/
+
+Poly Haven textures (CC0 1.0 Universal):
+- Rough Concrete: https://polyhaven.com/a/rough_concrete
+  4K JPG diffuse, 2K JPG OpenGL normal and roughness; source area 1.23 m square.
+- Marble 01: https://polyhaven.com/a/marble_01
+  4K JPG diffuse, 2K JPG OpenGL normal and roughness; source area 1.5 m square.
+- Clean Asphalt: https://polyhaven.com/a/clean_asphalt
+  4K JPG diffuse, 2K JPG OpenGL normal and roughness; source area 2.1 m square.
+- Rubber Tiles: https://polyhaven.com/a/rubber_tiles
+  4K JPG diffuse, 2K JPG OpenGL normal and roughness; source area 2 m square.
+
+ambientCG texture (CC0 1.0 Universal):
+- Ice 003: https://ambientcg.com/a/Ice003
+  4K JPG color, 2K JPG OpenGL normal and roughness. The source reports no physical dimensions; the renderer maps its procedural tile to 1 m square.
+
+The providers state that attribution is not required. Five 128px WEBP thumbnails are derived from the local diffuse textures; the plain swatch is a locally generated solid neutral sample.
+
+Runtime maps are locally re-encoded WEBP derivatives without changing pixel dimensions: 4096x4096 color and 2048x2048 normal/roughness. JPEG originals are not required at runtime.

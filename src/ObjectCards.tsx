@@ -1,3 +1,5 @@
+import { Clock } from '@phosphor-icons/react';
+import { useState } from 'react';
 import type { EntityObservation, InspectionSnapshot, Observation } from './physics/types.ts';
 
 const ENTITY_LABELS: Record<EntityObservation['kind'], string> = {
@@ -71,33 +73,40 @@ function PropertyRows({ properties, featured = false }: { properties: Observatio
   );
 }
 
-function ObjectCard({ entity }: { entity: EntityObservation }) {
-  const primary = primaryProperties(entity);
-  const remaining = entity.properties.filter(property => !primary.includes(property));
+function ObjectCard({ entity, selected, canSelect, onSelect }: { entity: EntityObservation; selected: boolean; canSelect: boolean; onSelect: (id: string | null) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const activity = entity.properties.find(property => property.label === 'Activity');
+  const waiting = activity?.value === 'Waiting for launch' || activity?.value === 'Waiting for release';
+  const primary = waiting ? [] : primaryProperties(entity);
+  const remainingCount = entity.properties.length - primary.length;
   const fixed = entity.kind === 'body' && entity.properties.some(property => property.label === 'Motion' && property.value === 'fixed');
   return (
-    <article className={`object-card${fixed ? ' object-card--support' : ''}`} aria-label={`${fixed ? 'Fixed support' : ENTITY_LABELS[entity.kind]}: ${displayText(entity.label)}`} title={`ID ${entity.id}`}>
+    <article id={`object-${entity.id}`} data-entity-id={entity.id} className={`object-card${fixed ? ' object-card--support' : ''}${waiting ? ' object-card--waiting' : ''}${selected ? ' is-selected' : ''}`} aria-label={`${fixed ? 'Fixed support' : ENTITY_LABELS[entity.kind]}: ${displayText(entity.label)}`} title={`ID ${entity.id}`}>
       <header className="object-card__header">
         <span className="object-card__swatch" style={{ backgroundColor: entity.color }} aria-hidden="true" />
-        <h3>{displayText(entity.label)}</h3>
+        <h3>{canSelect ? <button className="object-select" type="button" aria-label={`Select ${displayText(entity.label)} in scene`} aria-pressed={selected} onClick={() => onSelect(selected ? null : entity.id)}>{displayText(entity.label)}</button> : displayText(entity.label)}</h3>
         <span className="object-card__kind">{fixed ? 'Fixed support' : ENTITY_LABELS[entity.kind]}</span>
       </header>
+      {waiting ? <p className="object-card__activity"><Clock size={14} aria-hidden="true" />{String(activity?.value)}</p> : null}
       {primary.length > 0 ? <PropertyRows properties={primary} featured /> : null}
       {entity.properties.length === 0 ? <p className="object-card__empty">No properties are exposed for this item.</p> : null}
-      {entity.properties.length > 0 && primary.length === 0 ? <p className="object-card__empty">No length or force values are exposed.</p> : null}
-      {remaining.length > 0 ? (
-        <details className="object-details">
-          <summary>More properties ({remaining.length})</summary>
-          <PropertyRows properties={remaining} />
+      {!waiting && entity.properties.length > 0 && primary.length === 0 ? <p className="object-card__empty">No length or force values are exposed.</p> : null}
+      {remainingCount > 0 ? (
+        <details className="object-details" onToggle={event => setExpanded(event.currentTarget.open)}>
+          <summary>More properties ({remainingCount})</summary>
+          {expanded ? <PropertyRows properties={entity.properties.filter(property => !primary.includes(property))} /> : null}
         </details>
       ) : null}
     </article>
   );
 }
 
-export default function ObjectCards({ snapshot, hasExperiment }: {
+export default function ObjectCards({ snapshot, hasExperiment, selectedEntityId, selectableEntities, onSelectEntity }: {
   snapshot: InspectionSnapshot | null;
   hasExperiment: boolean;
+  selectedEntityId: string | null;
+  selectableEntities: ReadonlySet<string>;
+  onSelectEntity: (id: string | null) => void;
 }) {
   const entities = snapshot ? [...snapshot.entities].sort((left, right) => {
     const leftFixed = left.kind === 'body' && left.properties.some(property => property.label === 'Motion' && property.value === 'fixed');
@@ -114,7 +123,7 @@ export default function ObjectCards({ snapshot, hasExperiment }: {
       </div>
       {entities.length > 0 ? (
         <div className="object-grid">
-          {entities.map(entity => <ObjectCard entity={entity} key={entity.id} />)}
+          {entities.map(entity => <ObjectCard entity={entity} selected={entity.id === selectedEntityId} canSelect={selectableEntities.has(entity.id)} onSelect={onSelectEntity} key={entity.id} />)}
         </div>
       ) : (
         <div className="inspector-empty" role="status">

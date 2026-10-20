@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateScene } from '../shared/scene.ts';
-import { parseDecisionText } from '../server/providers.ts';
+import { validateDecision, validateScene } from '../shared/scene.ts';
+import { makeHarnessFailure } from '../shared/harness-failure.ts';
 import { createRuntime } from '../src/physics/mujoco.ts';
+import { advanceNativeCheckTo, NATIVE_CHECK_WALL_BUDGET_MS } from '../src/physics/native-check.ts';
 import type { InspectionSnapshot, MechanicsRuntime } from '../src/physics/types.ts';
 import { atwood, changingWrap, projectile } from './fixtures.ts';
 
@@ -77,8 +78,134 @@ test('a browser work budget defers fixed steps but never skips them', async () =
   }
 });
 
+test('budgeted native substeps resume, reset, and apply scheduled events once', async () => {
+  const scene = validateScene({
+    category: 'mechanics', title: 'Paused native substeps', gravity: [0, 0, 0], ground: null,
+    bodies: [
+      { id: 'body', label: 'Moving body', position: [0, 0, 0], shape: { kind: 'box', size: [0.2, 0.2, 0.2] }, mass: 1,
+        friction: { sliding: 0.3 }, motion: { kind: 'free', linearVelocity: [0, 0, 0], angularVelocity: [0, 0, 0] } },
+      { id: 'support', label: 'Remote support', position: [3, 0, 0], shape: { kind: 'box', size: [0.2, 0.2, 0.2] }, mass: null,
+        motion: { kind: 'fixed' } },
+    ],
+    events: [
+      { id: 'push', label: 'Initial push', at: 0,
+        action: { kind: 'impulse', bodyId: 'body', linear: [1, 0, 0], angular: [0, 0, 0] } },
+      { id: 'stop', label: 'Boundary impulse', at: 0.0005,
+        action: { kind: 'impulse', bodyId: 'body', linear: [-1, 0, 0], angular: [0, 0, 0] } },
+    ],
+  });
+  const budgeted = await createRuntime(scene);
+  const reference = await createRuntime(scene);
+  try {
+    const idle = budgeted.advance(0, 1, 0);
+    assert.equal(idle.steps, 0);
+    assert.equal(budgeted.time, 0);
+    assert.equal(budgeted.snapshot().events?.[0].status, 'pending');
+    const partial = budgeted.advance(0.001, 1, 0);
+    assert.equal(partial.pauseReason, null);
+    assert.equal(partial.steps, 0);
+    assert.equal(budgeted.time, 0.001 / 16);
+    assert.ok(Math.abs(budgeted.frame().find(item => item.id === 'body')!.position[0] - budgeted.time) < 1e-12);
+    const partialSnapshot = budgeted.snapshot();
+    assert.equal(partialSnapshot.time, budgeted.time);
+    assert.equal(partialSnapshot.events?.[0].firedAt, 0);
+    assert.deepEqual(vectorValue(partialSnapshot, 'body', 'Contact force'), [0, 0, 0]);
+    const pausedAt = budgeted.time;
+    const longGap = budgeted.advance(0.251, 1, 0);
+    assert.notEqual(longGap.pauseReason, null);
+    assert.equal(longGap.steps, 0);
+    assert.equal(budgeted.time, pausedAt);
+    const afterGap = budgeted.snapshot();
+    assert.equal(afterGap.time, pausedAt);
+    assert.deepEqual(vectorValue(afterGap, 'body', 'Velocity'), [1, 0, 0]);
+
+    budgeted.reset();
+    assert.equal(budgeted.time, 0);
+    assert.equal(budgeted.snapshot().events?.[0].status, 'pending');
+    const replay = budgeted.advance(0.001, 1, 0);
+    assert.equal(replay.steps, 0);
+    assert.equal(budgeted.snapshot().events?.[0].firedAt, 0);
+
+    let nativeSubsteps = 1;
+    let completedSteps = replay.steps;
+    while (completedSteps === 0) {
+      const previousTime = budgeted.time;
+      const result = budgeted.advance(0, 1, 0);
+      assert.equal(result.pauseReason, null);
+      assert.ok(Math.abs(budgeted.time - previousTime - 0.001 / 16) < 1e-15);
+      nativeSubsteps++;
+      completedSteps += result.steps;
+      if (nativeSubsteps === 8) {
+        const boundary = budgeted.snapshot();
+        assert.equal(boundary.time, 0.0005);
+        assert.equal(boundary.events?.[1].firedAt, 0.0005);
+        assert.equal(vectorValue(boundary, 'body', 'Velocity')[0], 0);
+      }
+      if (nativeSubsteps === 9) assert.equal(budgeted.snapshot().events?.[1].firedAt, 0.0005);
+      assert.ok(nativeSubsteps <= 16);
+    }
+    assert.equal(nativeSubsteps, 16);
+    assert.equal(completedSteps, 1);
+    assert.ok(Math.abs(budgeted.time - 0.001) < 1e-15);
+
+    reference.advance(0.001, 1);
+    const actual = budgeted.snapshot();
+    const expected = reference.snapshot();
+    assert.deepEqual(vectorValue(actual, 'body', 'Position'), vectorValue(expected, 'body', 'Position'));
+    assert.deepEqual(vectorValue(actual, 'body', 'Velocity'), vectorValue(expected, 'body', 'Velocity'));
+    assert.equal(actual.events?.[0].firedAt, 0);
+    assert.equal(actual.events?.[1].firedAt, 0.0005);
+    assert.equal(actual.events?.[0].status, 'completed');
+  } finally {
+    budgeted.dispose();
+    reference.dispose();
+  }
+});
+
+
+test('native check reaches its exact sample target and stops when its deadline expires', async () => {
+  const runtime = await createRuntime(projectile());
+  try {
+    let samples = 0;
+    const bodyCount = runtime.scene.bodies.length;
+    await advanceNativeCheckTo(runtime, 0.026, performance.now() + NATIVE_CHECK_WALL_BUDGET_MS, bodyCount,
+      () => samples++, () => {});
+    assert.ok(Math.abs(runtime.time - 0.026) < 1e-12);
+    assert.equal(samples, 2);
+    const reachedTime = runtime.time;
+    await assert.rejects(advanceNativeCheckTo(runtime, 0.05, performance.now() - 1, bodyCount,
+      () => samples++, () => {}), error => {
+      const diagnostic = makeHarnessFailure(error, { stage: 'checking', modelTurns: 1, toolCalls: 1 });
+      assert.equal(diagnostic.code, 'physics_check_failed');
+      assert.equal(diagnostic.lastIssue?.code, 'native_error');
+      return true;
+    });
+    assert.equal(runtime.time, reachedTime);
+  } finally {
+    runtime.dispose();
+  }
+});
+
+test('native checks accept physical progress within an unfinished millisecond', async () => {
+  const runtime = await createRuntime(validateScene({ ...projectile(), ground: undefined }));
+  const advance = runtime.advance.bind(runtime);
+  runtime.advance = (seconds, speed) => advance(seconds, speed, 0);
+  const progress: number[] = [];
+  try {
+    await advanceNativeCheckTo(runtime, 0.002, performance.now() + NATIVE_CHECK_WALL_BUDGET_MS,
+      runtime.scene.bodies.length, () => {}, time => progress.push(time));
+    assert.ok(progress.some(time => time > 0 && time < 0.001));
+    assert.ok(Math.abs(runtime.time - 0.002) < 1e-12);
+    const state = runtime.snapshot();
+    assert.ok(Math.abs(vectorValue(state, 'ball', 'Position')[0] - 0.01) < 1e-12);
+    assert.ok(Math.abs(vectorValue(state, 'ball', 'Velocity')[2] + 9.81 * 0.002) < 1e-12);
+  } finally {
+    runtime.dispose();
+  }
+});
+
 test('generated initial world poses use zero joint coordinates without applying the displacement twice', async () => {
-  const decision = parseDecisionText(JSON.stringify({ decision: {
+  const decision = validateDecision({
     kind: 'scene', summary: 'A guided sphere pulled toward its spring equilibrium.', assumptions: [],
     question: null, reason: null, scene: {
       category: 'mechanics', title: 'Initial-pose spring', gravity: [0, 0, 0],
@@ -88,7 +215,7 @@ test('generated initial world poses use zero joint coordinates without applying 
         motion: { kind: 'slide', axis: [1, 0, 0], anchor: [0, 0, 1], stiffness: 10, springReference: -1 },
       }],
     },
-  } }));
+  });
   assert.ok(decision.scene);
   const runtime = await createRuntime(decision.scene);
   try {
@@ -236,7 +363,7 @@ test('world torque and body-local force points map into the correct angular moti
 test('cable reaction remains observable with many independent degrees of freedom', async () => {
   const model = atwood();
   for (let index = 0; index < 24; index++) model.bodies.push({
-    id: `particle_${index}`, label: `Independent particle ${index}`, parentId: null,
+    id: `particle_${index}`, label: `Independent particle ${index}`, parentId: null, heldBy: null,
     position: [10 + index, 1, 0], orientation: [1, 0, 0, 0], shape: { kind: 'point' },
     mass: 1, motion: { kind: 'particle', linearVelocity: [0, 0, 0] },
     restitution: 0, friction: { sliding: 0, torsional: 0, rolling: 0, static: null }, color: '#67d9ce',

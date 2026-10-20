@@ -5,10 +5,11 @@ import { createServer as createHttpServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { AssemblyRequestSchema } from '../shared/scene.ts';
+import { HarnessRequestSchema } from '../shared/harness.ts';
 import { SavedSceneIdSchema } from '../shared/saved-scene.ts';
 import { InvalidSceneDocumentError, SceneStore } from './scenes.ts';
-import { assemble, getProviderConfig, listOpenRouterModels, ProviderError } from './providers.ts';
+import { getProviderConfig, listOpenRouterModels, ProviderError } from './providers.ts';
+import { runLab } from './harness.ts';
 
 const PORT = 3001;
 const MAX_ASSEMBLY_BYTES = 64 * 1024;
@@ -105,7 +106,7 @@ async function readJsonBody(
     throw new ApiError(415, 'unsupported_media_type', `Send the ${label} request as application/json.`, true);
   }
   const declaredLength = Number(request.headers['content-length']);
-  const limitMessage = label === 'assembly' ? 'Assembly requests are limited to 64 KiB.' : 'Saved-scene requests are limited to 1 MiB.';
+  const limitMessage = label === 'lab' ? 'Lab requests are limited to 1 MiB, including conversation and scene context.' : label === 'assembly' ? 'Requests are limited to 64 KiB.' : 'Saved-scene requests are limited to 1 MiB.';
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     request.resume();
     throw new ApiError(413, 'payload_too_large', limitMessage, true);
@@ -254,13 +255,17 @@ async function handleRequest(
       sendJson(response, 200, saved);
       return;
     }
-    if (url.pathname === '/api/assemble') {
-      if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use POST to assemble an experiment.');
-      const parsed = AssemblyRequestSchema.safeParse(await readJsonBody(request));
-      if (!parsed.success) throw new ApiError(400, 'invalid_request', 'The assembly request does not match the supported format.');
+    if (url.pathname === '/api/lab') {
+      if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed', 'Use POST to work with the lab assistant.');
+      const parsed = HarnessRequestSchema.safeParse(await readJsonBody(request, MAX_SCENE_BYTES, 'lab'));
+      if (!parsed.success) throw new ApiError(400, 'invalid_request', 'The lab request does not match the supported format.');
+      const controller = new AbortController();
+      const disconnected = () => { if (!response.writableEnded) controller.abort(); };
+      response.once('close', disconnected);
       const ensureConnected = () => {
-        if (response.destroyed || response.writableEnded) throw new ApiError(499, 'assembly_canceled', 'The assembly wait was canceled.');
+        if (response.destroyed || response.writableEnded) throw new ApiError(499, 'lab_canceled', 'The lab assistant was stopped.');
       };
+      try {
       if (request.headers.accept?.split(',').some(value => value.split(';', 1)[0].trim() === 'application/x-ndjson')) {
         const writeRecord = (record: unknown) => {
           ensureConnected();
@@ -275,11 +280,15 @@ async function handleRequest(
           }
           response.write(`${JSON.stringify(record)}\n`);
         };
-        const decision = await assemble(parsed.data, progress => writeRecord({ type: 'progress', ...progress }));
-        writeRecord({ type: 'decision', decision });
+        const outcome = await runLab(parsed.data, progress => writeRecord({ type: 'progress', ...progress }), text => writeRecord({ type: 'assistant', text }), controller.signal);
+        writeRecord(outcome.kind === 'proposal' ? { type: 'proposal', proposal: outcome } : { type: 'decision', decision: outcome });
         response.end();
       } else {
-        sendJson(response, 200, await assemble(parsed.data, ensureConnected));
+        sendJson(response, 200, await runLab(parsed.data, ensureConnected, ensureConnected, controller.signal));
+      }
+      } finally {
+        response.off('close', disconnected);
+        controller.abort();
       }
       return;
     }

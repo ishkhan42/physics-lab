@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { FixedStepClock } from '../src/physics/clock.ts';
+import { FixedStepClock, browserFrameSeconds } from '../src/physics/clock.ts';
 
 const advanceStep = { advanced: true, pauseReason: null } as const;
 
@@ -34,8 +34,8 @@ test('clock rejects hidden pages and long frame gaps without adding wall time', 
   let steps = 0;
   const step = () => { steps++; return advanceStep; };
   assert.deepEqual(clock.advance(0.0005, 1, step), { steps: 0, pauseReason: null });
-  assert.match(clock.advance(0.251, 1, step).pauseReason ?? '', /long frame gap/);
-  assert.match(clock.advance(0.0005, 1, step, false).pauseReason ?? '', /page is hidden/);
+  assert.equal(clock.advance(0.251, 1, step).steps, 0);
+  assert.equal(clock.advance(0.0005, 1, step, false).steps, 0);
   assert.deepEqual(clock.advance(0.0005, 1, step), { steps: 1, pauseReason: null });
   assert.equal(steps, 1);
 });
@@ -47,4 +47,13 @@ test('clock validates timestep, wall time, and playback speed', () => {
   assert.throws(() => clock.advance(Number.NaN, 1, step), RangeError);
   assert.throws(() => clock.advance(0, 0.09, step), RangeError);
   assert.throws(() => clock.advance(0, 10.1, step), RangeError);
+});
+
+test('browser timing separates foreground work from suspended gaps while bounding catch-up', () => {
+  assert.equal(browserFrameSeconds(1000, 1010, 1016), 0.016);
+  assert.equal(browserFrameSeconds(1000, 2000, 2016), 0.25);
+  assert.equal(browserFrameSeconds(1000, 2000, 2250), 0.25);
+  assert.equal(browserFrameSeconds(1000, 2000, 2251), null);
+  const clock = new FixedStepClock();
+  assert.equal(clock.advance(browserFrameSeconds(0, 1000, 1016)!, 1, () => advanceStep).steps, 250);
 });

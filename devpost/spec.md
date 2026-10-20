@@ -25,7 +25,7 @@ The first implementation is mechanics-only and compositional, not a menu of comp
 | Renderer | Three.js 0.186.1 | [Three.js](https://threejs.org/) |
 | Physics | Official `@mujoco/mujoco` 3.16.0, single-threaded WASM | [Versioned bindings](https://github.com/google-deepmind/mujoco/blob/3.16.0/wasm/README.md) |
 | Validation | Zod 4.6.7 | [JSON Schema conversion](https://zod.dev/json-schema) |
-| Server/tests | Node `http`, `fetch`, `node:test`, `assert` | No provider SDK, HTTP framework or test-runner dependency required. |
+| Server/tests/agent | Node `http`, `fetch`, `node:test`, `assert`; pinned Pi agent-core/pi-ai 1.3.0 and Docker | Pi owns the agent loop and provider transport; Docker enforces worker isolation. |
 | Presentation | CSS, system sans and monospace fonts | No animation framework or asset-generation service needed. |
 
 These versions were checked during planning; pin installed versions and commit the lockfile. Use ESM, explicit `.ts` imports in server/shared modules, erasable TypeScript syntax and a strict no-emit check. Node does not execute TSX or implement TS path aliases.
@@ -39,21 +39,23 @@ Local browser plus a loopback Node service, using operator-owned application key
 Implemented local commands:
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 npm run api
 # Second terminal:
 npm run dev
 ```
 
-- `npm run api`: `node --env-file-if-exists=.env --watch server/index.ts`, at `127.0.0.1:3001`.
+- `npm run api`: automatically build/cache the Docker sandbox, then `node --env-file-if-exists=.env --watch server/index.ts` at `127.0.0.1:3001`.
 - `npm run dev`: Vite at `127.0.0.1:5173`, proxying `/api` to Node; open `http://127.0.0.1:5173`.
 - `npm run build`: strict TypeScript check and `vite build`.
 - `npm test`: Node behavioral tests; engine integration is additionally exercised in the actual browser.
-- `npm start`: `node --env-file-if-exists=.env server/index.ts`, serving built `dist` and `/api` at `127.0.0.1:3001`. Build first; Vite preview is not the production API server.
+- `npm start`: automatically build/cache the Docker sandbox, then `node --env-file-if-exists=.env server/index.ts`, serving built `dist` and `/api` at `127.0.0.1:3001`. Build first; Docker must be available.
 
-Provide a secret-free `.env.example` naming `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `OPENROUTER_API_KEY`. Keep real credential files outside the public-facing tree; an ignored local `.env` link to a private file, or explicitly authorized process environment, supplies them. Never use a `VITE_` secret, copy coding-agent OAuth credentials, or put real values in chat, source, fixtures or logs. Missing keys produce setup guidance, not a fake model. An authorized configured provider is required for live generation verification.
+Provide secret-free provider environment names; keep keys outside the public tree and never use VITE_ secrets or copy credentials into source, fixtures, saved scenes or logs. Standard providers use the private environment. Connected GPT requires explicit operator authorization and PHYSICS_LAB_CONNECTED_GPT=1; the broker resolves the existing OMP login through its token command, pins one credential per run and supports only gpt-6-luna. The worker never receives credentials or the login store. Missing authorization/login fails closed.
 
 The required demo video must show the real core journey; the public repository remains required. Deployment is optional and needs its own access/spending policy before exposing operator keys.
+
+Application source and technical documentation use the root MIT license; package metadata declares `MIT`. The Skill Pack, imported libraries/fonts and CC0 material derivatives retain their original notices and terms. `devpost/app-map.html` is a standalone offline source reference, not a public app endpoint or learner-profile artifact. Publishing a reviewed source checkpoint does not itself complete learner sign-off, deployment or Devpost submission.
 
 ## Look and Feel
 
@@ -61,7 +63,7 @@ Implements `prd.md > Look and Feel` and `prd.md > Screens and Layout`.
 
 One physics-lab Mission Board, Apple-inspired web glassmorphism and restrained kinetic motion. The current user-requested palette is soft light grey with dark ink, muted teal controls and a light blue-grey canvas, readable sans labels and monospaced values. This is a web approximation, not an official Apple component package.
 
-Prompt/provider/category controls sit beside the simulation on desktop, with object cards directly beneath the canvas. Narrow screens stack the same sections. Use one coherent light theme, sufficient contrast without relying on blur, visible focus, keyboard operation and reduced-motion treatment.
+Use the existing light Geist/teal visual system for nontechnical learners. Compact expandable chat and the composer sit beside the canvas; AI settings, detailed activity and assumptions are disclosures. A visual storyboard presents actual event times, planned launch mass/speed, queued state and native loaded mass before Run. Mechanics is a badge, not a one-option category form. Narrow screens stack the same surfaces with accessible horizontal timeline scrolling.
 
 The short themed intro is skippable and has a reduced-motion alternative. It is decorative, not fabricated simulation or progress. Stop decorative animation and unnecessary rendering once the interface/camera is settled. Detailed visual refinement is iterative, while the approved sections and journey remain intact.
 
@@ -71,7 +73,7 @@ Implements `prd.md > The Core Journey`.
 
 1. Intro leads to an empty Mission Board. Mechanics is the only active category.
 2. The student selects an available provider/model and submits the scenario.
-3. `POST /api/assemble` sends the description and any clarification exchange with the supported catalog/schema.
+3. POST /api/lab sends the latest description, clarifications, recent history, actual scene, saved human request and prior assumptions. The sandbox computes a measured initial-state snapshot, including startup impulses, so follow-ups do not mistake old momentum fields for velocity or inherit missing context after refresh.
 4. Make the best meaningful model within Mechanics. A paused approximate model explicitly names requested behavior it cannot reproduce and the actual approximation. Ask a consequential clarification when necessary; explain unsupported only when no meaningful category model can be made. No fabricated capability or silent change.
 5. A validated scene passes through the trusted MJCF builder and actual MuJoCo compilation/initialization. Only successful initialization replaces the previous paused experiment.
 6. Initial geometry, cards, assumptions and interpretation appear paused at simulation time zero. Run is explicit.
@@ -90,7 +92,7 @@ Report only real stages, without fabricated percentages or agent-log walls. Prev
 
 Desktop uses a composer beside the simulation and inspection directly below the canvas; narrow screens stack them. A brief CSS entrance never blocks typing and respects reduced motion. Editable prompt starters fill descriptions only. Model settings are secondary, with route/cost warnings. Clarification focuses its answer field; current response and preserved-preview assumptions stay distinguishable. Stop waiting aborts the local fetch/candidate, invalidates stale work and preserves the active model; upstream computation and charges may continue.
 
-Submission focuses and scrolls to a prominent progress panel with an indeterminate indicator and monotonic elapsed time. Optional NDJSON progress reports actual provider generation, local validation, one same-model correction if needed, and native preparation; the UI never schedules fake phase transitions or percentages. The pre-submit notice discloses the possible second provider charge. Reduced motion keeps a static activity indicator and elapsed updates. Local stop-waiting returns focus to the draft. The presentation uses a coherent light UI and light blue-grey WebGL background; plane reference points, not arbitrary infinite-plane patch extents, contribute to view framing.
+Real progress appears in the conversation panel without covering the canvas. Plain-language phase names and elapsed time are visible; raw activity and model IDs stay behind details. Chat text is compact but expandable, and a restored scene exposes its saved request without pre-filling the follow-up composer. Source assumptions keep their provenance; calculated facts come from the solver, not AI arithmetic. Stop aborts further model work and preserves draft/preview, with focus returned to the editor. Reduced motion and visible keyboard focus remain.
 
 ### Model Contract and Catalog
 
@@ -104,9 +106,20 @@ The current mechanics definition contains environment/model assumptions, named b
 
 Every unspecified physical choice must be clarified or sensibly assumed with exact values/units in the model's assumptions, including initial rest/spin, geometry, gravity, contact/friction/damping when used. Proposals must state changed/dropped conditions, preserve the remaining comparison and choose non-overlapping placement unless contact is requested. This is an interpretation policy, not an automatic proof that natural-language intent was correctly understood; native values and explicit review remain necessary.
 
-Provider-native schemas preserve physical descriptions and use one initial-pose convention for generated scalar-joint bodies: the provider cannot emit a second initial `motion.position`; local admission supplies zero. Initial body poses, joint rest references and limits share that zero. The full internal scene API retains nonzero reference-coordinate support for existing validated callers. This is a general representation boundary, not a prompt-specific numerical repair.
+The lab catalog exposes the complete shared decision JSON schema to Pi through a trusted tool, using numeric arrays for all tuples regardless of provider. Scalar-joint reference poses should use initial coordinate zero; schema defaults supply zero when omitted. Advanced validated callers retain nonzero coordinate support. Tool validation, not a provider-specific tuple rewrite or prompt-specific repair, enforces actual geometry and physics.
 
-Ground omission never removes the default silently. When neither configured ground nor an existing upward horizontal plane is present, the default ground is kept and the scene notes say so. A Ground switch on the canvas validates the changed scene locally and rebuilds it paused without another inference request; the choice stays with the open experiment and its session-history entry. Walls and ceilings do not count as ground; custom horizontal planes avoid duplicate floors.
+Omitted ground receives the shared physical default. An explicit `ground:null` for a requested groundless experiment or replacement support is preserved, so the checked candidate and saved preview stay identical. The Ground switch validates and rebuilds a paused scene locally without inference; saved ground edits fork the immutable setup URL.
+
+### Scheduled actions and carried objects
+
+The scene has events[] (default empty, at most 256) and bodies have heldBy (default null). Events declare unique IDs/labels, nonnegative simulation seconds and one action: world linear/angular impulse; held-body release; held-body launch; or enabling/disabling a continuous load by index. Startup impulse loads remain distinct. Same-time ordering is input order.
+
+At-zero actions wait for the first Run step; exact reached-boundary actions execute before publication. Integer native ticks prevent floating-point accumulation from missing a nominal boundary. Arbitrary off-grid times wait until the first native boundary at or after their declaration, with actual firedAt and timing notes exposed. Reset restores contacts, friction modes, welds, held inventories, load flags, clock and pending events. No action may fire twice per run.
+
+Held objects are real massive free rigid roots attached to a fixed/free solid root carrier by trusted private welds. They contribute mass/inertia while held but are collision- and render-inactive. Activation restores explicit material pairs, markers and trails; hidden bodies cannot distort Fit/Follow bounds or leave pre-launch paths. Validation rejects nested groups, articulated descendants, external user constraints/tendons, incompatible independent held velocities and invalid transition ordering.
+
+World launch velocity is an absolute world target in m/s. Body-frame velocity is relative to the post-recoil carrier point in carrier axes, not projectile geometry axes. The coupled response preserves total free-group linear/angular momentum, including remaining payload and pre-release spin; a fixed carrier supplies an external reaction. Carrier own mass stays separate from native Loaded mass/Carried objects observations. These are ideal instantaneous launches, not barrel/fuel/continuum models or arbitrary topology scripts.
+
 
 Validate unique IDs and names, references, topology, positive masses/dimensions, finite values, nonzero axes, quaternion normalization, material ranges, initial constraint consistency and resource budgets. Normalize representation only where it preserves meaning; do not silently clamp physical values or discard objects. Validate on the server and again before browser allocation. Native model compilation is an additional check, not a replacement for validation.
 
@@ -160,6 +173,10 @@ Constraint-force observations are model-specific. Find the correct active rows u
 
 Equality-based tendons and unilateral limits use different active constraint rows; resolve by native constraint type and ID. Select dense versus sparse Jacobian interpretation through `mj_isSparse`, not an assumed row-count sentinel. Render only the active native path range from `ten_wrapadr`/`ten_wrapnum`, splitting pulley markers rather than drawing stale allocated-buffer entries.
 
+Straight two-site tendons expose native path length separately from world-Z separation and angle from world vertical. Wrapped/routed paths must not receive a false chord-based cord angle. Branched strings are separate tendons sharing a moving body-backed junction; world-fixed sites do not create a dynamic knot. MuJoCo requires positive mass for an unconstrained moving junction; an ideal massless approximation must be explicitly disclosed. Initial force absence/zero alone is not evidence of a missing mechanism.
+
+For resting contact performance, `ContactEquilibrium` enables native automatic sleep only when eligible boxes exist. Candidates are initially motionless rough free root boxes with dissipative normal contact, no driven/held/parented/connected/tendon participation, and enough frictional deceleration relative to native sleep tolerance. A supported island plus bounded scaled qvel/qacc is required before native ALLOWED; all other trees remain NEVER. No forced initial sleep. Native awake contact wakes the island; Reset restores policies and fully resets data. Keep Newton, contact profile and timestep unchanged. Sleeping contact-force rows are omitted as stale. This retains separate physical bodies but carries the documented 0.001 m/s approximation; it is not a general exact static solver.
+
 Detect nonfinite state, numerical-reset/warning conditions and infeasible compilation. Pause with an explanation instead of suppressing warnings, showing invented values or silently resetting the experiment.
 
 Native objects/buffers and copied contacts have explicit ownership. Delete owned data before model and release buffers on replacement/unmount. The SDK's `data.warning` vector is borrowed: delete its owned get() values, not the vector. `data.contact` returns an owned snapshot vector; delete it and its get() copies. Editing those snapshots does not modify native contact data. Modify supported model arrays/constraint references and reacquire detached views after allocation or memory growth.
@@ -180,7 +197,15 @@ Pause stops stepping and preserves time/state; resume continues rather than recr
 
 Implements `prd.md > Mission Board`, `prd.md > Simulation and Playback`, `prd.md > Read-Only Object Cards`.
 
-`SimulationCanvas.tsx` owns the WebGL renderer, camera, view-only orbit controls, procedural geometry and lifecycle. Match native geometry dimensions, local frames and rotations; maintain the Z-up convention. Fit the initial scene and show a readable scale/axes. Moving bodies draw a trail of their rendered positions (2048 points, halving resolution rather than dropping the start); every non-plane solid gets a fixed-pixel ring marker that appears only when the body would be under about 5 px on screen. Follow (on by default, off on any manual orbit/zoom/pan) eases the camera to frame bodies and trails while running. Fit and Follow include trails; infinite planes contribute only their reference point. The reference grid and infinite-plane patches scale in powers of ten with the framed scene, and the canvas states the current grid square size. The animation loop must never schedule a second frame callback; camera updates inside a frame fire OrbitControls change events. Rendering or camera movement never alters physical objects.
+SimulationCanvas owns the WebGL renderer, view-only camera/OrbitControls, procedural geometry and lifecycle. Preserve native dimensions/poses and Z-up. Moving bodies retain2048point trails (decimated rather than dropping the start), with fixed-pixel markers for objects below about5pixels. Follow all frames visible bodies and trails; manual navigation hands that overview back. Fit all uses scene bounds, with infinite planes contributing only reference positions. Reference grid/plane patches scale in powers of ten.
+
+Native hinge/ball links use transformed joint anchors and current body centers, including moving-parent anchors. They are non-selectable reference render items, with no added model bodies, DOFs or constraints. Native snapshots expose at most64measured signed contact distances plus truncation state. Model evidence lists actual support/coupling relationships and samples current poses throughout checks, retaining spin and return-to-origin movement rather than only comparing endpoints.
+
+Click/tap picks visible solids, point proxies and cable/connection paths. Screen markers use CSS-pixel hit tolerance and nearest-depth tie breaking; hidden queued objects and infinite planes cannot intercept picks. Capture the target on pointer-down so fast motion cannot outrun a click; reject drag, multitouch, cancel and scene-epoch changes. A single reusable box helper and adaptive marker feedback highlight selection, synchronized with an accessible chooser and read-only inspector title buttons.
+
+Focus frames the selected entity alone. Target follow translates camera/target with current entity bounds, preserving orbit/zoom and excluding other objects/trails; manual pan or arrow keys stops it. A selected hidden entity can arm follow, then frame on activation without exposing its queued geometry. Values scrolls/focuses the selected inspector. Clear/Escape, Reset and successful replacement remove selection; failed replacement retains it. This state is local, does not alter the solver or save/renew records, and clears on refresh.
+
+Picking and camera updates must keep the single-rAF ownership guard: OrbitControls change events inside a frame may already schedule the next callback. Reuse picking vectors/raycaster/intersection storage, update grouped cable bounds from current vertices and dispose helper resources/listeners with the renderer. Keyboard shortcuts must not hijack buttons, selects, text fields or disclosure controls.
 
 Update mesh transforms from native state using reusable arrays/matrices. Do not render the whole React tree at physics frequency. Render while stepping or changing the view; stop once paused and settled. Dispose WebGL resources/listeners and the old runtime when a validated replacement is ready. Compilation/renderer failure retains the previous usable scene rather than a false success surface.
 
@@ -188,11 +213,29 @@ Update mesh transforms from native state using reusable arrays/matrices. Do not 
 
 Update ordinary live observations at a modest cadence of about 20 Hz, plus an immediate coherent snapshot on ready/pause. Pose rendering is independent of this cadence. The motion graphs record only these solver snapshots (height, speed, translational kinetic energy for moving bodies), reset with the experiment or Reset, and never interpolate invented samples. Inspection remains read-only; no object dragging, property editing, rewind or history scrubbing is implied.
 
+### Cosmetic environments
+
+`scene.appearance` is the closed `{surface,sky,textured,grid}` contract. Surface choices are ice, stone, concrete, asphalt, rubber and plain; sky choices are studio, day, overcast and sunset. Missing fields/scenes default to concrete/day/textured/grid-on without rewriting the stored record. The independent Reference grid switch hides visual guides and the scale caption, never the ground collider. The assistant uses stated material/friction context as a cosmetic cue, not a material-identification rule or permission to change physical coefficients, and preserves appearance on ordinary follow-ups.
+
+`SceneEnvironment` owns local CC0 PBR maps, coordinated lights, sky gradients and their disposal. Color maps are 4K; normal and roughness maps are 2K. WEBP derivatives retain source dimensions, and small-screen GPU maps are capped at 2K within device limits. Load only the selected material when horizontal planes exist. Recompute each plane's UVs only when its physical repeat dimensions change, sharing maps/materials without per-draw uniform mutation or duplicate GPU maps. Non-horizontal authored supports keep their own materials. No displacement, extra collision bodies, remote asset URLs or new dependency is introduced. Sky/lighting presets are static visual gradients, not weather or atmospheric scattering.
+
+The visual picker updates the existing viewer without rebuilding native state, resetting time/graphs/selection or invoking a model. Saving forks the immutable record/link; a save during playback records activity on the new link. An unsaved optimistic look must not expose a misleading Copy link; Retry reuses its captured document and Keep previous look restores the saved appearance. Texture-off keeps the collider; the physical Ground switch remains distinct. Known texture upload frames are excluded from simulation wall-time accounting, while ordinary hidden-tab/frame-gap and native numerical-safety guards remain active.
+
+Viewer and isolated inspection share the renderer and local assets. Inspection's static whitelist admits WEBP, not arbitrary URLs, and capture waits for pending material loading. Missing assets report a plain fallback to both the user and model, without invalidating otherwise valid physics. Appearance is excluded from the native-check cache key but included in the visual key so cosmetic edits cannot return stale screenshots.
+
+### Responsive native stepping and observation rendering
+
+Budgeted `advance` retains a pending contact-substep phase. `steps` counts completed 1 ms macro steps, while `runtime.time` reports actual native-tick progress even when `steps=0`. Check callers must test genuine time progress, drain existing queued wall time before adding another chunk, and retain the deadline. Partial handoffs synchronize poses and check warnings/nonfinite/singular state; due events at the exact boundary execute once. `snapshot()` refreshes force/tendon/velocity observations before exposing them, including after a clock-level pause; invalid native pauses do not trigger an unsafe retry. Reset clears the phase. Unbudgeted stepping retains the original operation sequence; equilibrium qualification remains at macro boundaries. One native call/synchronization cannot be preempted.
+
+Main-thread work is measured through the end of the rendered frame rather than classified as a hidden/suspended gap. True idle gaps still pause; admitted wall-time debt stays bounded. Live observation polls require completed macro progress and a 50 ms wall interval, avoiding a force-evaluation storm while yielding through tiny partial steps. Sampling is independent of geometry rendering, and explicit paused inspection remains coherent at actual native time.
+
+`markers.ts` batches ordinary distant markers in one Points draw and keeps a separate selected marker. Subpixel mesh/edge materials and unresolvable trail drawings are hidden, not their logical objects, physical bodies or recorded buffers. ScenePicker still uses the per-entity marker visibility and full physical bounds, so distant objects remain selectable and focusing restores full geometry. Renderer batches never contribute to experiment framing. Closed inspector details allocate no property rows; opening them exposes current values. Telemetry ingests every distinct snapshot into its bounded 4,000-sample history, coalesces only chart view updates to 100 ms, and resets immediately on experiment/time rewind.
+
 ### Provider API and Local Security
 
 Implements `prd.md > Scenario Prompt and Assembly`, `prd.md > Approved Conventional Defaults`.
 
-Provider/model controls live in the prompt section. Only configured providers can run. Offer `openrouter/free` as the initial free choice when configured; otherwise require an explicit available provider/model, with no silent paid selection.
+OpenRouter remains the shipped environment default. Optional environment-configured OpenAI/Anthropic and explicitly enabled Connected GPT appear in AI settings. PHYSICS_LAB_CONNECTED_GPT=1 selects the authorized OMP login with GPT-6 Luna by default; without it, the broker rejects connected-GPT requests before reading credentials. No automatic provider/model fallback occurs.
 
 `server/index.ts` exposes:
 
@@ -200,34 +243,65 @@ Provider/model controls live in the prompt section. Only configured providers ca
 | --- | --- |
 | `GET /api/config` | Provider availability and safe defaults, never key values. |
 | `GET /api/models?provider=openrouter` | Current text-model IDs, names and capabilities, with actual free/router labels. Direct-provider model IDs can be entered explicitly. |
-| `POST /api/assemble` | `{provider,model,description,clarification:[{question,answer}]}` to a validated scene/clarify/unsupported decision. Default clients retain final JSON and non-success status errors. `Accept: application/x-ndjson` opts into actual `progress` records (`stage`, `message`) followed by exactly one `decision` or `error` record. |
-| `POST /api/scenes` | Validated `{prompt,decision,scene,userGroundChoice?}` to a new immutable saved record; 201 with unguessable UUID, server timestamps, expiry and document. 1 MiB input limit; assembly remains 64 KiB. |
+| POST /api/lab | provider, model, description plus optional clarification/history/currentScene/sourcePrompt/sourceAssumptions; 1 MiB total. History allows only bounded user/assistant text. The sandbox derives currentInitialState; clients cannot inject measured state, credentials, tools or endpoints. JSON returns one decision; NDJSON adds actual activity and assistant text. |
+| `POST /api/scenes` | Validated `{prompt,decision,scene,userGroundChoice?}` to a new immutable saved record; 201 with unguessable UUID, server timestamps, expiry and document. 1 MiB input limit. |
 | `GET /api/scenes/:id` | Read the saved definition without renewal; missing/malformed/expired IDs return safe 404 `scene_not_found`. No listing endpoint. |
 | `POST /api/scenes/:id/run` | Empty JSON object; atomically renew a live record to 24 hours from server activity, returning metadata only. Expired records cannot be revived. |
 | `GET/HEAD /scenes/:id` | Serve the app shell for valid UUID links even when expired, so the browser can explain the unavailable link. Scene routes send noindex/nofollow; API data is no-store. |
 
 Use fixed upstream HTTPS hosts, allowlisted provider values, bounded model IDs, JSON-only requests, allowed local Host/Origin values, size limits and deadlines. No arbitrary proxy URLs, wildcard credentialed CORS, prompt/key logging or raw upstream diagnostic dumps. Serve only files safely resolved inside `dist` with correct MIME types.
 
-The browser bounds the streamed response to 1 MiB, validates progress stages, handles fragmented UTF-8/record boundaries and rejects incomplete, oversized, unknown or duplicate-terminal streams. Every final decision still passes full local scene admission. Once streaming headers are sent, errors are terminal error records, never counterfeit ready models.
+The browser bounds the streamed response to 1 MiB, validates bounded activity records, handles fragmented UTF-8/record boundaries and rejects incomplete, oversized, malformed, unknown-type or duplicate-terminal streams. An unfamiliar bounded activity-stage name maps to general progress without aborting a valid final decision. Every final decision still passes full local scene admission. Transport/protocol/service failures carry distinct safe codes. Once streaming headers are sent, errors are terminal error records, never counterfeit ready models. Structured provider overloads inside HTTP200 are classified as service outages, without private error echoes or automatic retries.
 
-Safety budgets start at 128 bodies, 128 constraints/tendons, 256 loads and 32 mutually attracting particles; 64 KiB assembly input, 256 KiB generated response, 8 MiB upstream catalog, 8192 output tokens and a 120-second deadline per model call. Model calls are bounded to two total: initial plus exactly one of validation correction, HTTP 5xx recovery (after a 1-second delay) or review of an unsupported verdict. Public model discovery has a 5-second deadline and 5-minute cache. Native compilation/runtime still enforce numerical feasibility. A representative model must be explicitly labelled, never silently truncated.
+Model records declare a trusted builder/reviewer purpose, which the host checks against the active tool scope. Builder requests require any declared lab-tool action; reviewer requests require the named native submit_review tool. Clarification/unsupported outcomes still finish through the decision tool, without physics approval or narration-only loops. There is no plain-text fallback on service rejection. The host supplies authoritative model counts and current validated worker tool counts in bounded progress metadata. UI current-phase/counter/elapsed displays are honest resource/activity information, not a percentage complete. Invalid or absent review after its bounded attempts terminates distinctly, not as an instruction to repeatedly change physically valid data; a genuine negative verdict still returns actionable findings for revision. A reserved-capacity stop retains its last concrete validation issue instead of replacing it with a generic budget message.
+
+Budgets: 128 bodies, 128 combined public/held constraints and tendons, 256 loads, 256 scheduled events and 32 mutual-gravity particles. Each run allows 16 shared builder/reviewer model requests, 24 recognized tool calls, 2 concurrent runs and 240 seconds. Reserve final-review capacity; a reviewer has at most 2 requests to submit a usable verdict, counted inside the total rather than as hidden retries. Each call has 120 seconds, 512 KiB generated deltas and 2 MiB upstream transport; supported providers receive an 8192-output-token request cap. Connected GPT's endpoint lacks that cap, so byte/time limits remain authoritative. Requests/browser streams are 1 MiB. Catalog: 8 MiB, 5 seconds, 5-minute cache. All containers use 1 CPU; text-only runs use 512MiB/64PIDs/16MiB scratch, image-capable runs 1GiB/128PIDs/128MiB scratch. Higher request capacity is not a dollar cap.
+
+AI authoring also accepts a closed `{kind:"grid", counts:[nx,ny,nz], spacing:[dx,dy,dz], body:Body}` entry. The template position is the first cell center and spacing is world XYZ. Preflight total counts, including default ground, before cloning; expand to ordinary separate canonical bodies and run the existing admission rules. No nested grids, code evaluation, dynamic spawning, persisted shorthand or cap increase. Catalog/check evidence reports actual current and remaining capacity.
+
+Each native candidate check has a 60-second wall deadline within the overall run. Existing 10 ms work-budget advances drain queued chunks before adding time, yield the event loop and stream real simulated-time progress, including incomplete-macro native progress. Readiness verifies initialization and a fixed 0.5-second motion warm-up, with native numerical-safety guards active at every handoff. It does not replay scheduled future events or a configurable frame checklist. A synchronous native substep is not preemptible. Deadline feedback is not permission to remove requested bodies or change constants.
+
+The builder-only `calculate` tool accepts at most 32 named arithmetic steps and eight finite operands per step, explicit pi/prior-step references, fixed operation arity, radians for trig and explicit degree/radian conversions. Invalid references, duplicate IDs, undefined/domain/nonfinite results and excess bounds fail closed. No expression/code evaluation, I/O or new authority is exposed.
+
+Compact evidence retains native initial/final observations and sampled warm-up motion, not a continuous first-contact or exact path-length certificate. Initial box AABBs use native poses and full dimensions; rotated AABB overlap is not an exact collision test. Declared launch speed and world-XY elevation are separate provenance-labeled input measurements; carrier-relative or zero-speed elevation remains unknown. Later scheduled actions stay declared and pending rather than being falsely reported as pre-verified.
+
+Complete initial-context/tool-result/review JSON is losslessly framed into ordered text blocks of at most 524,288 UTF-16 code units without splitting surrogate pairs. Both roles read adjacent chunks as one document; image blocks follow the complete review text. Keep the existing per-block guard and total pipe/provider byte limits, rather than raising caps or deleting evidence to fit.
+
+Authoring tools accept a typed `decision` object with the derived complete schema and the retained 524,288-character compact-serialization guard; no embedded-JSON string alias exists. Native report tables group ordered observation descriptors and homogeneous record columns without rounding or deleting values, units, notes, order or provenance.
+
+Every outgoing model request receives current trusted remaining allowances: total model requests after the current admission, builder turns available before the two final-review slots, admitted lab actions, inspection calls and image-attempt quota. Text-only image allowance is unavailable. Each reviewer also sees its own current request and remaining format attempts. Status is added only to the outgoing context, not accumulated in Agent history, and grants no extra tools.
 
 ## External Service Contracts
 
-`server/providers.ts` derives provider-native strict structured-output schemas from the single shared decision schema. OpenAI/OpenRouter retain supported regex, scalar bounds, array budgets and exact numeric tuple lengths. Anthropic uses its supported subset, representing tuples as required numeric-key objects; restore those before full unchanged local physics validation. Every response is validated locally. At most one additional same-model call either corrects schema/semantic defects, recovers a temporary HTTP 5xx failure, or reviews an `unsupported` verdict for a buildable or labelled approximate scene; the two-call budget is shared. Corrections receive the issue paths plus the app's own fixed physics-rule messages, never echoed model values in user diagnostics. A failed review keeps the original valid verdict. No extra request follows refusals, truncation, quota/auth failures or timeouts, and no unconstrained or paid-model fallback exists. User-facing schema rejection exposes bounded paths/codes only.
+The isolated builder has inspect_catalog, calculate, check_experiment and finish_experiment. A separate independent reviewer uses the same pinned model/credential and only submit_review. Requests and tools count within the existing totals. Native checking advances real fixed steps through the short warm-up; all actions due by that time must have executed, and later actions remain pending. A successful finish requires native initialization, the warm-up and independent intent/fidelity approval. The host forwards an accepted scene's initial-check coverage in final progress without changing saved scene definitions. The interface opens paused, keeps verification detail expandable and preserves the last good experiment on failure.
 
-Native generation wraps a discriminated decision union as `{decision: ...}` so the root remains an object while branch-specific null/required fields are grammar constrained. The public API returns the unwrapped existing decision. Disconnected clients abort at progress checkpoints before further paid model work; already-sent upstream calls may continue. The recovery backoff completes before its send checkpoint, so cancellation during the delay cannot trigger another call.
+As an explicit last resort, exhausted automatic correction after a real concrete negative review may produce a host-only `proposal` outcome containing the exact native-checked scene, its check receipt and bounded safe assistant concerns. It is not a model-authorable decision kind, a native-check override or an automatically saved scene. Native invalidity, unusable/unstarted review, provider/transport/cancel/timeout failures do not trigger it. JSON clients can receive `kind:"proposal"` and NDJSON uses one `proposal` terminal; normal decision responses are unchanged.
 
-| Provider | Request | Accept/reject behavior |
+The UI presents a calm unsaved proposal with inspect, explicit use, keep-previous and refinement choices. The previous definition/link stays intact until acceptance; acceptance uses the ordinary validated save path without another model request, and refinement uses the proposal as current context. Normal approved builds do not acquire a confirmation step. A user-accepted proposal is not represented as AI approval.
+
+Builder and reviewer receive the authoritative schema and reuse one coordinate-conventions block, without a mandatory catalog turn. Native initial/final joint anchors, body origins, distances and gravity-relative angles supplement structural and motion evidence; reviewer findings must identify concrete expected-versus-observed mismatches, not reject valid reference poses because their joint coordinate is zero or demand schema-forbidden values. Fixed-support Position observations use native body origins instead of undefined massless inertial centers; dynamic COM/energy are unchanged. finish_experiment accepts an optional reviewResponse of 1..1600 characters describing a correction or evidence-backed rebuttal. Only the previous rejected findings and this response enter the next ordinary review as untrusted claims; current evidence and independent approval remain authoritative, with no extra reviewer, retry or budget increase.
+
+Only a selected model advertising image input receives inspect_scene; unknown capability stays text-only without heuristics or model switching. The tool accepts any nonnegative safe-integer frame on demand at a 60 Hz reference, including frame 0 for initial diagnosis, without an arbitrary 20-second horizon. Diagnostic inspection validates initialization and returns actual geometry/state plus requested Three.js/MuJoCo frames without first requiring an entire future check. Capture bounds remain three frames/call, two calls/four frame attempts/run, 960×640 JPEG/128KiB each and a 45-second deadline with browser-process termination. Automatic QA uses the initial view and warm-up result as allowance permits; the agent can inspect another relevant moment on demand. Missing current-candidate images are disclosed, never replaced by stale pictures; imageless review never claims pixel verification.
+
+Physics fingerprints exclude cosmetic titles/labels/colors. Cached physical reports are reusable after presentation/summary/assumption edits, while final metadata remains validated and reviewed. An unusable previous native state is reported to the builder as repair context. Free-text evidence is not a formal semantic proof; the graph/contacts/motion and user intent must be considered together.
+
+Terminal records are flushed before exit. Structured failures distinguish model/tool limits, JSON/schema, physics, independent verdict/review, internal and protocol causes, with bounded stage/counts and safe last issue. Unknown exception content, raw responses/reasoning, source prompts, credentials, paths and stacks are omitted. Broker/UI preserve cause rather than converting it to unsupported physics; console failure logs contain only fixed code/stage/counts. Scene links do not retain failed-request transcripts or recover old discarded exceptions.
+
+The host sends model stream start/done/error lifecycle records through the worker pipe, not cumulative SDK partial snapshots. Bounded public builder text deltas stream directly to the client; private reviewer/thinking/tool-argument fragments do not. Original decoded/raw/pipe limits remain enforced. Typed sandbox failures distinguish image absence, Docker/start, worker, resource, timeout, protocol and input/output limits; rebuild advice applies only to a missing image, never every internal exception.
+
+`server/sandbox.ts` launches a fresh non-root Docker container with network disabled, read-only root filesystem, all capabilities dropped and no-new-privileges. There are no host binds, Docker socket, database or credential mounts. Only trusted lab source, production dependencies and separately built inspection assets enter the deny-by-default build context. Image capture starts software-rendered Chromium with a private scratch profile and debugging pipe; a same-container loopback asset server and exact request allowlist admit only bundled renderer files. No arbitrary URL/path/code arguments enter inspection; JPEG blocks are capability-gated and validated at the host broker. MuJoCo Embind's function generation is allowed only in that private asset-only page. No shell/file tools, default coding-agent tools, extensions, skills, local auth discovery or MCP are loaded. Missing Docker/image fails closed. `npm run api` and `npm start` automatically build/cache the image; setup downloads may use networking, running workers cannot. Inspection images, like prompts and scene data, are sent to the selected AI service.
+
+The broker pins provider/model, credential and exact HTTPS endpoint for the entire run. Ordinary keys come from the environment; Connected GPT uses a bounded constant-argument OMP token subprocess only after explicit opt-in. Tokens never enter the worker or API response. All inference uses guarded SSE, including Codex: no WebSocket bypass, redirects, arbitrary URLs or SDK retries. Abort terminates the wait/container and prevents new calls; already-sent provider work may still count toward usage.
+
+| Provider | Brokered Pi transport | Boundaries |
 | --- | --- | --- |
-| OpenAI | POST `https://api.openai.com/v1/responses`, Bearer key; `text.format:{type:"json_schema",strict:true,schema}` with `store:false`. | Require completed status; collect message `output_text` content from `output`; reject refusal, incomplete or missing text. |
-| Anthropic | POST `https://api.anthropic.com/v1/messages`, `x-api-key`, `anthropic-version:2023-06-01`; `output_config.format:{type:"json_schema",schema}`. | Require completed `end_turn` text; restore exact tuple transport; reject refusal, truncation and tool use. |
-| OpenRouter | POST `https://openrouter.ai/api/v1/chat/completions`, Bearer key; strict `response_format.json_schema`, `provider.require_parameters:true`. | Require completed text choice and full local validation. Preserve the selected exact model ID during correction/recovery. |
-| Discovery | GET `https://openrouter.ai/api/v1/models`, cached 5 minutes. | Read actual IDs/modalities/capabilities. Free means the explicit router or an existing `:free` entry. Use advertised 2048-token reasoning budgets or low/minimal effort; disable optional unbounded reasoning only when `mandatory:false` is advertised. Unknown/dynamic-router capabilities retain provider defaults. |
+| OpenRouter | `https://openrouter.ai/api/v1/chat/completions` | Tool-capable parameter routing; no browser/search plugins or silent model change. Default environment provider. |
+| OpenAI | `https://api.openai.com/v1/responses` | Optional environment key; Pi streaming/tool normalization; same local decision/native checks. |
+| Anthropic | `https://api.anthropic.com/v1/messages?beta=true` | Exact pinned Pi SDK beta-messages target; optional environment key and normalized streaming/tools; arbitrary queries and redirects remain denied. |
+| Connected GPT | https://chatgpt.com/backend-api/codex/responses | Explicit PHYSICS_LAB_CONNECTED_GPT=1 authorization; existing OMP login, pinned per run; gpt-6-luna only; SSE and unchanged sandbox denial. |
+| Discovery | `https://openrouter.ai/api/v1/models` | Public server-side catalog, text/tool-capable suggestions, cached5minutes; model availability is not automatically monitored. |
 
-Routing references: [Free Models Router capabilities](https://openrouter.ai/docs/cookbook/get-started/free-models-router-playground), [JSON response formats](https://openrouter.ai/docs/api/reference/overview), [required provider parameters](https://openrouter.ai/docs/guides/routing/provider-selection).
-
-Structured-output references: [OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs), [Anthropic](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), [OpenRouter](https://openrouter.ai/docs/guides/features/structured-outputs), [advertised reasoning controls and shared output budget](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens). The initial configured free model is `nvidia/nemotron-3.5-super-vl:free`, not the random free router. Its continued availability is not automatically monitored.
+References: [Pi agent SDK](https://github.com/earendil-works/pi/tree/main/packages/agent), [Pi integration](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md), [Docker network isolation](https://docs.docker.com/engine/network/drivers/none/), [Docker runtime controls](https://docs.docker.com/engine/containers/run/).
 
 Malformed/truncated output, refusal, HTTP failure, missing key, rate limit or failed validation is an assembly error preserving input/scene. Never turn it into a fabricated physics result. Free inference still needs a key and has changing quotas/availability. Token and time limits do not constitute a guaranteed dollar cap; operator accounts should have provider-side spending controls.
 
@@ -235,7 +309,7 @@ References: [OpenAI Responses](https://developers.openai.com/api/reference/resou
 
 ## Data Ownership and Future Physics
 
-Browser memory owns prompt editing, view state, live observations and unsaved recovery; the native runtime owns solver state. Node privately persists immutable validated scene documents (source prompt, original interpretation, actual scene and ground choice) with creation, last-run and expiry timestamps in SQLite. It does not persist provider settings/credentials, clarification transcripts, runtime handles, trajectories or snapshots. The browser caches up to eight link IDs/titles/expiry hints, verifies records on opening, and never treats cached expiry as authoritative after another viewer runs. Credentials remain server-owned; submitted descriptions still go to the selected provider under its policy.
+Browser memory owns editing, the bounded tab-local conversation, view state, live observations and unsaved recovery; the native runtime owns solver state. Node privately persists immutable validated scene documents, including the source prompt with follow-ups/clarifications, interpretation, actual scene and ground choice, with creation/last-run/expiry timestamps. It does not persist the full Pi/tool transcript, provider settings/credentials, runtime handles, trajectories or snapshots. The browser caches at most8 link metadata entries and revalidates on open. The selected provider receives submitted message/history/scene context under its own policy.
 
 Saved IDs are random UUID capabilities, with no directory/list or update route. Each setup change creates a new record/link; reading and sharing are non-renewing. Initial lifetime is creation plus 86,400,000 ms. Run/Resume must confirm renewal before physics starts; active playback renews every 60 seconds and at its final Pause. Paused Reset, camera controls and opening links do not extend lifetime. Exact-boundary expiry is enforced in SQL independently of the minute cleanup task, and expired IDs never resurrect. A local definition may explicitly be copied to a fresh ID after expiry.
 
@@ -268,6 +342,7 @@ src/
   App.tsx                              intro, Mission Board and assembly/clarification flow
   styles.css                           lab/glass layout, motion and accessibility
   SimulationCanvas.tsx                 native-scene rendering and view-only camera
+  selection.ts                         ray/marker/path picking and visible entity bounds
   ObjectCards.tsx                      contextual read-only observations
   TelemetryPanel.tsx / telemetry.css   motion graphs from recorded solver snapshots
   SceneLinkBar.tsx / scene-link.css    save, copy-link and expiry feedback
@@ -281,10 +356,16 @@ shared/
   scene.ts                             decision/model schemas and semantic admission
   catalog.ts                           supported blocks, units and observation metadata
   saved-scene.ts                       saved document and retention contracts
+  harness.ts                           conversation, run budgets and progress contract
+  assembly-stream.ts                   bounded NDJSON progress/text/final admission
 server/
   index.ts                             local API and safe built-static serving
-  providers.ts                         direct requests and response extraction
+  providers.ts                         Pi adapters and exact-endpoint credential broker
+  harness.ts                           bounded broker/worker orchestration
+  harness-worker.ts                    Pi lab tools and native candidate checks
+  sandbox.ts                           no-network Docker lifecycle and bounded JSONL
   scenes.ts                            private SQLite storage and sliding expiry
+sandbox/Dockerfile / .dockerignore      trusted image and deny-by-default build context
 tests/
   scene.test.ts                        structural/physical admission invariants
   compiler.test.ts                     physical compilation and frame/constraint behavior
@@ -297,7 +378,7 @@ devpost/                               plans, official build checklist and event
 README.md / CHANGELOG.md                actual setup, limitations, run and verified changes
 ```
 
-No compatibility exports, old-engine adapter, provider SDK abstraction or extra process-launching framework is required.
+Pi supplies the agent/provider APIs. The application exposes no general-purpose coding-agent tool surface, compatibility assembler route or extra process-launching framework.
 
 ## Verification and Prior Evidence
 
@@ -315,8 +396,14 @@ Every build slice gets its mechanical verification. After integration, run the p
 
 ## Decisions and Open Issues
 
-Current production build and 89 behavioral checks pass, retaining all prior native mechanics/provider/clock references. New checks cover durable private records, process reopen, read-versus-run retention, exact 24-hour expiry, non-resurrection, metadata-only renewal, stale cleanup safety, validation/corruption/permissions and bounded client cancellation. Actual browser/API checks prove refresh and process-restart survival, clean-browser read/run with no inference, immutable ground-choice forks, source-prompt preservation, Back/Forward and clipboard fallback at320px. An isolated clock-controlled server proves access1ms before expiry, exact-boundary denial, non-resurrection, active heartbeat/final Pause renewal, stopped renewal after Pause, expired-link recovery and stale-read/Reset races. Response-boundary probes cover failed-save retries that survive running the old scene. A fresh provider request timed out; the prior saved URL/scene remained intact, and no new inference reliability is claimed.
+The scheduled-action and visual-interaction revision passes the production build and 95 behavioral checks. Native references cover carried mass/inertia, world and post-recoil relative velocities, angular/linear momentum, fractional and exact event boundaries, no early/duplicate execution, load switching, friction between actions and Reset/speed invariance. Legacy stored definitions run without rewriting their JSON. The final-review gate rejects unresolved metadata even when physical checks are cached.
+
+Connected GPT was live-tested with GPT-6 Luna. A brokered run of the unchanged follow-up produced three distinct 10 kg projectiles at 300 m/s and 30 degrees, at 0/10/20 seconds, without the old startup recoil inputs. Actual browser playback showed all three releases and native inventory 1030/1020/1010/1000 kg. Reset and clean-browser restore return to three queued rounds at t0 without inference or renewed expiry. Mobile/reduced-motion checks cover compact chat, horizontal timeline access, cancellation/focus preservation and 100-character label containment. Nine pre-existing records remain byte-identical. Source/asset scans found no configured keys, literal JWTs or live scene IDs. Software-rendered frame gaps can intentionally pause playback; explicit resume preserves every physics step.
+
+The prior Pi-only checkpoint passed 82 behavioral checks. Its Docker probes verified non-root/read-only/capability/network limits and denied host paths, socket, credentials and root writes; cancellation waited for removal. OpenRouter/browser evidence covered elastic/inelastic falls, scene-aware height/velocity edits, preserved masses/materials, paused immutable links, narrow/reduced-motion layout and inference-free restore. Four then-existing records stayed unchanged. A provider502 was not hidden. Provider availability and natural-language interpretation remain limits, not universal guarantees.
+
+The previous saved-scene checkpoint passed89 checks before one-shot adapter tests were retired. Its browser/API evidence covered refresh and process-restart survival, clean-browser read/run without inference, immutable ground forks, source-prompt preservation, Back/Forward and320px clipboard fallback. Clock-controlled checks covered1ms-before/exact expiry, non-resurrection, active heartbeat/final Pause, stopped renewal after Pause, expired-link recovery and stale-read/Reset races. Failed-save retry ownership and all still-relevant native/storage contracts remain covered; obsolete provider-envelope behavior is not retained as a compatibility path.
 
 Source/provider contracts and numerical evidence informed the engineering defaults above. Any discovered change to the product, chosen architecture or supported physical meaning must be discussed, while routine internal corrections are recorded in the checklist's Revisions. A needed new model is not labeled impossible merely because it is absent.
 
-Live model verification needs authorized application API access; never paste keys in chat or reuse coding-agent credentials. This is an external verification prerequisite, not permission for a fake model. Browser/solver research does not substitute for the finished app's hands-on learner feedback and final review.
+Live verification requires authorized AI access. Never paste keys in chat or copy them into the public project. The explicitly approved connected-GPT mode is a broker-side exception to standard environment-key setup, not permission for agent credential discovery or sandbox access. Provider quota/auth failures remain real failures; no fake model substitutes for them. Browser/solver proof does not replace learner review.

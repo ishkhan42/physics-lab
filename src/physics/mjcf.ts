@@ -18,6 +18,10 @@ export function geomName(bodyId: string): string {
   return `${GEOM_NAME_PREFIX}${bodyId}`;
 }
 
+export function heldWeldName(bodyId: string): string {
+  return `_held_${bodyId}`;
+}
+
 export function fixedTendonEqualityName(tendonId: string): string {
   return `${FIXED_TENDON_NAME_PREFIX}${tendonId}`;
 }
@@ -118,7 +122,8 @@ function shapeGeom(body: Body, damping: number): string {
   const sliding = staticFriction(body);
   const condim = body.friction.rolling > 0 ? 6 : body.friction.torsional > 0 ? 4 : sliding > 0 ? 3 : 1;
   const mass = moving ? body.mass! : 0;
-  return `<geom name="${geomName(body.id)}" type="${type}" size="${vector(size)}" rgba="${rgba(body.color)}" friction="${vector([sliding, body.friction.torsional, body.friction.rolling])}" condim="${condim}" solref="${vector([-CONTACT_STIFFNESS, -damping])}" solimp="${CONTACT_IMPEDANCE}" mass="${number(mass)}"/>`;
+  const collision = body.heldBy == null ? '' : ' contype="0" conaffinity="0"';
+  return `<geom name="${geomName(body.id)}" type="${type}" size="${vector(size)}" rgba="${rgba(body.color)}" friction="${vector([sliding, body.friction.torsional, body.friction.rolling])}" condim="${condim}" solref="${vector([-CONTACT_STIFFNESS, -damping])}" solimp="${CONTACT_IMPEDANCE}" mass="${number(mass)}"${collision}/>`;
 }
 
 function jointXml(body: Body): string {
@@ -229,7 +234,9 @@ export function compileMjcf(input: Scene): string {
     .map(site => `<site name="${site.id}" pos="${vector(site.position)}" size="0.008"/>`);
   const tendon = tendonXml(scene);
   const bodyXmlLines = roots.map(body => bodyXml(body, undefined, children, sitesByBody, damping));
-  const equalities = connectionXml(scene).concat(tendon.equalities);
+  const heldEqualities = scene.bodies.filter(body => body.heldBy != null)
+    .map(body => `<weld name="${heldWeldName(body.id)}" body1="${body.heldBy}" body2="${body.id}" solref="${SOLREF}" active="true"/>`);
+  const equalities = connectionXml(scene).concat(heldEqualities, tendon.equalities);
   const bodyLabels = scene.bodies.map(body => `<text name="_label_${body.id}" data="${escapeXml(body.label)}"/>`);
   const siteLabels = scene.sites.map(site => `<text name="_label_${site.id}" data="${escapeXml(site.label)}"/>`);
   const tendonLabels = scene.tendons.map(item => `<text name="_label_${item.id}" data="${escapeXml(item.label)}"/>`);

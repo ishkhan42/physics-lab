@@ -70,6 +70,8 @@ The user approved the assemble–preview–run flow:
 - Keep limitation feedback concise and actionable, with technical detail in a disclosure. A question, explanation and supported alternative may coexist without a scene being built. Selecting a proposal fills the draft for review; only a separate Assemble action can request the changed experiment.
 - Default to a real physical ground at z=0, not just the reference grid; expose its height and material assumptions. Omit it only for an explicitly groundless/custom-support setup.
 - Preserve requested elastic/inelastic collisions and friction. Offer restitution targets, static/kinetic coefficients and contact results rather than removing the requested behavior. Static friction prevents slip, not necessarily rolling motion.
+- Replace one-shot scene generation with an integrated Pi lab assistant. It can inspect the mechanics catalog, validate and numerically check candidate scenes, revise them using tool feedback, and accept follow-up requests with the current experiment as context.
+- Automatically prepare an enforced sandbox for each run. Permit only trusted Physics Lab tools; deny shell, host files, arbitrary execution, external assets and worker network access. Broker only the selected provider connection outside the sandbox, keeping credentials private. OpenRouter is the default environment-configured provider.
 
 Source: `scope.md > The Unique Kernel` and `scope.md > The POC Boundary`.
 

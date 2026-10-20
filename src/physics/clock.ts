@@ -6,6 +6,12 @@ const MAX_STEPS_PER_FRAME = 512;
 const MIN_SPEED = 0.1;
 const MAX_SPEED = 10;
 
+// Foreground solver/render work is not a suspended browser; keep debt bounded without skipping native steps.
+export function browserFrameSeconds(previousStart: number, previousEnd: number, now: number): number | null {
+  if (now - Math.max(previousStart, previousEnd) > MAX_FRAME_GAP * 1000) return null;
+  return Math.min(Math.max(0, now - previousStart) / 1000, MAX_FRAME_GAP);
+}
+
 export interface ClockStepResult {
   advanced: boolean;
   pauseReason: string | null;

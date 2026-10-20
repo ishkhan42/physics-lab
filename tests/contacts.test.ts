@@ -11,6 +11,7 @@ type SphereOptions = Partial<Pick<Body, 'mass' | 'restitution' | 'friction'>>;
 function sphere(id: string, position: Vec3, velocity: Vec3, options: SphereOptions = {}): Body {
   return {
     id, label: id, parentId: null, position, orientation: [1, 0, 0, 0],
+    heldBy: null,
     shape: { kind: 'sphere', radius: 0.1 }, mass: options.mass ?? 1,
     motion: { kind: 'free', linearVelocity: velocity, angularVelocity: [0, 0, 0] },
     restitution: options.restitution ?? 0, friction: options.friction ?? zeroFriction, color: '#67d9ce',

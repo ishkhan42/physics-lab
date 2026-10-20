@@ -6,4 +6,5 @@
 /dist/
 /.vite/
 *.log
+/dist-inspection/
 /MUJOCO_LOG.TXT

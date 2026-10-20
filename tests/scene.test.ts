@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
-import { AssemblyRequestSchema, hasGroundPlane, physicalScene, validateDecision, validateScene } from '../shared/scene.ts';
+import { hasGroundPlane, physicalScene, validateDecision, validateScene } from '../shared/scene.ts';
+import { HarnessRequestSchema } from '../shared/harness.ts';
 import { atwood, projectile } from './fixtures.ts';
 
 function rejected(scene: unknown) {
@@ -96,7 +97,7 @@ test('loads cannot act on a fixed support or an absent body', () => {
 
 test('strict model admission rejects executable or unrestricted solver input', () => {
   rejected({ ...projectile(), xml: '<mujoco><include file="private-file"/></mujoco>' });
-  assert.throws(() => AssemblyRequestSchema.parse({
+  assert.throws(() => HarnessRequestSchema.parse({
     provider: 'openrouter', model: 'openrouter/free', description: 'An experiment',
     apiKey: 'not-a-real-key',
   }), z.ZodError);
@@ -276,6 +277,7 @@ test('physical scenes add one canonical ground without mutating or double-expand
   assert.deepEqual(expanded.ground, null);
   assert.deepEqual(expanded.bodies.at(-1), {
     id: 'world-ground', label: 'Ground', parentId: null,
+    heldBy: null,
     position: [0, 0, -0.25], orientation: [1, 0, 0, 0],
     shape: { kind: 'plane', size: [10, 10] }, mass: null,
     motion: { kind: 'fixed' }, restitution: 0.8,

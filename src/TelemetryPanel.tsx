@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
-import type { InspectionSnapshot, Observation } from './physics/types.ts';
+import type { InspectionSnapshot } from './physics/types.ts';
+import { appendSnapshot, type Sample } from './telemetry-samples.ts';
 import './telemetry.css';
 
-const MAX_SAMPLES = 4000;
+const CHART_REFRESH_INTERVAL_MS = 100;
 const METRICS = {
   height: { label: 'Height', unit: 'm' },
   speed: { label: 'Speed', unit: 'm/s' },
   energy: { label: 'Kinetic energy', unit: 'J' },
 } as const;
 type Metric = keyof typeof METRICS;
-type BodyValues = { id: string; label: string; color: string; height: number | null; speed: number; energy: number | null };
-type Sample = { time: number; bodies: Map<string, BodyValues> };
 type ChartSeries = { id: string; label: string; color: string; latestValue: number; values: (number | null)[]; path: string };
 type TickScale = { min: number; max: number; ticks: number[] };
 type ChartModel = {
@@ -37,41 +36,6 @@ function formatNumber(value: number): string {
   if (value === 0) return '0';
   const magnitude = Math.abs(value);
   return magnitude < 0.001 || magnitude >= 10000 ? value.toExponential(3) : NUMBER_FORMAT.format(value);
-}
-
-
-function vector3(value: Observation['value'] | undefined): [number, number, number] | null {
-  if (!Array.isArray(value) || value.length < 3) return null;
-  const [x, y, z] = value;
-  return typeof x === 'number' && Number.isFinite(x)
-    && typeof y === 'number' && Number.isFinite(y)
-    && typeof z === 'number' && Number.isFinite(z)
-    ? [x, y, z]
-    : null;
-}
-
-
-function sampleSnapshot(snapshot: InspectionSnapshot): Sample {
-  const bodies = new Map<string, BodyValues>();
-  for (const entity of snapshot.entities) {
-    // Fixed supports never move; plotting them adds flat zero lines.
-    if (entity.kind !== 'body' || entity.properties.some(property => property.label === 'Motion' && property.value === 'fixed')) continue;
-    const velocity = vector3(entity.properties.find(property => property.label === 'Velocity')?.value);
-    if (!velocity) continue;
-    const position = vector3(entity.properties.find(property => property.label === 'Position')?.value);
-    const energy = entity.properties.find(property => property.label === 'Translational kinetic energy')?.value;
-    const speed = Math.hypot(velocity[0], velocity[1], velocity[2]);
-    if (!Number.isFinite(speed)) continue;
-    bodies.set(entity.id, {
-      id: entity.id,
-      label: entity.label,
-      color: entity.color,
-      height: position?.[2] ?? null,
-      speed,
-      energy: typeof energy === 'number' && Number.isFinite(energy) ? energy : null,
-    });
-  }
-  return { time: snapshot.time, bodies };
 }
 
 
@@ -219,6 +183,7 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
   snapshot: InspectionSnapshot | null;
 }) {
   const samplesRef = useRef<Sample[]>([]);
+  const chartRefreshTimer = useRef<number | null>(null);
   const lastExperimentId = useRef(experimentId);
   const plotRef = useRef<HTMLDivElement>(null);
   const [samples, setSamples] = useState<Sample[]>([]);
@@ -229,28 +194,42 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
   useEffect(() => {
     const changedExperiment = lastExperimentId.current !== experimentId;
     lastExperimentId.current = experimentId;
-    let current = changedExperiment ? [] : samplesRef.current;
-    let last: Sample | undefined = current[current.length - 1];
+    const current = changedExperiment ? [] : samplesRef.current;
+    let resetHistory = changedExperiment;
     let resetSelection = changedExperiment;
 
     if (experimentId !== null && snapshot && Number.isFinite(snapshot.time)) {
-      if (last && snapshot.time < last.time) {
-        current = [];
-        last = undefined;
+      if (appendSnapshot(current, snapshot) === 'reset') {
+        resetHistory = true;
         resetSelection = true;
-      }
-      if (!last || snapshot.time > last.time) {
-        const start = Math.max(0, current.length - MAX_SAMPLES + 1);
-        current = [...current.slice(start), sampleSnapshot(snapshot)];
       }
     }
 
-    if (current !== samplesRef.current) {
-      samplesRef.current = current;
-      setSamples(current);
+    samplesRef.current = current;
+    if (resetHistory) {
+      if (chartRefreshTimer.current !== null) {
+        window.clearTimeout(chartRefreshTimer.current);
+        chartRefreshTimer.current = null;
+      }
+      setSamples([...current]);
+    } else if (
+      current[current.length - 1]?.time !== samples[samples.length - 1]?.time
+      && chartRefreshTimer.current === null
+    ) {
+      chartRefreshTimer.current = window.setTimeout(() => {
+        chartRefreshTimer.current = null;
+        setSamples([...samplesRef.current]);
+      }, CHART_REFRESH_INTERVAL_MS);
     }
     if (resetSelection) setActiveIndex(null);
-  }, [experimentId, snapshot]);
+  }, [experimentId, snapshot, samples]);
+
+  useEffect(() => () => {
+    if (chartRefreshTimer.current !== null) {
+      window.clearTimeout(chartRefreshTimer.current);
+      chartRefreshTimer.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const node = plotRef.current;

@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Physics Lab — Technical app map</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #172321;
+      background: #f3f6f5;
+      --ink: #172321;
+      --muted: #53615f;
+      --line: #d7e0de;
+      --paper: #fff;
+      --teal: #0f6b62;
+      --teal-dark: #0a5850;
+      --teal-soft: #e2efec;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; line-height: 1.55; }
+    a { color: var(--teal-dark); text-decoration-thickness: .08em; text-underline-offset: .18em; }
+    a:hover { text-decoration-thickness: .14em; }
+    :focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; border-radius: 3px; }
+    .skip-link { position: absolute; top: .5rem; left: .5rem; z-index: 2; padding: .6rem .8rem; transform: translateY(-160%); background: var(--paper); }
+    .skip-link:focus { transform: translateY(0); }
+    .page { width: min(100% - 2rem, 70rem); margin-inline: auto; padding-block: clamp(1.25rem, 4vw, 3rem) 3rem; }
+    header { margin-bottom: 1.5rem; }
+    .eyebrow, .kicker { margin: 0 0 .35rem; color: var(--teal-dark); font-size: .78rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 19ch; margin-bottom: .55rem; font-size: clamp(1.8rem, 7vw, 3rem); line-height: 1.08; letter-spacing: -.035em; }
+    h2 { margin-bottom: .75rem; font-size: clamp(1.25rem, 4vw, 1.65rem); line-height: 1.2; letter-spacing: -.02em; }
+    h3 { margin-bottom: .35rem; font-size: 1rem; line-height: 1.3; }
+    p, li { color: var(--muted); }
+    p:last-child, li:last-child { margin-bottom: 0; }
+    .lede { max-width: 67ch; margin-bottom: .9rem; color: var(--ink); font-size: 1.05rem; }
+    .snapshot, .callout { padding: .8rem 1rem; border: 1px solid var(--line); border-left: 4px solid var(--teal); border-radius: .65rem; background: var(--paper); }
+    .snapshot { max-width: 70ch; font-size: .9rem; }
+    nav { margin: 1rem 0 1.4rem; }
+    nav ul { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+    nav a { display: inline-block; padding: .35rem .65rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); font-size: .88rem; }
+    section { margin-top: 1.7rem; padding: clamp(1rem, 3vw, 1.5rem); border: 1px solid var(--line); border-radius: .9rem; background: var(--paper); box-shadow: 0 3px 14px rgb(23 35 33 / 4%); }
+    .pieces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; margin: .9rem 0 0; padding: 0; list-style: none; }
+    .pieces li, .flow li, .route li, .pointers li { min-width: 0; }
+    .pieces li { padding: .8rem; border: 1px solid var(--line); border-radius: .65rem; background: #fbfcfc; }
+    .pieces strong { display: block; margin-bottom: .2rem; color: var(--ink); }
+    .flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin: 1rem 0; padding: 0; list-style: none; counter-reset: flow; }
+    .flow li { position: relative; padding: .9rem; border: 1px solid var(--line); border-radius: .7rem; background: #fbfcfc; counter-increment: flow; }
+    .flow li::before { content: counter(flow, decimal-leading-zero); display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; margin-bottom: .55rem; border-radius: 50%; background: var(--teal-soft); color: var(--teal-dark); font-family: var(--mono); font-size: .78rem; font-weight: 700; }
+    .flow li + li::after { position: absolute; top: 1rem; left: -.72rem; color: var(--teal); content: "→"; font-weight: 700; }
+    .flow h3 { color: var(--ink); }
+    .flow p { margin-bottom: 0; font-size: .91rem; }
+    .route { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; counter-reset: route; }
+    .route li { padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .7rem; counter-increment: route; }
+    .route h3::before { content: counter(route) ". "; color: var(--teal); font-family: var(--mono); }
+    .route p { margin-bottom: .45rem; }
+    code, kbd { font-family: var(--mono); font-size: .9em; }
+    code { color: #174942; overflow-wrap: anywhere; }
+    .refs { margin: 0; padding-left: 1.15rem; }
+    .refs li { margin-top: .3rem; }
+    .pointers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin: 0; padding: 0; list-style: none; }
+    .pointers li { padding: .85rem; border: 1px solid var(--line); border-radius: .65rem; background: #fbfcfc; }
+    .pointers strong { display: block; margin-bottom: .25rem; color: var(--ink); }
+    .callout { margin-top: .85rem; }
+    .callout strong { color: var(--ink); }
+    pre { max-width: 100%; margin: .7rem 0; padding: .8rem; overflow-wrap: anywhere; white-space: pre-wrap; border-radius: .55rem; background: #f0f4f3; color: var(--ink); font: .9rem/1.55 var(--mono); }
+    footer { margin-top: 1.25rem; padding-inline: .2rem; color: var(--muted); font-size: .88rem; }
+    @media (max-width: 680px) {
+      .pieces, .flow, .pointers { grid-template-columns: minmax(0, 1fr); }
+      .flow li + li::after { top: -.85rem; left: 1rem; content: "↓"; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      section { break-inside: avoid; box-shadow: none; }
+      nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the map</a>
+  <div class="page">
+    <header>
+      <p class="eyebrow">Physics Lab · technical reference</p>
+      <h1>From a mechanics description to a paused experiment</h1>
+      <p class="lede">A compact route through the current implementation: what the browser sends, where assembly and native checks happen, and how the resulting scene becomes something you can inspect.</p>
+      <p class="snapshot"><strong>Reference route only.</strong> This page documents code locations; it does not claim that anyone has toured, practiced, learned, or approved anything.</p>
+      <nav aria-label="Map sections">
+        <ul>
+          <li><a href="#purpose">Purpose</a></li>
+          <li><a href="#flow">System flow</a></li>
+          <li><a href="#route">Code route</a></li>
+          <li><a href="#changes">Change pointers</a></li>
+          <li><a href="#practice">Reusable practice</a></li>
+          <li><a href="#run">Run again</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section id="purpose" aria-labelledby="purpose-title">
+        <p class="kicker">01 · Purpose</p>
+        <h2 id="purpose-title">A mechanics workbench, not a general physics simulator</h2>
+        <p>Physics Lab turns a described mechanics situation into validated scene data, prepares it with the native MuJoCo engine, and renders the actual state for inspection. The AI chooses supported data blocks; trusted code validates and compiles them. A scene opens paused: pressing <strong>Run</strong> is a separate user action.</p>
+        <ul class="pieces">
+          <li><strong>Browser workbench</strong> React manages the request and scene; Three.js draws the experiment, with read-only object cards and sampled motion charts.</li>
+          <li><strong>Node service and isolated worker</strong> The local API brokers the selected external model. A bounded Docker worker gets lab tools, not shell, host files, or network access.</li>
+          <li><strong>Trusted mechanics path</strong> Shared schemas admit mechanics data; the MuJoCo builder, runtime and observations handle the physics rather than model-written code.</li>
+        </ul>
+      </section>
+
+      <section id="flow" aria-labelledby="flow-title">
+        <p class="kicker">02 · One real action</p>
+        <h2 id="flow-title">Describe → check → inspect</h2>
+        <ol class="flow" aria-label="Flow from user description to native scene inspection">
+          <li>
+            <h3>Describe</h3>
+            <p><code>src/App.tsx</code> sends the description to the loopback <code>/api/lab</code> endpoint. <code>server/providers.ts</code> brokers inference with the selected outside model provider; the browser does not hold provider credentials.</p>
+          </li>
+          <li>
+            <h3>Assemble and check</h3>
+            <p>The isolated agent uses bounded lab tools. Normal ready handoffs require native checks and independent model review. A rare checked-but-unsettled proposal needs explicit user acceptance before saving. Checks run a native 0.5-second warm-up, not the whole future experiment.</p>
+          </li>
+          <li>
+            <h3>Save paused, then run</h3>
+            <p>The local service saves the scene in private SQLite storage. The browser compiles a native runtime and shows its paused preview, measured cards and charts. Run starts playback; inspection reads solver state.</p>
+          </li>
+        </ol>
+        <p class="callout"><strong>Storage and services:</strong> inference uses the configured external provider through the server-side broker; worker networking is disabled. Saved scene documents live in private SQLite outside the project tree and last 24 hours, renewed by Run/Resume. Browser recents retain link metadata, not scene definitions. Credentials and provider settings are not saved with scenes.</p>
+      </section>
+
+      <section id="route" aria-labelledby="route-title">
+        <p class="kicker">03 · Reference route</p>
+        <h2 id="route-title">Three stops through the implementation</h2>
+        <ol class="route">
+          <li>
+            <h3>Follow the submitted description</h3>
+            <p>Start at <code>src/App.tsx</code> — <code>handleSubmit</code>. It validates the request and posts to <code>/api/lab</code>. Follow <code>server/index.ts</code> — <code>handleRequest</code> to the route, then <code>server/harness.ts</code> — <code>runLab</code> and <code>server/providers.ts</code> — <code>providerKey</code>/<code>streamLabModel</code> to see the brokered model call and bounded worker handoff.</p>
+          </li>
+          <li>
+            <h3>Trace admission into native evidence</h3>
+            <p>In <code>server/harness-worker.ts</code>, search for <code>check_experiment</code> and <code>finish_experiment</code>. They use <code>src/physics/mjcf.ts</code> — <code>compileMjcf</code>, <code>src/physics/native-check.ts</code> — <code>advanceNativeCheckTo</code>, and an independent reviewer. <code>shared/harness.ts</code> defines limits: 16 model requests, 24 lab-tool calls and 240 seconds per run, with two model requests reserved for review.</p>
+          </li>
+          <li>
+            <h3>Watch the paused preview become observable</h3>
+            <p>Back in <code>src/App.tsx</code>, search <code>saveSceneDocument</code> and <code>preparePreview</code>. <code>src/SimulationCanvas.tsx</code> prepares <code>createRuntime</code> and gates playback in <code>toggleRunning</code>. <code>src/ObjectCards.tsx</code> and <code>src/TelemetryPanel.tsx</code> display native observations and sampled motion. The preview begins paused; rendering or inspection does not itself run inference.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section id="changes" aria-labelledby="changes-title">
+        <p class="kicker">04 · Navigation for future edits</p>
+        <h2 id="changes-title">To change this, start here</h2>
+        <ul class="pointers">
+          <li><strong>Physics blocks and admission</strong><code>shared/scene.ts</code> — <code>SceneSchema</code>/<code>validateScene</code>; then <code>src/physics/mjcf.ts</code> — <code>compileMjcf</code> and the native runtime. Keep the supported data contract and generated engine model aligned.</li>
+          <li><strong>Agent tools and limits</strong><code>server/harness-worker.ts</code> — tool registrations and check/review sequence; <code>shared/harness.ts</code> — shared request/time/tool limits; <code>server/lab-resources.ts</code> — <code>withLabResources</code> exposes remaining allowances.</li>
+          <li><strong>Readouts and visuals</strong><code>src/physics/mujoco.ts</code> — runtime snapshots; <code>src/ObjectCards.tsx</code> — <code>ObjectCards</code>; <code>src/TelemetryPanel.tsx</code> — <code>TelemetryPanel</code>; <code>src/SimulationCanvas.tsx</code> — <code>createVisualSet</code>.</li>
+          <li><strong>Saved-scene retention</strong><code>server/scenes.ts</code> — <code>SceneStore.create</code>/<code>SceneStore.run</code>; <code>shared/saved-scene.ts</code> — <code>SCENE_RETENTION_MS</code>; <code>src/saved-scenes.ts</code> — browser recent-link metadata.</li>
+        </ul>
+      </section>
+
+      <section id="practice" aria-labelledby="practice-title">
+        <p class="kicker">05 · A practice to reuse</p>
+        <h2 id="practice-title">A valid model is not proof of the requested physics</h2>
+        <p>This project recorded a real gap: an earlier response treated an ideal elastic impact as unsupported even though the native engine could model it (<code>devpost/spec.md</code>, “MuJoCo Model Builder”). The native regression <code>tests/contacts.test.ts</code> — “sphere-plane restitution follows the lower pair coefficient at a selected impact speed” — measures restitution targets 0, 0.5 and 1. That evidence is stronger than executable output or schema validity alone.</p>
+        <p>Reusable approach: turn the request into observable conditions, compare actual native measurements and assumptions against those conditions, then inspect the setup yourself. The independent reviewer is another model, not human sign-off. Readiness covers the initial state and a 0.5-second warm-up; scheduled actions after that remain pending, and longer-term outcomes are not certified.</p>
+        <details>
+          <summary>Optional transfer reflection</summary>
+          <p>What would you do differently next time you start a project with an agent? This is optional; no response or personal learning claim is recorded by this page.</p>
+        </details>
+      </section>
+
+      <section id="run" aria-labelledby="run-title">
+        <p class="kicker">06 · Reopen the workbench</p>
+        <h2 id="run-title">Build and start locally</h2>
+        <p>Use Node 24.12 or later in the Node 24 line, npm, Docker, and access to a running Docker daemon. The project’s documented install is <code>npm ci --ignore-scripts</code>; then build the app and start it:</p>
+        <pre><code>npm ci --ignore-scripts
+npm run build
+npm start</code></pre>
+        <p><code>npm start</code> runs the prestart hook to build/cache the sandbox image and serves the built app at <code>http://127.0.0.1:3001</code>. First sandbox setup needs registry access to fetch the Node base image and pinned packages. The worker container itself has no network access.</p>
+        <p>For an authorized provider, use the secret-free <a href="../.env.example"><code>.env.example</code></a> as the server-side template; keep real credentials in a private file outside this public checkout. The map contains no credentials or private data. See <a href="../README.md">README.md</a> for configuration details.</p>
+        <p class="snapshot"><strong>Source snapshot:</strong> this map describes the current release working tree based on <code>14a119b</code>, including local release changes; those changes are not attributed to that older commit. The map will be versioned with the source and can drift as code changes.</p>
+      </section>
+    </main>
+    <footer>Standalone technical reference · no scripts, remote fonts, CDN, or network resources required for this page.</footer>
+  </div>
+</body>
+</html>

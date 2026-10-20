@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppearanceSchema } from './appearance.ts';
 
 const number = z.number().finite();
 const positive = number.positive();
@@ -24,7 +25,7 @@ const zero: Vec3 = [0, 0, 0];
 
 export const ShapeSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('sphere'), radius: positive }),
-  z.strictObject({ kind: z.literal('box'), size: z.tuple([positive, positive, positive]) }),
+  z.strictObject({ kind: z.literal('box'), size: z.tuple([positive, positive, positive]).describe('Full side lengths along local X/Y/Z in metres, not MuJoCo half-extents.') }),
   z.strictObject({ kind: z.literal('cylinder'), radius: positive, length: positive }),
   z.strictObject({ kind: z.literal('capsule'), radius: positive, length: positive }),
   z.strictObject({ kind: z.literal('ellipsoid'), radii: z.tuple([positive, positive, positive]) }),
@@ -49,7 +50,7 @@ export const MotionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('particle'), linearVelocity: Vec3Schema.default(zero) }).describe('Unconstrained point particle with three translations, no rotation and no collision surface.'),
   z.strictObject({ kind: z.literal('hinge'), ...joint }).describe('Exactly one rotational DOF around axis through anchor; all other relative motion constrained.'),
   z.strictObject({ kind: z.literal('slide'), ...joint }).describe('Ideal linear guide: exactly one translational DOF along axis, no rotation. Use this for motion constrained to one straight line.'),
-  z.strictObject({ kind: z.literal('ball'), angularVelocity: Vec3Schema.default(zero), damping: nonnegative.default(0) }).describe('Three rotations about a fixed reference point; no translation.'),
+  z.strictObject({ kind: z.literal('ball'), angularVelocity: Vec3Schema.default(zero), damping: nonnegative.default(0) }).describe('Three rotations about the body reference origin; its translation is locked relative to parent/world. No separate offset anchor field.'),
 ]);
 export const BodySchema = z.strictObject({
   id,
@@ -58,7 +59,8 @@ export const BodySchema = z.strictObject({
   position: Vec3Schema.describe('World-space reference pose. When this is the requested initial pose, use motion.position=0; a nonzero hinge/slide coordinate is applied afterward.'),
   orientation: QuatSchema.default([1, 0, 0, 0]).describe('World-space reference orientation, quaternion w,x,y,z.'),
   shape: ShapeSchema,
-  mass: positive.nullable().describe('Kilograms for moving bodies; null for immobile supports.'),
+  mass: positive.nullable().describe('Kilograms for moving bodies, including junction particles; null only for immobile supports. An ideal massless moving junction cannot use zero mass. Disclose every positive numerical-junction mass.'),
+  heldBy: id.nullable().default(null).describe('Initial physical carrying attachment to a fixed/free root carrier, not a display label. Native mass/inertia and carrier-relative pose are included; held collisions/visibility are inactive until release. A native launch exchanges momentum with the carrier.'),
   restitution: restitution.default(0),
   motion: MotionSchema,
   friction: FrictionSchema,
@@ -67,7 +69,8 @@ export const BodySchema = z.strictObject({
 export type Body = z.infer<typeof BodySchema>;
 
 export const SiteSchema = z.strictObject({
-  id, label: z.string().min(1).max(100), bodyId: id.nullable(),
+  id, label: z.string().min(1).max(100),
+  bodyId: id.nullable().describe('Non-null physically attaches this site to that body and follows its pose; null fixes it in world space. A moving junction needs a body-backed site, not just a world point with the same label.'),
   position: Vec3Schema.describe('Body-local position when attached to a body; world position otherwise.'),
 });
 const PathSchema = z.discriminatedUnion('kind', [
@@ -77,9 +80,9 @@ const PathSchema = z.discriminatedUnion('kind', [
 ]);
 export const TendonSchema = z.strictObject({
   id, label: z.string().min(1).max(100),
-  path: z.array(PathSchema).min(2).max(64),
-  mode: z.enum(['fixed', 'rope', 'spring']).describe('Only spring mode uses stiffness/damping; fixed and rope require both to be zero.'),
-  length: positive.describe('Fixed/maximum length, or spring rest length, in metres.'),
+  path: z.array(PathSchema).min(2).max(64).describe('One continuous cord route. A tied branch network uses separate tendons that meet at a shared site on a moving junction body; do not draw disconnected world-only paths as a substitute.'),
+  mode: z.enum(['fixed', 'rope', 'spring']).describe('Rope is a tension-only maximum-length constraint and may go slack; fixed is bilateral fixed length; spring uses a rest length. Only spring uses nonzero stiffness/damping.'),
+  length: positive.describe('Native path/constraint length or spring rest length in metres, not a vertical drop/projection. Derive this from actual endpoint geometry (and any wrap/pulley routing).'),
   stiffness: nonnegative.default(0), damping: nonnegative.default(0),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#f2c178'),
 });
@@ -96,6 +99,19 @@ const LoadSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('drag'), bodyId: id, coefficient: nonnegative, mediumVelocity: Vec3Schema.default(zero) }),
   z.strictObject({ kind: z.literal('gravity'), bodyIds: z.array(id).min(2).max(32), G: positive }),
 ]);
+export const ScheduledActionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('impulse'), bodyId: id, linear: Vec3Schema, angular: Vec3Schema.default(zero) }),
+  z.strictObject({ kind: z.literal('launch'), bodyId: id,
+    velocity: Vec3Schema.describe('Native carried-body launch with carrier reaction in either frame. Velocity is in metres per second, NOT impulse or momentum. Changing projectile mass does not multiply launch speed.'),
+    frame: z.enum(['world', 'body']).default('body').describe('Both modes exchange momentum with the carrier: world is an absolute world target velocity; body is velocity relative to the post-recoil carrier point, in carrier axes.') }),
+  z.strictObject({ kind: z.literal('release'), bodyId: id }),
+  z.strictObject({ kind: z.literal('load'), loadIndex: z.number().int().nonnegative(), enabled: z.boolean() }),
+]);
+export type ScheduledAction = z.infer<typeof ScheduledActionSchema>;
+export const ScheduledEventSchema = z.strictObject({
+  id, label: z.string().trim().min(1).max(100), at: nonnegative, action: ScheduledActionSchema,
+});
+export type ScheduledEvent = z.infer<typeof ScheduledEventSchema>;
 export const SceneSchema = z.strictObject({
   category: z.literal('mechanics'),
   title: z.string().trim().min(1).max(120),
@@ -103,16 +119,19 @@ export const SceneSchema = z.strictObject({
   ground: GroundSchema.nullable().default({
     height: 0, restitution: 1, friction: { sliding: 0, torsional: 0, rolling: 0, static: null },
   }).describe('Physical ground is included by default. Use null ONLY for an explicitly requested groundless scene or a custom replacement support. Zero gravity or a noncontact experiment is not a request to remove ground.'),
+  appearance: AppearanceSchema,
   bodies: z.array(BodySchema).min(1).max(128),
   sites: z.array(SiteSchema).max(512).default([]),
   tendons: z.array(TendonSchema).max(128).default([]),
   connections: z.array(ConnectionSchema).max(128).default([]),
   loads: z.array(LoadSchema).max(256).default([]),
+  events: z.array(ScheduledEventSchema).max(256).default([]),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 function groundBody(ground: NonNullable<Scene['ground']>): Body {
   return {
     id: 'world-ground', label: 'Ground', parentId: null,
+    heldBy: null,
     position: [0, 0, ground.height], orientation: [1, 0, 0, 0],
     shape: { kind: 'plane', size: [10, 10] }, mass: null,
     motion: { kind: 'fixed' }, restitution: ground.restitution,
@@ -129,7 +148,7 @@ export function hasGroundPlane(scene: Scene): boolean {
   return scene.ground !== null || scene.bodies.some(body => body.shape.kind === 'plane'
     && body.motion.kind === 'fixed' && body.orientation[1] ** 2 + body.orientation[2] ** 2 < 1e-10);
 }
-export const ProviderSchema = z.enum(['openai', 'anthropic', 'openrouter']);
+export const ProviderSchema = z.enum(['openai', 'anthropic', 'openrouter', 'openai-codex']);
 export type Provider = z.infer<typeof ProviderSchema>;
 const decisionFields = {
   summary: z.string().trim().min(1).max(3000),
@@ -154,13 +173,6 @@ export const DecisionSchema = z.discriminatedUnion('kind', [
 ]);
 export type Decision = z.infer<typeof DecisionSchema>;
 
-export const AssemblyRequestSchema = z.strictObject({
-  provider: ProviderSchema,
-  model: z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9][A-Za-z0-9._:/+-]*$/),
-  description: z.string().trim().min(3).max(16000),
-  clarification: z.array(z.strictObject({ question: z.string().min(1).max(2000), answer: z.string().trim().min(1).max(4000) })).max(12).default([]),
-});
-export type AssemblyRequest = z.infer<typeof AssemblyRequestSchema>;
 
 export function validateScene(input: unknown): Scene {
   const scene = SceneSchema.parse(input);
@@ -178,13 +190,40 @@ export function validateScene(input: unknown): Scene {
   if (scene.ground !== null) bodies.set('world-ground', groundBody(scene.ground));
   const sites = new Set(scene.sites.map(site => site.id));
   const names = new Set<string>();
-  for (const [group, entries] of [['bodies', scene.bodies], ['sites', scene.sites], ['tendons', scene.tendons], ['connections', scene.connections]] as const) {
+  for (const [group, entries] of [['bodies', scene.bodies], ['sites', scene.sites], ['tendons', scene.tendons], ['connections', scene.connections], ['events', scene.events]] as const) {
     entries.forEach((item, i) => {
       if (item.id === 'world' || (scene.ground !== null && item.id === 'world-ground') || names.has(item.id)) {
         issue([group, i, 'id'], 'Entity IDs must be unique and cannot be world or the reserved world-ground.');
       }
       names.add(item.id);
     });
+  }
+  const heldBodies = scene.bodies.filter(body => body.heldBy !== null);
+  const heldByCarrier = new Map<string, Body[]>();
+  const heldCarrierFor = new Map<string, string>();
+  for (const [index, body] of scene.bodies.entries()) {
+    if (body.heldBy === null) continue;
+    const path = ['bodies', index, 'heldBy'] as (string | number)[];
+    const carrier = bodies.get(body.heldBy);
+    if (!carrier || carrier.id === body.id) {
+      issue(path, 'A carried body needs a different existing carrier.');
+      continue;
+    }
+    if (body.motion.kind !== 'free' || body.shape.kind === 'point' || body.shape.kind === 'plane') {
+      issue(path, 'A carried body must be a solid free rigid root.');
+    }
+    if (body.motion.kind === 'free'
+      && (body.motion.linearVelocity.some(value => value !== 0) || body.motion.angularVelocity.some(value => value !== 0))) {
+      issue(path, 'A carried body derives its initial velocity from the carrier; its own initial linear and angular velocities must be zero.');
+    }
+    if (!['fixed', 'free'].includes(carrier.motion.kind) || carrier.shape.kind === 'point' || carrier.shape.kind === 'plane') {
+      issue(path, 'Carriers must be fixed or free solid roots.');
+    }
+    if (carrier.heldBy !== null) issue(path, 'Nested carried-body groups are not supported.');
+    heldCarrierFor.set(body.id, carrier.id);
+    const group = heldByCarrier.get(carrier.id) ?? [];
+    group.push(body);
+    heldByCarrier.set(carrier.id, group);
   }
   scene.bodies.forEach((body, i) => {
     const path = ['bodies', i] as (string | number)[];
@@ -214,7 +253,7 @@ export function validateScene(input: unknown): Scene {
   });
   if (scene.ground !== null) validateFriction(scene.ground.friction, ['ground', 'friction']);
   scene.sites.forEach((site, i) => { if (site.bodyId && !bodies.has(site.bodyId)) issue(['sites', i, 'bodyId'], 'Attachment body does not exist.'); });
-  if (scene.connections.length + scene.tendons.length > 128) issue(['connections'], 'The combined constraint/tendon budget is 128.');
+  if (scene.connections.length + scene.tendons.length + heldBodies.length > 128) issue(['connections'], 'The combined connection, tendon, and held-body constraint budget is 128.');
   scene.tendons.forEach((tendon, i) => {
     if (tendon.mode !== 'spring' && (tendon.stiffness !== 0 || tendon.damping !== 0)) issue(['tendons', i, 'mode'], 'Fixed and maximum-length cables do not include elastic stiffness or damping; use a spring model for those properties.');
     if (tendon.path[0]?.kind !== 'site' || tendon.path.at(-1)?.kind !== 'site') issue(['tendons', i, 'path'], 'A routed path begins and ends with attachment sites.');
@@ -250,6 +289,53 @@ export function validateScene(input: unknown): Scene {
           || (load.kind === 'impulse' && Math.hypot(...load.angular) > 0)
           || (load.kind === 'force' && load.point !== null && Math.hypot(...load.point) > 0);
         if (rotational) issue(['loads', i], 'A point particle has no rotational degrees of freedom or off-center application point; use a rigid solid for this load.');
+      }
+    }
+  });
+  const carriedRoots = new Set(heldByCarrier.keys());
+  const isCarriedGroupBody = (bodyId: string | null) => bodyId !== null && (carriedRoots.has(bodyId) || heldCarrierFor.has(bodyId));
+  const siteBodies = new Map(scene.sites.map(site => [site.id, site.bodyId]));
+  scene.connections.forEach((connection, i) => {
+    if (isCarriedGroupBody(connection.bodyA) || isCarriedGroupBody(connection.bodyB)) {
+      issue(['connections', i], 'Carried rigid groups cannot participate in user-declared connections.');
+    }
+  });
+  scene.tendons.forEach((tendon, i) => tendon.path.forEach((part, j) => {
+    const bodyId = part.kind === 'wrap' ? part.bodyId : part.kind === 'site' ? siteBodies.get(part.siteId) ?? null : null;
+    if (isCarriedGroupBody(bodyId)) issue(['tendons', i, 'path', j], 'Carried rigid groups cannot participate in user-declared tendons.');
+  }));
+  scene.bodies.forEach((body, i) => {
+    if (isCarriedGroupBody(body.id)) return;
+    let parent = body.parentId;
+    for (let depth = 0; parent && bodies.has(parent) && depth < bodies.size; depth++) {
+      if (isCarriedGroupBody(parent)) {
+        issue(['bodies', i, 'parentId'], 'Carried rigid groups cannot have articulated descendants.');
+        break;
+      }
+      parent = bodies.get(parent)!.parentId;
+    }
+  });
+  const heldAt = new Set(heldBodies.map(body => body.id));
+  scene.events.map((event, index) => ({ event, index })).sort((a, b) => a.event.at - b.event.at || a.index - b.index).forEach(({ event, index }) => {
+    const path = ['events', index, 'action'] as (string | number)[];
+    const action = event.action;
+    if (action.kind === 'impulse') {
+      const body = bodies.get(action.bodyId);
+      if (!body || body.motion.kind === 'fixed') issue(path, 'A scheduled impulse needs an existing moving body.');
+      if (heldAt.has(action.bodyId)) issue(path, 'A scheduled impulse cannot target a body while it is carried; release it first.');
+      if (body?.motion.kind === 'particle' && Math.hypot(...action.angular) > 0) {
+        issue(path, 'A point particle has no rotational degrees of freedom; use a rigid solid for this impulse.');
+      }
+    } else if (action.kind === 'load') {
+      if (!scene.loads[action.loadIndex] || scene.loads[action.loadIndex].kind === 'impulse') {
+        issue(path, 'A load event must reference an existing continuous force, torque, drag, or gravity load.');
+      }
+    } else {
+      const body = bodies.get(action.bodyId);
+      if (!body || !heldAt.has(action.bodyId)) {
+        issue(path, 'A launch or release event must target a body that is still carried at that time.');
+      } else {
+        heldAt.delete(action.bodyId);
       }
     }
   });

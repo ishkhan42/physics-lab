@@ -10,6 +10,7 @@ interface SceneLinkBarProps {
   error: string;
   onRetry: () => void;
   onSaveCopy?: () => void;
+  onKeepPreviousLook?: () => void;
 }
 const DEADLINE_FORMAT = new Intl.DateTimeFormat(undefined, {
   month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
@@ -18,7 +19,7 @@ const OPERATION_LABELS = {
   idle: 'Saved scene', saving: 'Saving scene', loading: 'Opening scene', renewing: 'Updating retention',
 };
 
-export default function SceneLinkBar({ saved, operation, error, onRetry, onSaveCopy }: SceneLinkBarProps) {
+export default function SceneLinkBar({ saved, operation, error, onRetry, onSaveCopy, onKeepPreviousLook }: SceneLinkBarProps) {
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
   const [manualFor, setManualFor] = useState<string | null>(null);
   const copyTimer = useRef<number | undefined>(undefined);
@@ -70,7 +71,7 @@ export default function SceneLinkBar({ saved, operation, error, onRetry, onSaveC
         <div className="scene-link-bar__metadata">
           <span className="scene-link-bar__state" role="status" aria-live="polite">
             {saved && !busy ? <Check size={16} aria-hidden="true" /> : <LinkSimple size={16} aria-hidden="true" />}
-            {busy ? OPERATION_LABELS[operation] : !saved ? 'Scene not available' : 'Saved scene'}
+            {busy ? OPERATION_LABELS[operation] : onKeepPreviousLook ? 'Look not saved' : !saved ? 'Scene not available' : 'Saved scene'}
           </span>
           {saved ? (
             <span className="scene-link-bar__expiry">
@@ -101,7 +102,8 @@ export default function SceneLinkBar({ saved, operation, error, onRetry, onSaveC
           <div className="scene-link-bar__actions">
             <button className="secondary-button" type="button" onClick={onRetry} disabled={busy}>Retry</button>
             {onSaveCopy ? <button className="secondary-button" type="button" onClick={onSaveCopy} disabled={busy}>Save new copy</button> : null}
-            {!saved ? <a className="tool-button" href="/">New experiment</a> : null}
+            {onKeepPreviousLook ? <button className="secondary-button" type="button" onClick={onKeepPreviousLook} disabled={busy}>Keep previous look</button> : null}
+            {!saved && !onKeepPreviousLook ? <a className="tool-button" href="/">New experiment</a> : null}
           </div>
         </div>
       ) : null}

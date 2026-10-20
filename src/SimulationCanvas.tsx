@@ -1,22 +1,23 @@
-import { ArrowCounterClockwise, CornersOut, Crosshair, Pause, Play } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, CornersOut, Crosshair, Eye, Pause, Play, X } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CanvasTexture,
   AxesHelper,
   Box3,
+  Box3Helper,
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
   CapsuleGeometry,
   Color,
   CylinderGeometry,
-  DirectionalLight,
+  EdgesGeometry,
   DynamicDrawUsage,
   GridHelper,
   Group,
-  HemisphereLight,
   Line,
   LineBasicMaterial,
+  LineSegments,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -33,14 +34,32 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { Decision, Scene } from '../shared/scene.ts';
+import type { InspectionView } from '../shared/visual-inspection.ts';
 import { createRuntime } from './physics/mujoco.ts';
+import { FIXED_TIMESTEP, browserFrameSeconds } from './physics/clock.ts';
 import type { InspectionSnapshot, MechanicsRuntime, RenderItem } from './physics/types.ts';
+import { entityBounds, ScenePicker, type PickTarget } from './selection.ts';
+import { updateMarkers, type Marked } from './markers.ts';
+import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance.ts';
+import { SceneEnvironment } from './environment.ts';
+import AppearanceControls from './AppearanceControls.tsx';
 
 export interface CanvasExperiment {
   id: number;
   scene: Scene;
   decision: Decision;
   userGroundChoice?: 'default' | 'none';
+}
+export interface CanvasInspectionCapture {
+  simulatedAt: number;
+  focusedId: string | null;
+  notes: string[];
+  snapshot: InspectionSnapshot;
+  camera: { position: [number, number, number]; target: [number, number, number] };
+}
+
+export interface CanvasInspectionController {
+  capture(time: number, view: InspectionView, focusId: string | null): Promise<CanvasInspectionCapture>;
 }
 
 interface SimulationCanvasProps {
@@ -58,6 +77,14 @@ interface SimulationCanvasProps {
   physicalGround: boolean;
   groundDisabled: boolean;
   onPhysicalGroundChange: (enabled: boolean) => void;
+  appearance?: Appearance;
+  appearanceDisabled?: boolean;
+  appearanceSaving?: boolean;
+  onAppearanceChange?: (appearance: Appearance) => void;
+  selectedEntityId: string | null;
+  onSelectEntity: (id: string | null) => void;
+  onInspectEntity: () => void;
+  onInspectionController?: (controller: CanvasInspectionController | null) => void;
 }
 
 interface Track {
@@ -68,11 +95,6 @@ interface Track {
   bounds: Box3;
 }
 
-interface Marked {
-  object: Object3D;
-  marker: Points;
-  radius: number;
-}
 
 interface VisualSet {
   group: Group;
@@ -80,7 +102,9 @@ interface VisualSet {
   lines: Map<string, Line>;
   tracks: Track[];
   marked: Marked[];
+  markerBatch: Points<BufferGeometry, PointsMaterial>;
   planes: Mesh[];
+  pickTargets: PickTarget[];
 }
 
 const TRAIL_CAPACITY = 2048;
@@ -113,6 +137,7 @@ function markerTexture(): CanvasTexture {
 
 const initialCameraDirection = new Vector3(1, -1.25, 0.9).normalize();
 const TIME_FORMAT = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 5 });
+const selectionColor = new Color(0x0f6b62);
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'An unknown rendering or runtime error occurred.';
@@ -123,7 +148,7 @@ function disposeGroup(group: Group): void {
     if (!(object instanceof Mesh) && !(object instanceof Line) && !(object instanceof Points)) return;
     object.geometry.dispose();
     const materials = Array.isArray(object.material) ? object.material : [object.material];
-    for (const material of materials) material.dispose();
+    for (const material of materials) if (!material.userData.environmentOwned) material.dispose();
   });
   group.removeFromParent();
 }
@@ -138,7 +163,11 @@ function createVisual(item: RenderItem): Object3D {
     for (let index = 0; index < points.length; index += 1) {
       attribute.setXYZ(index, points[index][0], points[index][1], points[index][2]);
     }
-    const line = new Line(geometry, new LineBasicMaterial({ color: item.color, transparent: true, opacity: 0.92 }));
+    const color = new Color(item.color);
+    const luminance = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+    // Preserve hue while keeping thin cords legible on the light canvas.
+    if (luminance > 0.12) color.multiplyScalar(0.12 / luminance);
+    const line = new Line(geometry, new LineBasicMaterial({ color }));
     line.frustumCulled = false;
     return line;
   }
@@ -174,6 +203,14 @@ function createVisual(item: RenderItem): Object3D {
   }
   const mesh = new Mesh(geometry, material);
   mesh.scale.set(...scale);
+  if (item.shape.kind === 'box') {
+    const edges = new LineSegments(new EdgesGeometry(geometry), new LineBasicMaterial({ color: new Color(item.color).multiplyScalar(0.03) }));
+    edges.renderOrder = 1;
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = 1;
+    material.polygonOffsetUnits = 1;
+    mesh.add(edges);
+  }
   return mesh;
 }
 
@@ -185,10 +222,22 @@ function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet
   const tracks: Track[] = [];
   const marked: Marked[] = [];
   const planes: Mesh[] = [];
+  const markerGeometry = new BufferGeometry();
+  markerGeometry.setAttribute('position', new BufferAttribute(new Float32Array(items.length * 3), 3).setUsage(DynamicDrawUsage));
+  markerGeometry.setAttribute('color', new BufferAttribute(new Float32Array(items.length * 3), 3).setUsage(DynamicDrawUsage));
+  markerGeometry.setDrawRange(0, 0);
+  const markerBatch = new Points(markerGeometry, new PointsMaterial({
+    vertexColors: true, size: 18, sizeAttenuation: false, map: markerTexture(), transparent: true, depthTest: false, depthWrite: false,
+  }));
+  markerBatch.frustumCulled = false;
+  markerBatch.renderOrder = 3;
+  group.add(markerBatch);
+  const pickTargets: PickTarget[] = [];
   try {
     for (const item of items) {
       if (objects.has(item.id)) throw new Error(`The runtime returned a duplicate render ID: ${item.id}.`);
       const object = createVisual(item);
+      object.visible = item.visible !== false;
       if (object instanceof Line) {
         object.position.set(0, 0, 0);
         object.quaternion.identity();
@@ -209,7 +258,8 @@ function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet
           object.add(marker);
           object.geometry.computeBoundingSphere();
           const radius = (object.geometry.boundingSphere?.radius ?? 0) * Math.max(object.scale.x, object.scale.y, object.scale.z);
-          marked.push({ object, marker, radius });
+          marked.push({ entityId: item.entityId, object, marker, radius, color: new Color(item.color), surfaceVisible: true });
+          pickTargets.push({ entityId: item.entityId, object, marker });
           if (movingIds.has(item.entityId)) {
             const positions = new Float32Array(TRAIL_CAPACITY * 3);
             const geometry = new BufferGeometry();
@@ -222,10 +272,11 @@ function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet
           }
         }
       }
+      if (object instanceof Line && item.selectable !== false) pickTargets.push({ entityId: item.entityId, object });
       objects.set(item.id, object);
       group.add(object);
     }
-    const visuals = { group, objects, lines, tracks, marked, planes };
+    const visuals = { group, objects, lines, tracks, marked, markerBatch, planes, pickTargets };
     clearTrails(visuals);
     return visuals;
   } catch (error) {
@@ -236,6 +287,8 @@ function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet
 
 function recordTrails(visuals: VisualSet): void {
   for (const track of visuals.tracks) {
+    track.trail.visible = track.object.visible;
+    if (!track.object.visible) continue;
     const { x, y, z } = track.object.position;
     if (track.count > 0) {
       const last = (track.count - 1) * 3;
@@ -247,7 +300,10 @@ function recordTrails(visuals: VisualSet): void {
       for (let index = 1; index < kept; index += 1) track.positions.copyWithin(index * 3, index * 6, index * 6 + 3);
       track.count = kept;
     }
-    track.positions.set([x, y, z], track.count * 3);
+    const offset = track.count * 3;
+    track.positions[offset] = x;
+    track.positions[offset + 1] = y;
+    track.positions[offset + 2] = z;
     track.count += 1;
     track.bounds.expandByPoint(track.object.position);
     track.trail.geometry.setDrawRange(0, track.count);
@@ -259,6 +315,8 @@ function clearTrails(visuals: VisualSet): void {
   for (const track of visuals.tracks) {
     track.count = 0;
     track.bounds.makeEmpty();
+    track.trail.geometry.setDrawRange(0, 0);
+    track.trail.visible = track.object.visible;
   }
   recordTrails(visuals);
 }
@@ -268,10 +326,11 @@ function sceneBounds(visuals: VisualSet): Box3 {
   const bounds = new Box3();
   const point = new Vector3();
   for (const object of visuals.objects.values()) {
+    if (!object.visible) continue;
     if (object instanceof Mesh && object.geometry instanceof PlaneGeometry) bounds.expandByPoint(object.getWorldPosition(point));
     else bounds.expandByObject(object, true);
   }
-  for (const track of visuals.tracks) bounds.union(track.bounds);
+  for (const track of visuals.tracks) if (track.object.visible) bounds.union(track.bounds);
   return bounds;
 }
 
@@ -297,18 +356,12 @@ function scaleReferences(visuals: VisualSet, grid: Object3D, radius: number): nu
   return GRID_SIZE / GRID_DIVISIONS * scale;
 }
 
-function updateMarkers(visuals: VisualSet, camera: PerspectiveCamera, viewportHeight: number): void {
-  const pixelsPerUnitAtOne = viewportHeight / 2 / Math.tan(camera.fov * Math.PI / 360);
-  for (const item of visuals.marked) {
-    const distance = Math.max(camera.position.distanceTo(item.object.position), 1e-6);
-    item.marker.visible = item.radius * pixelsPerUnitAtOne / distance < 5;
-  }
-}
 
 function applyFrame(items: RenderItem[], visuals: VisualSet): void {
   for (const item of items) {
     const line = visuals.lines.get(item.id);
     if (line) {
+      line.visible = item.visible !== false;
       const points = item.points;
       let position = line.geometry.getAttribute('position') as BufferAttribute;
       if (!points) {
@@ -331,15 +384,39 @@ function applyFrame(items: RenderItem[], visuals: VisualSet): void {
     }
     const object = visuals.objects.get(item.id);
     if (!object) throw new Error(`The runtime changed render IDs during playback: ${item.id}.`);
+    object.visible = item.visible !== false;
     object.position.set(item.position[0], item.position[1], item.position[2]);
     object.quaternion.set(item.quaternion[0], item.quaternion[1], item.quaternion[2], item.quaternion[3]);
   }
+  for (const track of visuals.tracks) track.trail.visible = track.object.visible;
 }
 
 /** Snaps to the default viewing direction; returns the framed radius. */
 function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, visuals: VisualSet): number {
   const { center, distance, radius } = framing(camera, sceneBounds(visuals));
   camera.position.copy(center).addScaledVector(initialCameraDirection, distance);
+  applyCameraRange(camera, distance);
+  controls.target.copy(center);
+  controls.update();
+  return radius;
+}
+
+function fitCameraPreset(
+  camera: PerspectiveCamera,
+  controls: OrbitControls,
+  visuals: VisualSet,
+  view: InspectionView,
+  bounds = sceneBounds(visuals),
+): number {
+  const { center, distance, radius } = framing(camera, bounds);
+  camera.up.set(0, 0, 1);
+  const direction = view === 'overview'
+    ? initialCameraDirection
+    : view === 'front' ? new Vector3(0, -1, 0)
+      : view === 'side' ? new Vector3(1, 0, 0)
+        : new Vector3(0, 0, 1);
+  if (view === 'top') camera.up.set(0, 1, 0);
+  camera.position.copy(center).addScaledVector(direction, distance);
   applyCameraRange(camera, distance);
   controls.target.copy(center);
   controls.update();
@@ -376,22 +453,34 @@ export default function SimulationCanvas({
   physicalGround,
   groundDisabled,
   onPhysicalGroundChange,
+  appearance,
+  appearanceDisabled = false,
+  appearanceSaving = false,
+  onAppearanceChange,
+  selectedEntityId,
+  onSelectEntity,
+  onInspectEntity,
+  onInspectionController,
 }: SimulationCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
   const sceneRef = useRef<ThreeScene | null>(null);
+  const environmentRef = useRef<SceneEnvironment | null>(null);
+  const appearanceUploadPendingRef = useRef(false);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const visualSetRef = useRef<VisualSet | null>(null);
   const runtimeRef = useRef<MechanicsRuntime | null>(null);
   const activeIdRef = useRef<number | null>(null);
+  const inspectionGenerationRef = useRef(0);
   const frameRequestRef = useRef<number | null>(null);
   const scheduleRef = useRef<(() => void) | null>(null);
   const runningRef = useRef(false);
   const speedRef = useRef(1);
   const lastFrameRef = useRef<number | null>(null);
+  const lastFrameEndRef = useRef(0);
   const lastSnapshotRef = useRef(0);
-  const callbacksRef = useRef({ onStatus, onReady, onSnapshot, onFailure, onBeforeRun, onPlaybackChange });
+  const callbacksRef = useRef({ onStatus, onReady, onSnapshot, onFailure, onBeforeRun, onPlaybackChange, onSelectEntity, onInspectionController });
   const experimentRef = useRef(experiment);
   const [running, setRunning] = useState(false);
   const [runPending, setRunPending] = useState(false);
@@ -405,6 +494,8 @@ export default function SimulationCanvas({
   const [preparing, setPreparing] = useState(false);
   const [canvasIssue, setCanvasIssue] = useState('');
   const [candidateError, setCandidateError] = useState('');
+  const [environmentIssue, setEnvironmentIssue] = useState('');
+  const environmentIssueRef = useRef('');
   const canvasIssueRef = useRef(canvasIssue);
   const preparingRef = useRef(preparing);
   const replacementPendingRef = useRef(replacementPending);
@@ -414,21 +505,28 @@ export default function SimulationCanvas({
   const throttledRef = useRef(false);
   const lastThrottledAtRef = useRef(-Infinity);
   const followRef = useRef(true);
+  const [followTarget, setFollowTarget] = useState<'all' | 'selection'>('all');
+  const followTargetRef = useRef<'all' | 'selection'>('all');
+  const followVisibleRef = useRef(false);
+  const selectedRef = useRef<string | null>(selectedEntityId);
+  const selectionHelperRef = useRef<Box3Helper | null>(null);
+  const [objectChoices, setObjectChoices] = useState<{ id: string; label: string }[]>([]);
   const [gridCell, setGridCell] = useState(GRID_SIZE / GRID_DIVISIONS);
   const gridCellRef = useRef(GRID_SIZE / GRID_DIVISIONS);
   const gridRef = useRef<Object3D | null>(null);
 
-  const rescaleReferences = (visuals: VisualSet, radius: number) => {
+  const rescaleReferences = useCallback((visuals: VisualSet, radius: number) => {
     const grid = gridRef.current;
     if (!grid) return;
     const cell = scaleReferences(visuals, grid, radius);
     if (cell !== gridCellRef.current) {
+      environmentRef.current?.syncGround(visuals.planes);
       gridCellRef.current = cell;
       setGridCell(cell);
     }
-  };
+  }, []);
 
-  callbacksRef.current = { onStatus, onReady, onSnapshot, onFailure, onBeforeRun, onPlaybackChange };
+  callbacksRef.current = { onStatus, onReady, onSnapshot, onFailure, onBeforeRun, onPlaybackChange, onSelectEntity, onInspectionController };
   experimentRef.current = experiment;
   canvasIssueRef.current = canvasIssue;
   preparingRef.current = preparing;
@@ -436,11 +534,152 @@ export default function SimulationCanvas({
   runTokenRef.current = runToken;
   playbackBlockedRef.current = playbackBlocked;
 
+
+  const selectEntity = useCallback((id: string | null) => {
+    if (selectedRef.current === id) return;
+    if (followTargetRef.current === 'selection') {
+      followRef.current = false;
+      setFollow(false);
+    }
+    followVisibleRef.current = false;
+    selectedRef.current = id;
+    callbacksRef.current.onSelectEntity(id);
+    scheduleRef.current?.();
+  }, []);
+
+  useEffect(() => { selectEntity(selectedEntityId); }, [selectedEntityId, selectEntity]);
+
+  useEffect(() => {
+    if (!appearance || !visualSetRef.current) return;
+    environmentRef.current?.setAppearance(appearance, visualSetRef.current.planes);
+    if (gridRef.current) gridRef.current.visible = appearance.grid;
+    scheduleRef.current?.();
+  }, [appearance]);
+
+  const focusSelection = useCallback(() => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const visuals = visualSetRef.current;
+    const helper = selectionHelperRef.current;
+    if (!camera || !controls || !visuals || !helper || !selectedRef.current) return false;
+    const bounds = entityBounds(visuals.pickTargets, selectedRef.current, helper.box);
+    if (bounds.isEmpty()) return false;
+    const { center, distance } = framing(camera, bounds);
+    const direction = camera.position.clone().sub(controls.target).normalize();
+    if (direction.lengthSq() === 0) direction.copy(initialCameraDirection);
+    camera.position.copy(center).addScaledVector(direction, distance);
+    applyCameraRange(camera, distance);
+    controls.target.copy(center);
+    controls.update();
+    scheduleRef.current?.();
+    return true;
+  }, []);
   const publishSnapshot = useCallback((id: number, runtime: MechanicsRuntime) => {
     const snapshot = runtime.snapshot();
     setTime(snapshot.time);
     callbacksRef.current.onSnapshot(id, snapshot);
   }, []);
+
+  const captureInspectionFrame = useCallback(async (
+    generation: number,
+    id: number,
+    runtime: MechanicsRuntime,
+    requestedAt: number,
+    view: InspectionView,
+    focusId: string | null,
+  ): Promise<CanvasInspectionCapture> => {
+    if (!Number.isFinite(requestedAt) || requestedAt < 0) {
+      throw new RangeError('Inspection time must be finite and nonnegative.');
+    }
+    if (!['overview', 'front', 'side', 'top'].includes(view)) throw new TypeError('The inspection camera view is invalid.');
+    const assertCurrent = () => {
+      if (generation !== inspectionGenerationRef.current
+        || runtimeRef.current !== runtime
+        || activeIdRef.current !== id
+        || !callbacksRef.current.onInspectionController) {
+        throw new Error('The inspection controller is stale because its scene is no longer active.');
+      }
+    };
+    assertCurrent();
+    if (runningRef.current || runPendingRef.current) throw new Error('Inspection requires ordinary playback to remain stopped.');
+    if (document.hidden) throw new Error('Inspection cannot capture while the browser page is hidden.');
+    if (preparingRef.current || replacementPendingRef.current || playbackBlockedRef.current || canvasIssueRef.current) {
+      throw new Error('Inspection is unavailable while the current scene is paused or being replaced.');
+    }
+    const visuals = visualSetRef.current;
+    if (!visuals) throw new Error('The current scene has no renderer geometry to inspect.');
+    const requestedSteps = requestedAt / FIXED_TIMESTEP;
+    const targetStep = Math.ceil(requestedSteps - Number.EPSILON * Math.max(1, requestedSteps) * 2);
+    if (!Number.isSafeInteger(targetStep)) throw new RangeError('Inspection time is outside the exactly representable native-step horizon.');
+    let currentStep = Math.round(runtime.time / FIXED_TIMESTEP);
+    if (currentStep > targetStep) {
+      throw new Error(`Inspection time ${requestedAt} is stale; the simulation has already advanced beyond it.`);
+    }
+    while (currentStep < targetStep) {
+      assertCurrent();
+      const result = runtime.advance(FIXED_TIMESTEP, 1);
+      if (result.pauseReason) throw new Error(`Physics paused during visual inspection: ${result.pauseReason}`);
+      if (result.steps !== 1) throw new Error('The native physics runtime did not advance by exactly one fixed step.');
+      applyFrame(runtime.frame(), visuals);
+      recordTrails(visuals);
+      currentStep += 1;
+    }
+    assertCurrent();
+    applyFrame(runtime.frame(), visuals);
+    recordTrails(visuals);
+
+    let focusedId: string | null = null;
+    let focusNote: string | null = null;
+    let focusBounds: Box3 | undefined;
+    if (focusId) {
+      const bounds = entityBounds(visuals.pickTargets, focusId, new Box3());
+      if (bounds.isEmpty()) focusNote = `Focus ${focusId} is not currently visible; the scene was framed instead.`;
+      else {
+        focusedId = focusId;
+        focusBounds = bounds;
+      }
+    }
+    selectEntity(focusedId);
+    followRef.current = false;
+    setFollow(false);
+    followTargetRef.current = 'all';
+    setFollowTarget('all');
+    followVisibleRef.current = false;
+
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const viewport = viewportRef.current;
+    const selectionHelper = selectionHelperRef.current;
+    if (!camera || !controls || !renderer || !scene || !viewport || !selectionHelper) {
+      throw new Error('The actual Three.js renderer is unavailable for visual inspection.');
+    }
+    rescaleReferences(visuals, fitCameraPreset(camera, controls, visuals, view, focusBounds));
+    await environmentRef.current?.ready();
+    assertCurrent();
+    updateMarkers(visuals, camera, viewport.clientHeight, selectedRef.current, selectionColor);
+    if (selectedRef.current) entityBounds(visuals.pickTargets, selectedRef.current, selectionHelper.box);
+    selectionHelper.visible = selectedRef.current !== null && !selectionHelper.box.isEmpty();
+    renderer.render(scene, camera);
+
+    assertCurrent();
+    const snapshot = runtime.snapshot();
+    setTime(snapshot.time);
+    callbacksRef.current.onSnapshot(id, snapshot);
+    const extraNotes = [focusNote, environmentIssueRef.current].filter((note): note is string => Boolean(note));
+    const notes = [...snapshot.notes.slice(0, 6 - extraNotes.length), ...extraNotes];
+    return {
+      simulatedAt: snapshot.time,
+      focusedId,
+      notes,
+      snapshot,
+      camera: {
+        position: camera.position.toArray() as [number, number, number],
+        target: controls.target.toArray() as [number, number, number],
+      },
+    };
+  }, [rescaleReferences, selectEntity]);
 
   const invalidateRunStart = useCallback(() => {
     runAttemptRef.current += 1;
@@ -506,14 +745,17 @@ export default function SimulationCanvas({
       controls.maxDistance = 10000;
       controls.target.set(0, 0, 0);
       controls.listenToKeyEvents(renderer.domElement);
-      const hemisphere = new HemisphereLight(0xf4fbfc, 0x7b9094, 1.9);
-      scene.add(hemisphere);
-      const keyLight = new DirectionalLight(0xf8ffff, 2.0);
-      keyLight.position.set(-4, -5, 8);
-      scene.add(keyLight);
-      const fillLight = new DirectionalLight(0xa5c3c6, 0.8);
-      fillLight.position.set(5, 4, 3);
-      scene.add(fillLight);
+      environmentRef.current = new SceneEnvironment(scene, renderer, upload => {
+        if (upload) {
+          lastFrameRef.current = null;
+          appearanceUploadPendingRef.current = true;
+        }
+        scheduleRef.current?.();
+      }, message => {
+        environmentIssueRef.current = message;
+        setEnvironmentIssue(message);
+      });
+      environmentRef.current.setAppearance(DEFAULT_APPEARANCE, []);
       const grid = new GridHelper(12, 24, 0x8d9b99, 0xc6cfcd);
       grid.rotation.x = Math.PI / 2;
       grid.renderOrder = 1;
@@ -529,6 +771,13 @@ export default function SimulationCanvas({
         material.opacity = 0.82;
       }
       scene.add(axes);
+      const selectionHelper = new Box3Helper(new Box3(), selectionColor);
+      selectionHelper.visible = false;
+      selectionHelper.renderOrder = 4;
+      for (const material of Array.isArray(selectionHelper.material) ? selectionHelper.material : [selectionHelper.material]) material.depthTest = false;
+      scene.add(selectionHelper);
+      selectionHelperRef.current = selectionHelper;
+      const followedPosition = new Vector3();
       viewport.append(renderer.domElement);
       sceneRef.current = scene;
       cameraRef.current = camera;
@@ -561,8 +810,8 @@ export default function SimulationCanvas({
           if (document.hidden) {
             pauseForGap('Paused because the page became hidden. Resume when you return to the lab.');
           } else if (previous !== null) {
-            const wallSeconds = (timestamp - previous) / 1000;
-            if (wallSeconds > 0.25) {
+            const wallSeconds = browserFrameSeconds(previous, lastFrameEndRef.current, timestamp);
+            if (wallSeconds === null) {
               pauseForGap('Paused because the browser frame gap exceeded 0.25 seconds. Resume to continue without hidden catch-up.');
             } else {
               const runtime = runtimeRef.current;
@@ -579,10 +828,24 @@ export default function SimulationCanvas({
                     setThrottled(nowThrottled);
                   }
                   recordTrails(visuals);
-                  if (followRef.current) rescaleReferences(visuals, followCamera(camera, controls, visuals));
+                  if (followRef.current && followTargetRef.current === 'all') {
+                    rescaleReferences(visuals, followCamera(camera, controls, visuals));
+                  } else if (followRef.current && selectedRef.current) {
+                    entityBounds(visuals.pickTargets, selectedRef.current, selectionHelper.box);
+                    if (!selectionHelper.box.isEmpty()) {
+                      if (!followVisibleRef.current) focusSelection();
+                      else {
+                        selectionHelper.box.getCenter(followedPosition);
+                        camera.position.add(followedPosition).sub(controls.target);
+                        controls.target.copy(followedPosition);
+                        controls.update();
+                      }
+                      followVisibleRef.current = true;
+                    } else followVisibleRef.current = false;
+                  }
                   if (result.pauseReason) {
                     stopSimulation(result.pauseReason);
-                  } else if (timestamp - lastSnapshotRef.current >= 50) {
+                  } else if (result.steps > 0 && timestamp - lastSnapshotRef.current >= 50) {
                     lastSnapshotRef.current = timestamp;
                     publishSnapshot(id, runtime);
                   }
@@ -598,13 +861,24 @@ export default function SimulationCanvas({
         const activeCamera = cameraRef.current;
         if (activeRenderer && activeScene && activeCamera) {
           try {
-            if (visualSetRef.current) updateMarkers(visualSetRef.current, activeCamera, viewport.clientHeight);
+            const visuals = visualSetRef.current;
+            if (visuals) {
+              updateMarkers(visuals, activeCamera, viewport.clientHeight, selectedRef.current, selectionColor);
+              if (selectedRef.current) entityBounds(visuals.pickTargets, selectedRef.current, selectionHelper.box);
+              selectionHelper.visible = selectedRef.current !== null && !selectionHelper.box.isEmpty();
+            } else selectionHelper.visible = false;
             activeRenderer.render(activeScene, activeCamera);
+            if (appearanceUploadPendingRef.current) {
+              // Texture upload is visual work, not elapsed simulation time or a hidden-tab gap.
+              lastFrameRef.current = null;
+              appearanceUploadPendingRef.current = false;
+            }
           } catch (error) {
             setCanvasIssue(`WebGL could not draw the preview: ${describeError(error)}`);
             if (runningRef.current) stopSimulation('Paused because WebGL could not draw the preview.', false);
           }
         }
+        lastFrameEndRef.current = performance.now();
         // Camera updates inside this frame can already have scheduled the next one; never run two loops.
         if (runningRef.current && frameRequestRef.current === null) frameRequestRef.current = requestAnimationFrame(tick);
       };
@@ -612,12 +886,79 @@ export default function SimulationCanvas({
         if (!disposed && frameRequestRef.current === null) frameRequestRef.current = requestAnimationFrame(tick);
       };
       controls.addEventListener('change', () => scheduleRef.current?.());
-      // Any manual orbit, pan or zoom hands the camera back to the user.
-      controls.addEventListener('start', () => {
-        if (!followRef.current) return;
+      const stopFollowing = () => {
         followRef.current = false;
         setFollow(false);
-      });
+      };
+      const picker = new ScenePicker();
+      const pointers = new Map<number, { x: number; y: number }>();
+      let downX = 0;
+      let downY = 0;
+      let dragged = false;
+      let panning = false;
+      let downEntity: string | null = null;
+      let downScene: number | null = null;
+      let touchCenterX = 0;
+      let touchCenterY = 0;
+      let touchDistance = 0;
+      const pointerDown = (event: PointerEvent) => {
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pointers.size > 1) {
+          dragged = true;
+          if (followTargetRef.current !== 'selection' || pointers.size !== 2) stopFollowing();
+          const contacts = pointers.values();
+          const first = contacts.next().value!;
+          const second = contacts.next().value!;
+          touchCenterX = (first.x + second.x) / 2;
+          touchCenterY = (first.y + second.y) / 2;
+          touchDistance = Math.hypot(first.x - second.x, first.y - second.y);
+          return;
+        }
+        downX = event.clientX;
+        downY = event.clientY;
+        dragged = event.button !== 0;
+        panning = event.button === 2 || event.ctrlKey || event.metaKey || event.shiftKey;
+        downScene = activeIdRef.current;
+        const rect = renderer.domElement.getBoundingClientRect();
+        const visuals = visualSetRef.current;
+        downEntity = visuals ? picker.pick(visuals.pickTargets, camera, rect.width, rect.height, event.clientX - rect.left, event.clientY - rect.top, event.pointerType === 'touch' ? 22 : 14) : null;
+      };
+      const pointerMove = (event: PointerEvent) => {
+        const pointer = pointers.get(event.pointerId);
+        if (!pointer) return;
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        if (pointers.size === 2) {
+          const contacts = pointers.values();
+          const first = contacts.next().value!;
+          const second = contacts.next().value!;
+          const pan = Math.hypot((first.x + second.x) / 2 - touchCenterX, (first.y + second.y) / 2 - touchCenterY);
+          const pinch = Math.abs(Math.hypot(first.x - second.x, first.y - second.y) - touchDistance);
+          if (pan > 6 && pinch < pan * 1.5) stopFollowing();
+          return;
+        }
+        if (Math.hypot(event.clientX - downX, event.clientY - downY) > 6) {
+          dragged = true;
+          if (followTargetRef.current !== 'selection' || panning) stopFollowing();
+        }
+      };
+      const pointerUp = (event: PointerEvent) => {
+        if (pointers.has(event.pointerId) && pointers.size === 1 && !dragged
+          && Math.hypot(event.clientX - downX, event.clientY - downY) <= 6
+          && downScene === activeIdRef.current && !preparingRef.current && !replacementPendingRef.current) {
+          selectEntity(downEntity);
+        }
+        pointers.delete(event.pointerId);
+      };
+      const pointerCancel = (event: PointerEvent) => { pointers.delete(event.pointerId); dragged = true; };
+      const keyboardNavigation = (event: KeyboardEvent) => { if (event.key.startsWith('Arrow')) stopFollowing(); };
+      const wheelNavigation = () => { if (followTargetRef.current !== 'selection') stopFollowing(); };
+      renderer.domElement.addEventListener('pointerdown', pointerDown, true);
+      renderer.domElement.addEventListener('pointermove', pointerMove, true);
+      renderer.domElement.addEventListener('pointerup', pointerUp, true);
+      renderer.domElement.addEventListener('pointercancel', pointerCancel, true);
+      renderer.domElement.addEventListener('wheel', wheelNavigation, { passive: true });
+      renderer.domElement.addEventListener('keydown', keyboardNavigation, true);
       scheduleRef.current?.();
 
       const onVisibility = () => {
@@ -642,6 +983,15 @@ export default function SimulationCanvas({
         observer.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
         renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
+        renderer.domElement.removeEventListener('pointerdown', pointerDown, true);
+        renderer.domElement.removeEventListener('pointermove', pointerMove, true);
+        renderer.domElement.removeEventListener('pointerup', pointerUp, true);
+        renderer.domElement.removeEventListener('pointercancel', pointerCancel, true);
+        renderer.domElement.removeEventListener('wheel', wheelNavigation);
+        renderer.domElement.removeEventListener('keydown', keyboardNavigation, true);
+        selectionHelper.geometry.dispose();
+        for (const material of Array.isArray(selectionHelper.material) ? selectionHelper.material : [selectionHelper.material]) material.dispose();
+        selectionHelperRef.current = null;
         if (frameRequestRef.current !== null) cancelAnimationFrame(frameRequestRef.current);
         frameRequestRef.current = null;
         runAttemptRef.current += 1;
@@ -654,6 +1004,8 @@ export default function SimulationCanvas({
         for (const material of Array.isArray(grid.material) ? grid.material : [grid.material]) material.dispose();
         axes.geometry.dispose();
         for (const material of Array.isArray(axes.material) ? axes.material : [axes.material]) material.dispose();
+        environmentRef.current?.dispose();
+        environmentRef.current = null;
         if (visualSetRef.current) disposeGroup(visualSetRef.current.group);
         visualSetRef.current = null;
         renderer.dispose();
@@ -667,6 +1019,8 @@ export default function SimulationCanvas({
       };
     } catch (error) {
       const message = `WebGL renderer unavailable: ${describeError(error)}`;
+      environmentRef.current?.dispose();
+      environmentRef.current = null;
       rendererRef.current?.dispose();
       rendererRef.current?.domElement.remove();
       rendererRef.current = null;
@@ -682,10 +1036,12 @@ export default function SimulationCanvas({
         rendererRef.current = null;
       };
     }
-  }, [invalidateRunStart, publishSnapshot, stopSimulation]);
+  }, [invalidateRunStart, publishSnapshot, stopSimulation, selectEntity, focusSelection]);
 
   useEffect(() => {
     if (!experiment) return;
+    const inspectionGeneration = ++inspectionGenerationRef.current;
+    callbacksRef.current.onInspectionController?.(null);
     invalidateRunStart();
     let canceled = false;
     let candidateRuntime: MechanicsRuntime | null = null;
@@ -728,6 +1084,9 @@ export default function SimulationCanvas({
         scene.add(candidateVisuals.group);
         try {
           rescaleReferences(candidateVisuals, fitCamera(camera, controls, candidateVisuals));
+          environmentRef.current?.setAppearance(experiment.scene.appearance, candidateVisuals.planes);
+          if (gridRef.current) gridRef.current.visible = experiment.scene.appearance.grid;
+          updateMarkers(candidateVisuals, camera, viewportRef.current?.clientHeight ?? 640, null, selectionColor);
           renderer.render(scene, camera);
           if (previousVisuals) scene.remove(previousVisuals.group);
           renderer.render(scene, camera);
@@ -740,6 +1099,8 @@ export default function SimulationCanvas({
           camera.updateProjectionMatrix();
           controls.target.copy(previousTarget);
           controls.update();
+          environmentRef.current?.setAppearance(appearance ?? DEFAULT_APPEARANCE, previousVisuals?.planes ?? []);
+          if (gridRef.current) gridRef.current.visible = (appearance ?? DEFAULT_APPEARANCE).grid;
           try { renderer.render(scene, camera); } catch { /* Keep the previous runtime alive if WebGL has failed. */ }
           throw error;
         }
@@ -749,6 +1110,14 @@ export default function SimulationCanvas({
         runtimeRef.current = installedRuntime;
         visualSetRef.current = candidateVisuals;
         activeIdRef.current = id;
+        selectEntity(null);
+        followRef.current = true;
+        setFollow(true);
+        followTargetRef.current = 'all';
+        setFollowTarget('all');
+        followVisibleRef.current = false;
+        const pickableIds = new Set(candidateVisuals.pickTargets.map(target => target.entityId));
+        setObjectChoices(initialSnapshot.entities.filter(entity => pickableIds.has(entity.id)).map(entity => ({ id: entity.id, label: entity.label })));
         candidateRuntime = null;
         candidateVisuals = null;
         setPreparing(false);
@@ -758,6 +1127,9 @@ export default function SimulationCanvas({
         lastFrameRef.current = null;
         setTime(initialSnapshot.time);
         lastSnapshotRef.current = performance.now();
+        callbacksRef.current.onInspectionController?.({
+          capture: (time, view, focusId) => captureInspectionFrame(inspectionGeneration, id, installedRuntime, time, view, focusId),
+        });
         callbacksRef.current.onReady(experiment, initialSnapshot);
         scheduleRef.current?.();
         try { if (previousVisuals) disposeGroup(previousVisuals.group); }
@@ -789,19 +1161,24 @@ export default function SimulationCanvas({
       candidateRuntime?.dispose();
       if (candidateVisuals) disposeGroup(candidateVisuals.group);
     };
-  }, [experiment, invalidateRunStart, stopSimulation]);
+  }, [experiment, invalidateRunStart, stopSimulation, captureInspectionFrame]);
 
   useEffect(() => {
     if (clearTokenRef.current === clearToken) return;
     clearTokenRef.current = clearToken;
+    inspectionGenerationRef.current += 1;
+    callbacksRef.current.onInspectionController?.(null);
     invalidateRunStart();
     if (runningRef.current) stopSimulation('Paused because the current scene was closed.', false);
     setCandidateError('');
     const visuals = visualSetRef.current;
     const runtime = runtimeRef.current;
     activeIdRef.current = null;
+    selectEntity(null);
+    setObjectChoices([]);
     visualSetRef.current = null;
     runtimeRef.current = null;
+    environmentRef.current?.syncGround([]);
     if (visuals) {
       sceneRef.current?.remove(visuals.group);
       try { disposeGroup(visuals.group); }
@@ -827,6 +1204,7 @@ export default function SimulationCanvas({
   };
 
   const toggleRunning = async () => {
+    if (callbacksRef.current.onInspectionController) return;
     const runtime = runtimeRef.current;
     const id = activeIdRef.current;
     if (!runtime || id === null || preparingRef.current || replacementPendingRef.current || playbackBlockedRef.current || canvasIssueRef.current) return;
@@ -883,6 +1261,9 @@ export default function SimulationCanvas({
       runtime.reset();
       applyFrame(runtime.frame(), visuals);
       clearTrails(visuals);
+      selectEntity(null);
+      followRef.current = true;
+      setFollow(true);
       publishSnapshot(id, runtime);
       setCandidateError('');
       fitView();
@@ -892,10 +1273,23 @@ export default function SimulationCanvas({
   };
 
   const toggleFollow = () => {
-    const next = !followRef.current;
+    const next = !followRef.current || followTargetRef.current !== 'all';
     followRef.current = next;
     setFollow(next);
+    followTargetRef.current = 'all';
+    setFollowTarget('all');
+    followVisibleRef.current = false;
     if (next && !runningRef.current) fitView();
+  };
+
+  const toggleSelectedFollow = () => {
+    const next = !(followRef.current && followTargetRef.current === 'selection');
+    followTargetRef.current = 'selection';
+    setFollowTarget('selection');
+    followRef.current = next;
+    setFollow(next);
+    followVisibleRef.current = next && focusSelection();
+    scheduleRef.current?.();
   };
 
   const fitView = () => {
@@ -903,6 +1297,9 @@ export default function SimulationCanvas({
     const controls = controlsRef.current;
     const visuals = visualSetRef.current;
     if (!camera || !controls || !visuals || preparingRef.current) return;
+    followTargetRef.current = 'all';
+    setFollowTarget('all');
+    followVisibleRef.current = false;
     rescaleReferences(visuals, fitCamera(camera, controls, visuals));
     scheduleRef.current?.();
   };
@@ -910,10 +1307,15 @@ export default function SimulationCanvas({
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (event.isComposing || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code === 'Escape' && !(target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]'))) {
+        selectEntity(null);
+        rendererRef.current?.domElement.focus({ preventScroll: true });
+        return;
+      }
       if (target instanceof HTMLElement && (
-        target.isContentEditable || target.closest('input:not([type="range"]), textarea, select, [contenteditable="true"]')
+        target.isContentEditable || target.closest('input, textarea, select, button, summary, a, [contenteditable="true"]')
       )) return;
-      if (event.code === 'Space' && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !playbackBlockedRef.current && !canvasIssueRef.current) {
+      if (event.code === 'Space' && !callbacksRef.current.onInspectionController && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !playbackBlockedRef.current && !canvasIssueRef.current) {
         event.preventDefault();
         void toggleRunning();
       } else if (event.code === 'KeyR' && runtimeRef.current && !preparingRef.current && !replacementPendingRef.current && !canvasIssueRef.current) {
@@ -927,6 +1329,9 @@ export default function SimulationCanvas({
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
   }, []);
+
+  const selectedChoice = objectChoices.find(choice => choice.id === selectedEntityId);
+  const selectedVisible = Boolean(selectedEntityId && visualSetRef.current?.pickTargets.some(target => target.entityId === selectedEntityId && target.object.visible));
 
   return (
     <div className="simulation-frame">
@@ -944,30 +1349,52 @@ export default function SimulationCanvas({
               <span>Ground</span>
             </label>
           ) : null}
+          {runtimeRef.current && onAppearanceChange ? <AppearanceControls
+            value={appearance ?? DEFAULT_APPEARANCE}
+            onChange={onAppearanceChange}
+            disabled={appearanceDisabled || preparing || replacementPending}
+            saving={appearanceSaving}
+          /> : null}
           {runtimeRef.current ? (
-            <button className="tool-button" type="button" onClick={toggleFollow} aria-pressed={follow} aria-label="Follow camera" title="Keep moving bodies and their paths in view while running">
+            <button className="tool-button" type="button" onClick={toggleFollow} aria-pressed={follow && followTarget === 'all'} aria-label="Follow all objects" title="Keep all moving objects and paths in view">
               <Crosshair size={16} aria-hidden="true" />
-              <span>Follow</span>
+              <span>Follow all</span>
             </button>
           ) : null}
           <button className="tool-button" type="button" onClick={fitView} disabled={!runtimeRef.current || preparing} title="Frame all objects (F)" aria-label="Fit view" aria-keyshortcuts="F">
             <CornersOut size={16} aria-hidden="true" />
-            <span>Fit</span>
+            <span>Fit all</span>
           </button>
         </div>
+        {objectChoices.length > 0 ? <div className="canvas-selection" role="group" aria-label="Object selection">
+          <select aria-label="Choose object" value={selectedEntityId ?? ''} onChange={event => selectEntity(event.target.value || null)} disabled={preparing || replacementPending}>
+            <option value="">Choose an object…</option>
+            {objectChoices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+          </select>
+          {selectedChoice ? <>
+            <span className="selection-state" role="status">{!selectedVisible ? 'Waiting to appear' : follow && followTarget === 'selection' ? 'Following' : 'Selected'}</span>
+            <div className="selection-actions">
+              <button className="tool-button" type="button" aria-label="Focus selected object" disabled={!selectedVisible || preparing} onClick={() => { followRef.current = false; setFollow(false); focusSelection(); }}><CornersOut size={15} aria-hidden="true" /><span>Focus</span></button>
+              <button className="tool-button" type="button" aria-label="Follow selected object" aria-pressed={follow && followTarget === 'selection'} disabled={preparing} onClick={toggleSelectedFollow}><Crosshair size={15} aria-hidden="true" /><span>Follow</span></button>
+              <button className="tool-button" type="button" aria-label="Show selected object values" onClick={onInspectEntity}><Eye size={15} aria-hidden="true" /><span>Values</span></button>
+              <button className="tool-button" type="button" aria-label="Clear selection" onClick={() => { selectEntity(null); rendererRef.current?.domElement.focus({ preventScroll: true }); }}><X size={15} aria-hidden="true" /></button>
+            </div>
+          </> : null}
+        </div> : null}
         {!runtimeRef.current ? (
           <div className="canvas-empty-state" role="status">
             <strong>{preparing ? 'Preparing your model' : canvasIssue || candidateError ? 'Preview unavailable' : 'No experiment yet'}</strong>
-            <p>{canvasIssue || candidateError || 'Describe a setup and assemble it. The scene opens here, paused, ready to inspect.'}</p>
+            <p>{canvasIssue || candidateError || 'Describe an experiment, then press Build. You choose when to run it.'}</p>
           </div>
         ) : null}
         {preparing && runtimeRef.current ? <div className="replacement-indicator" role="status">Preparing replacement. Current preview is paused and preserved.</div> : null}
         {candidateError && runtimeRef.current ? <div className="canvas-warning" role="alert">{candidateError}</div> : null}
-        <p className="canvas-help">{runtimeRef.current ? <span className="grid-scale">Grid squares {gridCell} m. </span> : null}<span className="hint-pointer">Drag to orbit. Scroll to zoom. Right-drag or arrow keys to pan.</span><span className="hint-touch">Drag to orbit. Pinch to zoom. Two-finger drag to pan.</span></p>
+        {environmentIssue ? <div className="canvas-warning" role="status">{environmentIssue}</div> : null}
+        <p className="canvas-help">{runtimeRef.current && (appearance ?? experiment?.scene.appearance ?? DEFAULT_APPEARANCE).grid ? <span className="grid-scale">Grid squares {gridCell} m. </span> : null}<span className="hint-pointer">Click an object to select. Drag to orbit. Scroll to zoom.</span><span className="hint-touch">Tap an object to select. Drag to orbit. Pinch to zoom.</span></p>
       </div>
       <div className="simulation-controls">
         <div className="playback-control">
-          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={() => { void toggleRunning(); }} disabled={!runtimeRef.current || preparing || replacementPending || runPending || playbackBlocked || Boolean(canvasIssue)} aria-keyshortcuts="Space" aria-busy={runPending}>
+          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={() => { void toggleRunning(); }} disabled={!runtimeRef.current || Boolean(onInspectionController) || preparing || replacementPending || runPending || playbackBlocked || Boolean(canvasIssue)} aria-keyshortcuts="Space" aria-busy={runPending}>
             {running ? <Pause size={16} weight="fill" aria-hidden="true" /> : <Play size={16} weight="fill" aria-hidden="true" />}
             <span>{runPending ? 'Checking scene' : running ? 'Pause' : 'Run'}</span>
           </button>

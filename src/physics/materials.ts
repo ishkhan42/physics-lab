@@ -126,6 +126,18 @@ export class ContactFriction {
       this.lookup[second * model.ngeom + first] = index;
     });
   }
+  reset(): void {
+    this.slip.fill(-1);
+    this.touched.fill(0);
+    if (!this.pairs.length) return;
+    if (!this.frictionView || this.frictionView.byteLength === 0) this.frictionView = this.model.pair_friction as Float64Array;
+    for (const pair of this.pairs) {
+      const offset = pair.index * 5;
+      this.frictionView[offset] = pair.static;
+      this.frictionView[offset + 1] = pair.static;
+    }
+  }
+
 
   private updateCoefficients(data: MjData): void {
     if (!this.pairs.length || !data.ncon) return;

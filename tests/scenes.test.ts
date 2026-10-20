@@ -10,6 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SCENE_RETENTION_MS, SavedSceneMetadataSchema, SavedSceneSchema } from '../shared/saved-scene.ts';
 import type { SavedScene, SceneDocument } from '../shared/saved-scene.ts';
+import type { Scene } from '../shared/scene.ts';
+import { createRuntime } from '../src/physics/mujoco.ts';
 import { createApiServer } from '../server/index.ts';
 import { atwood } from './fixtures.ts';
 
@@ -117,6 +119,40 @@ function errorCode(result: HttpResult): string | undefined {
 function savedScene(result: HttpResult): SavedScene {
   return SavedSceneSchema.parse(result.value);
 }
+
+test('pre-schedule saved scenes still run without rewriting their stored definitions', async t => {
+  const clock = { value: Date.parse('2026-01-01T00:00:00.000Z') };
+  const api = await sandbox(t, clock);
+  const server = await api.start();
+  const document = validDocument();
+  const created = savedScene(await send(server.port, 'POST', '/api/scenes', JSON.stringify(document)));
+  const legacyScene = (scene: Scene) => {
+    const { events: _events, ...definition } = scene;
+    return { ...definition, bodies: definition.bodies.map(({ heldBy: _heldBy, ...body }) => body) };
+  };
+  const originalJson = JSON.stringify({
+    ...document,
+    scene: legacyScene(document.scene),
+    decision: { ...document.decision, scene: legacyScene(document.decision.scene) },
+  });
+  const database = new DatabaseSync(api.databasePath);
+  t.after(() => database.close());
+  database.prepare('UPDATE scenes SET document = ? WHERE id = ?').run(originalJson, created.id);
+  const restored = await send(server.port, 'GET', `/api/scenes/${created.id}`);
+  assert.equal(restored.status, 200);
+  const runtime = await createRuntime(savedScene(restored).document.scene);
+  try {
+    assert.equal(runtime.advance(0.1, 1).pauseReason, null);
+    const velocity = runtime.snapshot().entities.find(entity => entity.id === 'light')?.properties.find(property => property.label === 'Velocity')?.value;
+    assert.ok(Array.isArray(velocity));
+    assert.ok(Math.abs(velocity[2] - 0.327) < 1e-8);
+  } finally { runtime.dispose(); }
+  clock.value += 5000;
+  const renewed = await send(server.port, 'POST', `/api/scenes/${created.id}/run`, '{}');
+  assert.equal(renewed.status, 200);
+  const row = database.prepare('SELECT document FROM scenes WHERE id = ?').get(created.id);
+  assert.equal(row?.document, originalJson);
+});
 
 test('saved scene metadata and validated documents persist privately across server restart', async t => {
   const clock = { value: Date.parse('2026-01-01T00:00:00.000Z') };
