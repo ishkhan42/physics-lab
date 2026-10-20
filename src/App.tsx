@@ -1418,7 +1418,6 @@ export default function App() {
         <section className="setup-panel" aria-labelledby="setup-title">
           <div className="setup-panel__heading">
             <div><ChatCircleDots size={22} weight="duotone" aria-hidden="true" /><h1 id="setup-title">Your experiment</h1></div>
-            <span className="context-badge">Mechanics</span>
           </div>
           {conversation.length > 0 ? (
             <section className="conversation-transcript" aria-label="Experiment conversation">
@@ -1440,9 +1439,7 @@ export default function App() {
               <summary><Cube size={16} aria-hidden="true" /><span>{proposalPreview ? 'Request' : 'Saved request'}</span></summary>
               <p>{proposalPreview?.sourcePrompt ?? activeSourcePromptRef.current}</p>
             </details>
-          ) : (
-            <div className="assistant-welcome"><Atom size={28} weight="duotone" aria-hidden="true" /><p>Describe it.<br /><strong>Watch it happen.</strong></p></div>
-          )}
+          ) : null}
 
           <AssemblyWork
             ref={progressRef}
@@ -1465,8 +1462,8 @@ export default function App() {
                 value={description}
                 onChange={event => handleDescriptionChange(event.target.value)}
                 placeholder={activeExperiment
-                  ? 'Ask for a change, a new action, or different timing…'
-                  : 'Two balls falling, a moving pendulum, a push after 5 seconds…'}
+                  ? 'Change a mass, add an object, or adjust the timing.'
+                  : 'Two balls fall from 2 m. One bounces; the other does not.'}
                 minLength={3}
                 maxLength={16000}
                 required
@@ -1476,7 +1473,7 @@ export default function App() {
               />
               <span className="field-hint" id="description-hint">{activeExperiment
                 ? 'Your current experiment is included.'
-                : 'Missing details will be asked about or clearly assumed.'}</span>
+                : 'Missing values will be asked for or shown as assumptions.'}</span>
             </label>
 
             {!activeExperiment ? <div className="prompt-starters" role="group" aria-label="Try an example">
@@ -1591,7 +1588,7 @@ export default function App() {
 
             {question ? (
               <div className="clarification-panel" aria-labelledby="clarification-question">
-                <span className="field-label">One quick question</span>
+                <span className="field-label">A detail is needed</span>
                 <p id="clarification-question">{question}</p>
                 <label className="field">
                   <span className="field-label">Your answer</span>
@@ -1610,7 +1607,7 @@ export default function App() {
 
             {configError ? (
               <div className="notice notice--error" role="alert">
-                <p><strong>The lab is offline.</strong> Your message is safe. Check the connection and try again.</p>
+                <p><strong>Couldn’t connect to the lab.</strong> Your draft is kept. Check the connection and try again.</p>
                 <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Retry connection</button>
                 <details className="diagnostic-details"><summary>Setup details</summary><p>Start the local service with npm run api.</p><p>{configError}</p></details>
               </div>
@@ -1653,7 +1650,7 @@ export default function App() {
 
           {responseDecision && (responseDecision.kind === 'unsupported' || responseDecision.alternative) ? (
             <section className="response-panel response-panel--unsupported" ref={responseRef} tabIndex={-1} aria-labelledby="response-title">
-              <h2 id="response-title">{responseDecision.kind === 'unsupported' ? 'Let’s adjust this experiment' : 'Another way to try this'}</h2>
+              <h2 id="response-title">{responseDecision.kind === 'unsupported' ? 'This setup needs a change' : 'Suggested setup'}</h2>
               {conversation.at(-1)?.content !== responseDecision.summary ? <p>{responseDecision.summary}</p> : null}
               {responseDecision.alternative ? (
                 <div className="response-proposal">
@@ -1662,8 +1659,8 @@ export default function App() {
                   <button className="primary-button" type="button" onClick={() => {
                     handleDescriptionChange(responseDecision.alternative!.description);
                     descriptionRef.current?.focus();
-                  }}>Use this setup</button>
-                  <small>Fills your draft for review. Send it to the assistant when you’re ready.</small>
+                  }}>Use as draft</button>
+                  <small>Review the draft, then send it to build.</small>
                 </div>
               ) : null}
               <div className="response-panel__actions">
@@ -1681,8 +1678,8 @@ export default function App() {
 
 
           {recentScenes.length > 0 ? (
-            <section className="recent-section" aria-labelledby="recent-title">
-              <h2 id="recent-title">Recent scenes</h2>
+            <details className="recent-section">
+              <summary><ClockCounterClockwise size={16} aria-hidden="true" /><span>Recent scenes</span><span className="recent-count">{recentScenes.length}</span></summary>
               <ul className="recent-list">
                 {recentScenes.map(item => (
                   <li key={item.id}>
@@ -1693,14 +1690,13 @@ export default function App() {
                       aria-current={!proposalPreview && currentSceneId === item.id ? 'true' : undefined}
                       title="Load the saved scene without a model request"
                     >
-                      <ClockCounterClockwise size={16} aria-hidden="true" />
                       <strong>{item.title}</strong>
                       {!proposalPreview && currentSceneId === item.id ? <small>Open</small> : null}
                     </button>
                   </li>
                 ))}
               </ul>
-            </section>
+            </details>
           ) : null}
 
           <details className="capabilities-details">
@@ -1827,7 +1823,7 @@ export default function App() {
                 {proposalPreview ? <span className="interpretation-tag">Unsaved proposal</span> : responseDecision ? <span className="interpretation-tag">Unchanged preview</span> : null}
               </div>
               {experimentFacts ? <div className="scene-facts">
-                <span><Cube size={15} aria-hidden="true" />{experimentFacts.objects} objects</span>
+                <span><Cube size={15} aria-hidden="true" />{experimentFacts.objects} {experimentFacts.objects === 1 ? 'object' : 'objects'}</span>
                 <span><ArrowDown size={15} aria-hidden="true" />{Number(experimentFacts.gravity.toPrecision(4))} m/s²</span>
                 <span><Atom size={15} aria-hidden="true" />Ground {experimentFacts.ground ? 'on' : 'off'}</span>
               </div> : null}
@@ -1850,8 +1846,10 @@ export default function App() {
               </div>
             </section>
           ) : null}
-          <TelemetryPanel experimentId={activeExperiment?.id ?? null} snapshot={snapshot} />
-          <ObjectCards snapshot={snapshot} hasExperiment={activeExperiment !== null || pendingExperiment !== null} selectedEntityId={selectedEntityId} selectableEntities={selectableEntities} onSelectEntity={setSelectedEntityId} />
+          {activeExperiment || pendingExperiment ? <>
+            <TelemetryPanel experimentId={activeExperiment?.id ?? null} snapshot={snapshot} />
+            <ObjectCards snapshot={snapshot} hasExperiment selectedEntityId={selectedEntityId} selectableEntities={selectableEntities} onSelectEntity={setSelectedEntityId} />
+          </> : null}
         </section>
 
       </main>

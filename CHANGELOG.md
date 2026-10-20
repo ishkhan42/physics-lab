@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Polish the light workbench without replacing its visual system: remove repeated welcome/category text, collapse recent scenes and defer empty charts/cards until an experiment exists.
+- Improve conversation readability, reduce the desktop viewer's height, enlarge touch targets and use 16px narrow-screen form text.
+- Shorten static progress/playback/sharing copy, distinguish “Use as draft” from accepting a checked proposal, correct singular object counts and request direct plain-text model summaries without promotional filler or forced second-person wording.
+
 - Surface the existing Devpost Learn Skill Pack artifacts near the top of the README, with direct planning/build/map links, the first implementation checkpoint and explicit unfinished readiness status; remove the buried duplicate.
 
 - Prepare the current app for authorized public source release with an MIT application license, preserved third-party notices and an offline technical app map. Keep technical verification separate from the learner's final readiness confirmation.

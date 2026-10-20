@@ -12,11 +12,11 @@ const LABELS: Record<AssemblyProgress['stage'], string> = {
   repairing: 'Refining after a check', retrying: 'Waiting for your AI service', reviewing: 'Reviewing your experiment',
 };
 const HINTS: Record<AssemblyProgress['stage'], string> = {
-  starting: 'Preparing a private space to work.', generating: 'Working through your objects and conditions.',
+  starting: 'Starting the isolated lab assistant.', generating: 'Setting up the objects and conditions.',
   catalog: 'Checking what the lab can model.', validating: 'Checking values and connections.',
   simulating: 'Running a real physics check.', inspecting: 'Inspecting the actual view.',
-  repairing: 'Using the check results to improve the setup.', retrying: 'Your current experiment stays unchanged.',
-  reviewing: 'Checking that the result matches your request.',
+  repairing: 'Adjusting the setup from the check results.', retrying: 'Your current experiment stays unchanged.',
+  reviewing: 'Comparing the setup with your request.',
 };
 const OUTCOMES: Record<Exclude<WorkState, 'working' | 'preparing'>, string> = {
   ready: 'Preview ready', proposal: 'Needs a look', stopped: 'Stopped', error: 'Could not finish', clarification: 'Waiting for you', unsupported: 'Request reviewed',
@@ -69,7 +69,7 @@ export default function AssemblyWork({ state, progress, budget, activity, verifi
     <div className="assembly-work__identity"><span><Atom size={16} aria-hidden="true" />Lab assistant</span><output aria-label="Elapsed work time" aria-live="off">{elapsed(seconds)}</output></div>
     <div className="assembly-work__status" role="status" aria-live="polite" aria-atomic="true">
       <strong>{title}</strong>
-      <p>{state === 'preparing' ? 'Your scene will open paused, ready to explore.' : hint}</p>
+      <p>{state === 'preparing' ? 'The preview opens paused.' : hint}</p>
     </div>
     {state !== 'preparing' ? <ol className="assembly-work__phases" aria-label="Current work, checks may repeat">
       <li aria-current={phase === 'build' ? 'step' : undefined}><Cube size={15} aria-hidden="true" />Build</li>

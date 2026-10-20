@@ -284,7 +284,7 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
       <header className="telemetry__header">
         <div>
           <h2 id="telemetry-title">Motion over time</h2>
-          <p>Solver samples, about 20 per second. Brief impacts can fall between samples.</p>
+          <p>Recorded about 20 times per second. Brief impacts may fall between samples.</p>
         </div>
         <div className="telemetry__metrics" role="group" aria-label="Measurement">
           {(Object.keys(METRICS) as Metric[]).map(key => (
@@ -301,9 +301,9 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
       </header>
       <div className="telemetry__plot" ref={plotRef} onPointerLeave={() => setActiveIndex(null)}>
         {samples.length < 2 ? (
-          <p className="telemetry__empty">Press Run to record height, speed and energy for each moving body.</p>
+          <p className="telemetry__empty">Press Run to start recording.</p>
         ) : chart && chart.series.length === 0 ? (
-          <p className="telemetry__empty">No body exposes this measurement.</p>
+          <p className="telemetry__empty">This measurement is unavailable for these objects.</p>
         ) : chart ? (
           <>
             <svg

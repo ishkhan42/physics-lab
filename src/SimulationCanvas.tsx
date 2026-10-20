@@ -1209,7 +1209,7 @@ export default function SimulationCanvas({
     const id = activeIdRef.current;
     if (!runtime || id === null || preparingRef.current || replacementPendingRef.current || playbackBlockedRef.current || canvasIssueRef.current) return;
     if (runningRef.current) {
-      stopSimulation('Paused by you. The inspection cards show the current solver state.');
+      stopSimulation('Paused. Values show the current state.');
       return;
     }
     if (runPendingRef.current) return;
@@ -1384,13 +1384,13 @@ export default function SimulationCanvas({
         {!runtimeRef.current ? (
           <div className="canvas-empty-state" role="status">
             <strong>{preparing ? 'Preparing your model' : canvasIssue || candidateError ? 'Preview unavailable' : 'No experiment yet'}</strong>
-            <p>{canvasIssue || candidateError || 'Describe an experiment, then press Build. You choose when to run it.'}</p>
+            <p>{canvasIssue || candidateError || 'Describe a setup and choose Build experiment.'}</p>
           </div>
         ) : null}
         {preparing && runtimeRef.current ? <div className="replacement-indicator" role="status">Preparing replacement. Current preview is paused and preserved.</div> : null}
         {candidateError && runtimeRef.current ? <div className="canvas-warning" role="alert">{candidateError}</div> : null}
         {environmentIssue ? <div className="canvas-warning" role="status">{environmentIssue}</div> : null}
-        <p className="canvas-help">{runtimeRef.current && (appearance ?? experiment?.scene.appearance ?? DEFAULT_APPEARANCE).grid ? <span className="grid-scale">Grid squares {gridCell} m. </span> : null}<span className="hint-pointer">Click an object to select. Drag to orbit. Scroll to zoom.</span><span className="hint-touch">Tap an object to select. Drag to orbit. Pinch to zoom.</span></p>
+        {runtimeRef.current ? <p className="canvas-help">{(appearance ?? experiment?.scene.appearance ?? DEFAULT_APPEARANCE).grid ? <span className="grid-scale">Grid squares {gridCell} m. </span> : null}<span className="hint-pointer">Click to select. Drag to orbit. Scroll to zoom.</span><span className="hint-touch">Tap to select. Drag to orbit. Pinch to zoom.</span></p> : null}
       </div>
       <div className="simulation-controls">
         <div className="playback-control">
@@ -1417,7 +1417,7 @@ export default function SimulationCanvas({
       </div>
       <div className="canvas-footer">
         <p className="canvas-status" role="status" aria-live="polite">
-          {canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? (throttled ? 'Running as fast as this device allows, slower than the selected speed. Every physics step is still computed.' : 'Running. Values and graphs update about twenty times per second.') : runtimeRef.current ? 'Paused at the initial state. Press Run when the setup looks right.' : 'No scene loaded.')}
+          {canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? (throttled ? 'Running below the selected speed on this device. No physics steps are skipped.' : 'Running. Values and graphs update as it moves.') : runtimeRef.current ? 'Paused at the start. Press Run to begin.' : 'The experiment opens paused.')}
         </p>
         <p className="keyboard-hint" aria-hidden="true"><kbd>Space</kbd> run <kbd>R</kbd> reset <kbd>F</kbd> fit</p>
       </div>

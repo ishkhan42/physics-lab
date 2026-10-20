@@ -52,6 +52,8 @@ Apple-inspired glass is an aesthetic reference, not a claim of an official Apple
 
 Accessibility constraints: readable properties and controls over glass surfaces, keyboard-operable controls, clear focus, and reduced-motion treatment for decorative animation. Motion must not obscure scientific state or force a student to follow moving UI to read a value.
 
+The polish pass preserves the light Geist/teal workbench and existing journey. Keep the composer free of repeated welcome text, collapse recent scenes by default, and show charts/cards only when an experiment is being prepared or is loaded. Use direct, specific language rather than promotional copy, canned introductions or decorative emphasis. Keep necessary assumptions, limitations, sharing and usage disclosures. Touch controls need at least 44px targets; narrow-screen form fields use 16px text.
+
 Source: `scope.md > Inspiration & Identity`.
 
 ## Features and Behavior
@@ -137,7 +139,7 @@ These criteria are requirements, not claims of an existing implementation or suc
 
 ## Approved Conventional Defaults
 
-- Before the first submitted scenario, show an empty canvas and an object-card empty state rather than a fabricated simulation or fabricated object values.
+- Before the first submitted scenario, show an empty canvas rather than a fabricated simulation or fabricated object values. The current polish defers charts and object cards until an experiment is being prepared.
 - If assembly fails, keep the student's prompt and show an understandable failure message rather than claiming scene readiness.
 
 These defaults were originally agent-proposed and approved by the user with the completed product definition.

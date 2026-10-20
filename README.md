@@ -70,13 +70,15 @@ Tests run one file at a time to bound simultaneous WASM/container work. They use
 
 ## Use
 
-1. Describe a mechanics situation, or fill an editable example prompt. Examples do not send a request or load a canned simulation.
+1. Describe a mechanics situation, or fill an editable example prompt. Examples do not send a request or load a canned simulation. The empty viewer stays uncluttered; charts and object cards appear once an experiment is being prepared.
 2. Press Build experiment, or Update experiment for a follow-up. The assistant shows its actual current activity and elapsed time beside the conversation, leaving the canvas visible. Detailed activity and AI settings are collapsed by default. OpenRouter's named free route remains the default unless connected-GPT mode was explicitly enabled; quota failures never silently select a paid model.
 3. Review the paused preview, visual action timeline, planned mass/speed values and native loaded-mass readout before Run. Missing details are asked about or explicitly assumed. Approximations remain visible; fuller assumptions and model notes are behind disclosures. A proposal only fills a draft and still needs your explicit submission.
    A physical plane at z=0 is included by default (ideal reference restitution 1, zero friction). An explicitly groundless model or custom replacement support may use `ground:null`; the checked scene is not silently rewritten afterward. Switch Ground on/off on the canvas to rebuild locally without another model request. The reference grid is not the ground collider.
 4. Press Run (or Space outside an editing control), choose a playback speed, and pause to inspect. Follow all initially keeps bodies and recorded paths in view; manual orbit, zoom or pan turns that overview tracking off. The grid grows with the scene and shows its square size. A slow device runs more slowly without skipping physics. Motion over time graphs actual solver samples at about20Hz. Reset clears selection and restores the initial state, view, trails and graphs without inference; Fit all (F) restores the overview.
 5. Ask for changes without rewriting the setup. The actual scene, saved human request, prior assumptions, measured initial state and recent conversation accompany the update, including after refresh. Old model mistakes are not treated as user intent. Conversation stays tab-local. Failed/canceled updates preserve your draft and existing preview; successful changes receive a fresh paused URL. Stop prevents further model turns and tears down the sandbox; already-sent provider work may still count toward usage.
-6. **Recent scenes** keeps up to eight links on this browser across refreshes. Opening one fetches the current saved record without another model request; a cached expiry never overrides renewal by another viewer.
+6. Open **Recent scenes** to see up to eight links kept on this browser across refreshes. The list starts collapsed so it does not crowd the composer. Opening a scene fetches its saved record without another model request; a cached expiry never overrides renewal by another viewer.
+
+Interface text uses short, direct instructions. The assistant is instructed to use plain text, describe the setup or change without promotional filler, and keep assumptions explicit with values and units. This guides model output; it is not a guarantee of every provider's wording.
 
 ### Surface and sky
 

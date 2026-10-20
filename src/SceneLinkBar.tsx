@@ -16,7 +16,7 @@ const DEADLINE_FORMAT = new Intl.DateTimeFormat(undefined, {
   month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
 });
 const OPERATION_LABELS = {
-  idle: 'Saved scene', saving: 'Saving scene', loading: 'Opening scene', renewing: 'Updating retention',
+  idle: 'Saved scene', saving: 'Saving scene', loading: 'Opening scene', renewing: 'Updating expiry',
 };
 
 export default function SceneLinkBar({ saved, operation, error, onRetry, onSaveCopy, onKeepPreviousLook }: SceneLinkBarProps) {
@@ -89,7 +89,7 @@ export default function SceneLinkBar({ saved, operation, error, onRetry, onSaveC
         ) : null}
       </div>
       <span className="visually-hidden" role="status" aria-live="polite">{saved && copiedFor === saved.id ? 'Scene link copied.' : ''}</span>
-      {saved ? <p className="scene-link-bar__help">Link holders can view the prompt and setup. Runs renew the 24-hour retention.</p> : null}
+      {saved ? <p className="scene-link-bar__help">Anyone with the link can see the prompt and setup. Running keeps it for another 24 hours.</p> : null}
       {saved && manualFor === saved.id ? (
         <label className="field scene-link-bar__manual">
           <span className="field-label">Select and copy this scene link</span>
