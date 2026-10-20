@@ -124,7 +124,7 @@
           </li>
           <li>
             <h3>Assemble and check</h3>
-            <p>The isolated agent uses bounded lab tools. Normal ready handoffs require native checks and independent model review. A rare checked-but-unsettled proposal needs explicit user acceptance before saving. Checks run a native 0.5-second warm-up, not the whole future experiment.</p>
+            <p>The isolated agent uses bounded lab tools. Normal ready handoffs require native checks and separate-context review by the selected model. A rare checked-but-unsettled proposal needs explicit user acceptance before saving. Checks run a native 0.5-second warm-up, not the whole future experiment.</p>
           </li>
           <li>
             <h3>Save paused, then run</h3>
@@ -167,8 +167,8 @@
       <section id="practice" aria-labelledby="practice-title">
         <p class="kicker">05 · A practice to reuse</p>
         <h2 id="practice-title">A valid model is not proof of the requested physics</h2>
-        <p>This project recorded a real gap: an earlier response treated an ideal elastic impact as unsupported even though the native engine could model it (<code>devpost/spec.md</code>, “MuJoCo Model Builder”). The native regression <code>tests/contacts.test.ts</code> — “sphere-plane restitution follows the lower pair coefficient at a selected impact speed” — measures restitution targets 0, 0.5 and 1. That evidence is stronger than executable output or schema validity alone.</p>
-        <p>Reusable approach: turn the request into observable conditions, compare actual native measurements and assumptions against those conditions, then inspect the setup yourself. The independent reviewer is another model, not human sign-off. Readiness covers the initial state and a 0.5-second warm-up; scheduled actions after that remain pending, and longer-term outcomes are not certified.</p>
+        <p>This project encountered a real limitation: the original catalog did not control elastic versus inelastic rebound. The calibrated material/contact layer added those numerical targets, verified by <code>tests/contacts.test.ts</code> — “sphere-plane restitution follows the lower pair coefficient at a selected impact speed” — at coefficients 0, 0.5 and 1. Measured behavior is stronger evidence than executable output or schema validity alone.</p>
+        <p>Reusable approach: turn the request into observable conditions, compare actual native measurements and assumptions against those conditions, then inspect the setup yourself. The reviewer is a separate call to the same selected model, not human sign-off. Readiness covers the initial state and a 0.5-second warm-up; scheduled actions after that remain pending, and longer-term outcomes are not certified.</p>
         <details>
           <summary>Optional transfer reflection</summary>
           <p>What would you do differently next time you start a project with an agent? This is optional; no response or personal learning claim is recorded by this page.</p>
