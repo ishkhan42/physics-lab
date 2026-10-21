@@ -206,6 +206,26 @@ test('an inextensible cable cannot silently discard elastic or damping parameter
   rejected(scene);
 });
 
+test('tendon visual options are optional, strict, and bounded', () => {
+  const base = atwood();
+  assert.equal(base.tendons[0]!.visual, undefined);
+  const empty = validateScene({
+    ...base, tendons: [{ ...base.tendons[0]!, visual: {} }],
+  });
+  assert.deepEqual(empty.tendons[0]!.visual, {});
+  const limits = validateScene({
+    ...base, tendons: [{ ...base.tendons[0]!, visual: { wireRadius: 100, coilRadius: 1000, turns: 64, forceScale: 1e12 } }],
+  });
+  assert.deepEqual(limits.tendons[0]!.visual, { wireRadius: 100, coilRadius: 1000, turns: 64, forceScale: 1e12 });
+  for (const visual of [
+    { wireRadius: 0 }, { wireRadius: 100.01 }, { wireRadius: Infinity }, { coilRadius: 0 }, { coilRadius: 1000.01 },
+    { turns: 1 }, { turns: 2.5 }, { turns: 65 }, { forceScale: 0 }, { forceScale: 1e12 + 1 },
+    { unknown: true },
+  ]) {
+    rejected({ ...base, tendons: [{ ...base.tendons[0]!, visual }] });
+  }
+});
+
 test('a translational point model cannot silently discard rotational loads', () => {
   const model = projectile();
   model.bodies[0].shape = { kind: 'point' };

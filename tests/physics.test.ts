@@ -232,6 +232,55 @@ test('generated initial world poses use zero joint coordinates without applying 
   }
 });
 
+test('rendered spring state carries signed native length and force; visual controls do not change motion', async () => {
+  const springScene = (restLength: number, anchorX: number, styled = false) => validateScene({
+    category: 'mechanics', title: 'Signed spring render state', gravity: [0, 0, 0], ground: null,
+    bodies: [{
+      id: 'mass', label: 'Sliding mass', position: [2, 0, 1], shape: { kind: 'sphere', radius: 0.05 }, mass: 1,
+      motion: { kind: 'slide', axis: [1, 0, 0], anchor: [0, 0, 1] },
+    }],
+    sites: [
+      { id: 'attached', label: 'Mass attachment', bodyId: 'mass', position: [0, 0, 0] },
+      { id: 'anchor', label: 'World anchor', bodyId: null, position: [anchorX, 0, 1] },
+    ],
+    tendons: [{
+      id: 'spring', label: 'Spatial spring', mode: 'spring', length: restLength, stiffness: 10, damping: 0,
+      path: [{ kind: 'site', siteId: 'attached' }, { kind: 'site', siteId: 'anchor' }],
+      ...(styled ? { visual: { wireRadius: 0.01, coilRadius: 0.1, turns: 8, forceScale: 25 } } : {}),
+    }],
+  });
+  const [stretched, styled, compressed] = await Promise.all([
+    createRuntime(springScene(1, 0)),
+    createRuntime(springScene(1, 0, true)),
+    createRuntime(springScene(2, 3)),
+  ]);
+  try {
+    const state = (runtime: MechanicsRuntime) => runtime.frame().find(item => item.entityId === 'spring')!.tendon!;
+    const stretchState = state(stretched);
+    const stretchSnapshot = stretched.snapshot();
+    assert.equal(stretchState.mode, 'spring');
+    assert.equal(stretchState.restLength, 1);
+    assert.equal(stretchState.length, scalarValue(stretchSnapshot, 'spring', 'Length'));
+    assert.equal(stretchState.force, scalarValue(stretchSnapshot, 'spring', 'Axial force'));
+    assert.ok(stretchState.force! > 0);
+    assert.deepEqual(styled.snapshot(), stretchSnapshot);
+
+    const compressionState = state(compressed);
+    const compressionSnapshot = compressed.snapshot();
+    assert.equal(compressionState.length, scalarValue(compressionSnapshot, 'spring', 'Length'));
+    assert.equal(compressionState.force, scalarValue(compressionSnapshot, 'spring', 'Axial force'));
+    assert.ok(compressionState.force! < 0);
+
+    simulate(stretched, 0.1, 1);
+    simulate(styled, 0.1, 1);
+    assert.deepEqual(styled.snapshot(), stretched.snapshot());
+  } finally {
+    stretched.dispose();
+    styled.dispose();
+    compressed.dispose();
+  }
+});
+
 test('routed Atwood cable has the measured acceleration and Jacobian-signed tension', async () => {
   const runtime = await createRuntime(atwood());
   try {
@@ -240,9 +289,89 @@ test('routed Atwood cable has the measured acceleration and Jacobian-signed tens
     assert.ok(Math.abs(vectorValue(snapshot, 'light', 'Position')[2] - 1.635) < 0.002);
     assert.ok(Math.abs(vectorValue(snapshot, 'heavy', 'Position')[2] + 1.635) < 0.002);
     assert.ok(Math.abs(scalarValue(snapshot, 'cord', 'Tension') - 13.08) < 0.05);
+    const render = runtime.frame().find(item => item.entityId === 'cord')!.tendon!;
+    assert.equal(render.mode, 'fixed');
+    assert.equal(render.length, scalarValue(snapshot, 'cord', 'Length'));
+    assert.equal(render.restLength, 6);
+    assert.equal(render.force, scalarValue(snapshot, 'cord', 'Tension'));
   } finally {
     runtime.dispose();
   }
+});
+
+test('fixed tendons render native compression with its negative sign', async () => {
+  const runtime = await createRuntime(validateScene({
+    category: 'mechanics', title: 'Compressed fixed tendon', gravity: [0, 0, 0], ground: null,
+    bodies: [{
+      id: 'mass', label: 'Sliding mass', position: [1, 0, 1], shape: { kind: 'sphere', radius: 0.05 }, mass: 1,
+      motion: { kind: 'slide', axis: [1, 0, 0], anchor: [0, 0, 1] },
+    }],
+    sites: [
+      { id: 'attached', label: 'Mass attachment', bodyId: 'mass', position: [0, 0, 0] },
+      { id: 'anchor', label: 'World anchor', bodyId: null, position: [0, 0, 1] },
+    ],
+    tendons: [{
+      id: 'fixed', label: 'Bilateral link', mode: 'fixed', length: 1, stiffness: 0, damping: 0,
+      path: [{ kind: 'site', siteId: 'attached' }, { kind: 'site', siteId: 'anchor' }],
+    }],
+    loads: [{ kind: 'force', bodyId: 'mass', vector: [-1, 0, 0], point: null }],
+  }));
+  try {
+    simulate(runtime, 0.01, 1);
+    const snapshot = runtime.snapshot();
+    const force = scalarValue(snapshot, 'fixed', 'Tension');
+    const render = runtime.frame().find(item => item.entityId === 'fixed')!.tendon!;
+    assert.ok(force < 0);
+    assert.equal(render.force, force);
+    assert.equal(render.length, scalarValue(snapshot, 'fixed', 'Length'));
+  } finally { runtime.dispose(); }
+});
+
+test('fixed tendon force stays unavailable when its native path has no generalized force', async () => {
+  const model = atwood();
+  model.sites.push(
+    { id: 'static_a', label: 'Static endpoint A', bodyId: null, position: [5, 0, 0] },
+    { id: 'static_b', label: 'Static endpoint B', bodyId: null, position: [6, 0, 0] },
+  );
+  model.tendons.push({
+    ...model.tendons[0]!, id: 'static', label: 'Static reference',
+    path: [{ kind: 'site', siteId: 'static_a' }, { kind: 'site', siteId: 'static_b' }],
+    length: 1,
+  });
+  const runtime = await createRuntime(model);
+  try {
+    const snapshot = runtime.snapshot();
+    const staticState = runtime.frame().find(item => item.entityId === 'static')!.tendon!;
+    const staticInspection = snapshot.entities.find(entity => entity.id === 'static')!;
+    assert.equal(staticState.force, null);
+    assert.ok(!staticInspection.properties.some(property => property.label === 'Tension'));
+  } finally { runtime.dispose(); }
+});
+
+test('pulley rendering scales the native axial force for each branch', async () => {
+  const model = atwood();
+  const tendon = model.tendons[0]!;
+  tendon.path = [
+    { kind: 'site', siteId: 'light_end' },
+    { kind: 'site', siteId: 'left_guide' },
+    { kind: 'pulley', divisor: 2 },
+    { kind: 'site', siteId: 'right_guide' },
+    { kind: 'site', siteId: 'heavy_end' },
+  ];
+  tendon.length = 3;
+  const runtime = await createRuntime(model);
+  try {
+    simulate(runtime, 0.5, 1);
+    const snapshot = runtime.snapshot();
+    const generalizedForce = scalarValue(snapshot, 'cord', 'Tension');
+    const branches = runtime.frame().filter(item => item.entityId === 'cord');
+    assert.equal(branches.length, 2);
+    assert.ok(Math.abs(generalizedForce) > 1);
+    assert.equal(branches[0]!.tendon!.force, generalizedForce);
+    assert.equal(branches[1]!.tendon!.force, generalizedForce / 2);
+    assert.equal(branches[0]!.tendon!.length, scalarValue(snapshot, 'cord', 'Length'));
+    assert.equal(branches[1]!.tendon!.length, scalarValue(snapshot, 'cord', 'Length'));
+  } finally { runtime.dispose(); }
 });
 
 test('equal simulated time is independent of playback speed and snapshots do not alias live state', async () => {
@@ -375,18 +504,27 @@ test('cable reaction remains observable with many independent degrees of freedom
   } finally { runtime.dispose(); }
 });
 
-test('a slack cable has zero tension and acquires tension when its limit activates', async () => {
+test('a slack cable has zero rendered tension and acquires native tension when its limit activates', async () => {
   const model = atwood();
-  model.tendons[0].mode = 'rope';
-  model.tendons[0].length = 7;
+  model.tendons[0]!.mode = 'rope';
+  model.tendons[0]!.length = 7;
   const runtime = await createRuntime(model);
   try {
     simulate(runtime, 0.1, 1);
-    assert.equal(scalarValue(runtime.snapshot(), 'cord', 'Tension'), 0);
-    assert.ok(scalarValue(runtime.snapshot(), 'cord', 'Length') < 7);
+    const slackSnapshot = runtime.snapshot();
+    const slack = runtime.frame().find(item => item.entityId === 'cord')!.tendon!;
+    assert.equal(scalarValue(slackSnapshot, 'cord', 'Tension'), 0);
+    assert.equal(slack.force, 0);
+    assert.equal(slack.restLength, 7);
+    assert.equal(slack.length, scalarValue(slackSnapshot, 'cord', 'Length'));
+    assert.ok(slack.length < 7);
     simulate(runtime, 0.5, 1);
-    assert.ok(Math.abs(scalarValue(runtime.snapshot(), 'cord', 'Tension') - 13.08) < 0.05);
-    assert.ok(Math.abs(scalarValue(runtime.snapshot(), 'cord', 'Length') - 7) < 0.001);
+    const loadedSnapshot = runtime.snapshot();
+    const loaded = runtime.frame().find(item => item.entityId === 'cord')!.tendon!;
+    assert.ok(Math.abs(scalarValue(loadedSnapshot, 'cord', 'Tension') - 13.08) < 0.05);
+    assert.equal(loaded.force, scalarValue(loadedSnapshot, 'cord', 'Tension'));
+    assert.notEqual(loaded.force, null);
+    assert.ok(Math.abs(scalarValue(loadedSnapshot, 'cord', 'Length') - 7) < 0.001);
   } finally { runtime.dispose(); }
 });
 
@@ -425,21 +563,79 @@ test('a point-particle inspection does not invent rotational state', async () =>
   } finally { runtime.dispose(); }
 });
 
-test('a cable leaving its guide renders only current physical path points', async () => {
+test('a cable leaving its guide renders reusable current paths with native wrap-edge flags', async () => {
   const runtime = await createRuntime(changingWrap());
   try {
-    const initial = runtime.frame().find(item => item.entityId === 'spring')!.points!;
+    const item = runtime.frame().find(item => item.entityId === 'spring')!;
+    const initial = item.points!;
+    const wrapped = item.tendon!.wrapped;
     assert.ok(initial.length > 2);
-    for (const point of initial.slice(1, -1)) assert.ok(Math.abs(Math.hypot(...point) - 0.5) < 1e-8);
+    assert.equal(wrapped.length, initial.length - 1);
+    assert.ok(wrapped.some(Boolean));
+    for (let edge = 0; edge < wrapped.length; edge++) if (wrapped[edge]) {
+      for (const pointIndex of [edge, edge + 1]) {
+        assert.ok(Math.abs(Math.hypot(...initial[pointIndex]!) - 0.5) < 1e-8);
+        const a = initial[edge]!;
+        const b = initial[edge + 1]!;
+        assert.ok(Math.hypot((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2) > 0.495);
+      }
+    }
     simulate(runtime, 2, 1);
-    const points = runtime.frame().find(item => item.entityId === 'spring')!.points!;
+    const current = runtime.frame().find(candidate => candidate.entityId === 'spring')!;
+    const points = current.points!;
     const endpoint = vectorValue(runtime.snapshot(), 'load', 'Position');
+    assert.equal(points, initial);
+    assert.equal(current.tendon!.wrapped, wrapped);
+    assert.equal(wrapped.length, points.length - 1);
+    assert.ok(wrapped.every(flag => !flag));
     assert.deepEqual(points[0], [-2, 0, 0]);
     assert.deepEqual(points.at(-1), endpoint);
     let drawnLength = 0;
     for (let index = 1; index < points.length; index++) {
-      drawnLength += Math.hypot(...points[index].map((value, axis) => value - points[index - 1][axis]));
+      drawnLength += Math.hypot(...points[index]!.map((value, axis) => value - points[index - 1]![axis]!));
     }
     assert.ok(Math.abs(drawnLength - scalarValue(runtime.snapshot(), 'spring', 'Length')) < 1e-8);
+  } finally { runtime.dispose(); }
+});
+
+test('a translated rotated cylinder wrap renders on its native world-space surface', async () => {
+  const center = [0.5, 0.25, 0.1];
+  const runtime = await createRuntime(validateScene({
+    category: 'mechanics', title: 'Rotated cylinder wrap', gravity: [0, 0, 0], ground: null,
+    bodies: [
+      { id: 'guide', label: 'Rotated cylinder', position: center, orientation: [Math.SQRT1_2, Math.SQRT1_2, 0, 0],
+        shape: { kind: 'cylinder', radius: 0.5, length: 1 }, mass: null, motion: { kind: 'fixed' } },
+      { id: 'load', label: 'Endpoint', position: [2.5, 0.25, 0.1], shape: { kind: 'sphere', radius: 0.05 }, mass: 1,
+        motion: { kind: 'free', linearVelocity: [0, 0, 0], angularVelocity: [0, 0, 0] } },
+    ],
+    sites: [
+      { id: 'left', label: 'Left end', bodyId: null, position: [-1.5, 0.25, 0.1] },
+      { id: 'right', label: 'Right end', bodyId: 'load', position: [0, 0, 0] },
+      { id: 'side', label: 'Wrap side', bodyId: null, position: [0.5, 0.25, 1.1] },
+    ],
+    tendons: [{
+      id: 'cord', label: 'Wrapped cord', mode: 'spring', length: 5, stiffness: 1, damping: 0,
+      path: [{ kind: 'site', siteId: 'left' }, { kind: 'wrap', bodyId: 'guide', sideSiteId: 'side' },
+        { kind: 'site', siteId: 'right' }],
+    }],
+  }));
+  try {
+    const item = runtime.frame().find(candidate => candidate.entityId === 'cord')!;
+    const points = item.points!;
+    const wrapped = item.tendon!.wrapped;
+    assert.equal(wrapped.length, points.length - 1);
+    assert.ok(wrapped.some(Boolean));
+    assert.deepEqual(points[0], [-1.5, 0.25, 0.1]);
+    assert.deepEqual(points.at(-1), [2.5, 0.25, 0.1]);
+    for (let edge = 0; edge < wrapped.length; edge++) if (wrapped[edge]) {
+      for (const pointIndex of [edge, edge + 1]) {
+        const point = points[pointIndex]!;
+        assert.ok(point.every(Number.isFinite));
+        assert.ok(Math.abs(Math.hypot(point[0] - center[0]!, point[2] - center[2]!) - 0.5) < 1e-8);
+        const a = points[edge]!;
+        const b = points[edge + 1]!;
+        assert.ok(Math.hypot((a[0] + b[0]) / 2 - center[0]!, (a[2] + b[2]) / 2 - center[2]!) > 0.495);
+      }
+    }
   } finally { runtime.dispose(); }
 });

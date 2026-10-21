@@ -224,6 +224,14 @@ Update mesh transforms from native state using reusable arrays/matrices. Do not 
 
 Update ordinary live observations at a modest cadence of about 20 Hz, plus an immediate coherent snapshot on ready/pause. Pose rendering is independent of this cadence. The motion graphs record only these solver snapshots (height, speed, translational kinetic energy for moving bodies), reset with the experiment or Reset, and never interpolate invented samples. Inspection remains read-only; no object dragging, property editing, rewind or history scrubbing is implied.
 
+### Loaded connector visuals
+
+`TendonVisual` sweeps reusable shaded tube buffers over native world-space routing, with spring coils on free spans, cord braid detail, and signed axial-load arrows. Native sphere/cylinder wrap arcs and pulley branch boundaries remain intact. Spring pitch follows the actual path; rope slack curvature is explicitly schematic. Joint reference links retain their distinct non-tendon guide rendering.
+
+`RenderItem.tendon` carries current native effective length, declared length, signed per-branch force (including pulley division), wrap-edge flags and optional presentation settings. Unknown force is not zero. The model's optional tendon `visual` fields control wire/coil radius, turns and relative-force scale, never mechanical properties. The native physical-check key excludes them; the image key retains them. Both the ordinary viewer and sandbox inspection use the same renderer and report the schematic/cosmetic limits.
+
+Keep dynamic geometry, current bounds and an unattached picking centerline reusable across frames. Compound visuals remain selectable through pixel-tolerant picking and delegate all owned GPU-resource disposal. Force arrows are illustrative glyphs, not extra bodies or forces; geometry updates must not create waves, state changes or time progression.
+
 ### Cosmetic environments
 
 `scene.appearance` is the closed `{surface,sky,textured,grid}` contract. Surface choices are ice, stone, concrete, asphalt, rubber and plain; sky choices are studio, day, overcast and sunset. Missing fields/scenes default to concrete/day/textured/grid-on without rewriting the stored record. The independent Reference grid switch hides visual guides and the scale caption, never the ground collider. The assistant uses stated material/friction context as a cosmetic cue, not a material-identification rule or permission to change physical coefficients, and preserves appearance on ordinary follow-ups.

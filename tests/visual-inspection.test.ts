@@ -7,7 +7,7 @@ import { runSandbox } from '../server/sandbox.ts';
 import { HarnessRequestSchema, ModelPurposeSchema } from '../shared/harness.ts';
 import { InlineSceneImageSchema, VisualInspectionRequestSchema, MAX_VISUAL_CALLS_PER_RUN, MAX_VISUAL_FRAMES_PER_RUN } from '../shared/visual-inspection.ts';
 import { validateDecision } from '../shared/scene.ts';
-import { projectile } from './fixtures.ts';
+import { changingWrap, projectile } from './fixtures.ts';
 
 const RequestSchema = z.object({ type: z.literal('model'), id: z.number(), purpose: ModelPurposeSchema, context: z.object({ messages: z.array(z.object({
   role: z.string(), content: z.unknown().optional(),
@@ -278,6 +278,47 @@ test('appearance-only edits render fresh ground images without reusing the previ
     }
     sandbox.send(id <= 2
       ? answer(id, 'inspect_scene', { decision: styled(id === 1), frames: [0] })
+      : answer(id, 'finish_experiment', { decision: clarification }));
+  }, new AbortController().signal);
+  try {
+    await sandbox.done;
+    assert.equal(compared, true);
+  } finally { sandbox.stop(); }
+});
+
+test('tendon visual-only edits refresh actual inspector renders', { timeout: 120000 }, async () => {
+  const model = { ...labModel('openrouter', 'example/model'), input: ['text', 'image'] as ('text' | 'image')[] };
+  const scene = changingWrap();
+  const first = validateDecision({
+    ...candidate,
+    scene: { ...scene, tendons: scene.tendons.map(tendon => ({
+      ...tendon, visual: { wireRadius: 0.006, coilRadius: 0.1, turns: 6, forceScale: 25 },
+    })) },
+  });
+  const second = structuredClone(first);
+  second.scene!.tendons[0]!.visual = { wireRadius: 0.02, coilRadius: 0.25, turns: 14, forceScale: 25 };
+  let firstImage = '';
+  let compared = false;
+  const sandbox = runSandbox({ type: 'init', request, model }, value => {
+    const parsed = RequestSchema.safeParse(value);
+    if (!parsed.success) return;
+    assert.equal(parsed.data.purpose, 'builder');
+    const id = parsed.data.id;
+    if (id > 1) {
+      const results = parsed.data.context.messages.map(message => ToolResultSchema.safeParse(message));
+      const latest = results.findLast(result => result.success && result.data.toolName === 'inspect_scene');
+      assert.ok(latest?.success && !latest.data.isError);
+      const images = latest.data.content.map(content => InlineSceneImageSchema.safeParse(content)).filter(result => result.success);
+      assert.equal(images.length, 1);
+      assert.ok(images[0]?.success);
+      if (id === 2) firstImage = images[0].data.data;
+      else {
+        assert.notEqual(images[0].data.data, firstImage);
+        compared = true;
+      }
+    }
+    sandbox.send(id <= 2
+      ? answer(id, 'inspect_scene', { decision: id === 1 ? first : second, frames: [0] })
       : answer(id, 'finish_experiment', { decision: clarification }));
   }, new AbortController().signal);
   try {

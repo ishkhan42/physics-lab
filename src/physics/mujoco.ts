@@ -15,6 +15,8 @@ const WARNING_LABELS: Record<number, string> = {
 const COMPLETED_STEP = { advanced: true, pauseReason: null } as const;
 const DEFERRED_STEP = { advanced: false, pauseReason: null } as const;
 const MAX_SNAPSHOT_CONTACTS = 64;
+const WRAP_ARC_SEGMENTS = 32;
+const TWO_PI = 2 * Math.PI;
 
 const wasmAsset = new URL('../../node_modules/@mujoco/mujoco/mujoco.wasm', import.meta.url);
 let modulePromise: Promise<MainModule> | undefined;
@@ -109,6 +111,9 @@ interface TendonBinding {
   id: number;
   equalityId: number | null;
   branches: RenderItem[];
+  branchDivisors: number[];
+  pointPools: Vec3[][];
+  pointCounts: number[];
 }
 
 interface ConnectionBinding {
@@ -193,6 +198,18 @@ function makeBodyItem(body: Body): RenderItem {
 
 function makeLineItem(id: string, label: string, color: string, points: number, entityId = id): RenderItem {
   return { id, entityId, label, color, shape: { kind: 'line' }, position: [0, 0, 0], quaternion: [0, 0, 0, 1], points: Array.from({ length: points }, () => [0, 0, 0] as Vec3) };
+}
+function makeTendonItem(id: string, tendon: Scene['tendons'][number]): RenderItem {
+  const item = makeLineItem(id, tendon.label, tendon.color, 0, tendon.id);
+  item.tendon = {
+    mode: tendon.mode,
+    length: 0,
+    restLength: tendon.length,
+    force: null,
+    wrapped: [],
+    ...(tendon.visual ? { visual: tendon.visual } : {}),
+  };
+  return item;
 }
 
 function coordinatesFor(mujoco: MainModule, model: MjModel, body: Body): { qpos: number; dof: number }[] {
@@ -536,17 +553,212 @@ function nonfiniteState(data: MjData): boolean {
 function makeTendonBindings(mujoco: MainModule, model: MjModel, scene: Scene): TendonBinding[] {
   return scene.tendons.map(tendon => {
     const id = idFor(mujoco, model, mujoco.mjtObj.mjOBJ_TENDON.value, tendon.id);
-    const branchCount = 1 + tendon.path.filter(part => part.kind === 'pulley').length;
+    const branchDivisors = [1];
+    for (const part of tendon.path) if (part.kind === 'pulley') branchDivisors.push(part.divisor);
     return {
       tendon,
       id,
       equalityId: tendon.mode === 'fixed'
         ? idFor(mujoco, model, mujoco.mjtObj.mjOBJ_EQUALITY.value, fixedTendonEqualityName(tendon.id))
         : null,
-      branches: Array.from({ length: branchCount }, (_, index) =>
-        makeLineItem(branchCount === 1 ? tendon.id : `${tendon.id}:branch:${index + 1}`, tendon.label, tendon.color, 0, tendon.id)),
+      branchDivisors,
+      pointPools: branchDivisors.map(() => []),
+      pointCounts: branchDivisors.map(() => 0),
+      branches: branchDivisors.map((_, index) =>
+        makeTendonItem(branchDivisors.length === 1 ? tendon.id : `${tendon.id}:branch:${index + 1}`, tendon)),
     };
   });
+}
+function resetTendonPaths(binding: TendonBinding): void {
+  for (let branchIndex = 0; branchIndex < binding.branches.length; branchIndex++) {
+    binding.pointCounts[branchIndex] = 0;
+  }
+}
+
+function appendTendonPoint(binding: TendonBinding, branchIndex: number, x: number, y: number, z: number, wrapped: boolean): void {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+    throw new Error('Native tendon path contains a non-finite point.');
+  }
+  const item = binding.branches[branchIndex]!;
+  const points = item.points!;
+  const index = binding.pointCounts[branchIndex]!;
+  const pool = binding.pointPools[branchIndex]!;
+  const point = pool[index] ?? (pool[index] = [0, 0, 0] as Vec3);
+  point[0] = x;
+  point[1] = y;
+  point[2] = z;
+  if (index) item.tendon!.wrapped[index - 1] = wrapped;
+  points[index] = point;
+  binding.pointCounts[branchIndex] = index + 1;
+}
+
+// MuJoCo records tangent endpoints; interpolate only consecutive points tagged with the same wrapping geom.
+function appendTendonWrapArc(
+  binding: TendonBinding, branchIndex: number, mujoco: MainModule, model: MjModel, data: MjData,
+  geomId: number, startIndex: number, endIndex: number, incomingIndex: number, outgoingIndex: number,
+): void {
+  if (geomId < 0 || geomId >= model.ngeom) throw new Error(`Native tendon wrap references invalid geom ${geomId}.`);
+  const type = model.geom_type[geomId];
+  if (type !== mujoco.mjtGeom.mjGEOM_SPHERE.value && type !== mujoco.mjtGeom.mjGEOM_CYLINDER.value) {
+    throw new Error(`Native tendon wrap geom ${geomId} is not a sphere or cylinder.`);
+  }
+  const radius = model.geom_size[geomId * 3];
+  if (!(radius > 0 && Number.isFinite(radius))) throw new Error(`Native tendon wrap geom ${geomId} has an invalid radius.`);
+  const center = data.geom_xpos;
+  const xmat = data.geom_xmat;
+  const positions = data.wrap_xpos;
+  const centerOffset = geomId * 3;
+  const matrixOffset = geomId * 9;
+  const startOffset = startIndex * 3;
+  const endOffset = endIndex * 3;
+  const incomingOffset = incomingIndex * 3;
+  const outgoingOffset = outgoingIndex * 3;
+  if (incomingIndex < 0 || outgoingIndex < 0 || outgoingOffset + 2 >= positions.length) {
+    throw new Error(`Native tendon wrap geom ${geomId} is missing a tangent endpoint.`);
+  }
+  const cx = center[centerOffset], cy = center[centerOffset + 1], cz = center[centerOffset + 2];
+  const x0 = positions[startOffset], y0 = positions[startOffset + 1], z0 = positions[startOffset + 2];
+  const x1 = positions[endOffset], y1 = positions[endOffset + 1], z1 = positions[endOffset + 2];
+  const ix = positions[incomingOffset], iy = positions[incomingOffset + 1], iz = positions[incomingOffset + 2];
+  const ox = positions[outgoingOffset], oy = positions[outgoingOffset + 1], oz = positions[outgoingOffset + 2];
+  if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(cz)
+    || !Number.isFinite(x0) || !Number.isFinite(y0) || !Number.isFinite(z0)
+    || !Number.isFinite(x1) || !Number.isFinite(y1) || !Number.isFinite(z1)
+    || !Number.isFinite(ix) || !Number.isFinite(iy) || !Number.isFinite(iz)
+    || !Number.isFinite(ox) || !Number.isFinite(oy) || !Number.isFinite(oz)) {
+    throw new Error(`Native tendon wrap geom ${geomId} has non-finite tangent data.`);
+  }
+
+  if (type === mujoco.mjtGeom.mjGEOM_SPHERE.value) {
+    const r0x = x0 - cx, r0y = y0 - cy, r0z = z0 - cz;
+    const r1x = x1 - cx, r1y = y1 - cy, r1z = z1 - cz;
+    const r0Length = Math.hypot(r0x, r0y, r0z);
+    const r1Length = Math.hypot(r1x, r1y, r1z);
+    if (!(r0Length > 1e-12 && r1Length > 1e-12) || !Number.isFinite(r0Length) || !Number.isFinite(r1Length)) {
+      throw new Error(`Native tendon wrap geom ${geomId} has a degenerate contact point.`);
+    }
+    const ux = r0x / r0Length, uy = r0y / r0Length, uz = r0z / r0Length;
+    const wx = r1x / r1Length, wy = r1y / r1Length, wz = r1z / r1Length;
+    let tx = x0 - ix, ty = y0 - iy, tz = z0 - iz;
+    let tangentProjection = tx * ux + ty * uy + tz * uz;
+    tx -= tangentProjection * ux;
+    ty -= tangentProjection * uy;
+    tz -= tangentProjection * uz;
+    let incomingLength = Math.hypot(tx, ty, tz);
+    let oxTangent = ox - x1, oyTangent = oy - y1, ozTangent = oz - z1;
+    tangentProjection = oxTangent * wx + oyTangent * wy + ozTangent * wz;
+    oxTangent -= tangentProjection * wx;
+    oyTangent -= tangentProjection * wy;
+    ozTangent -= tangentProjection * wz;
+    let outgoingLength = Math.hypot(oxTangent, oyTangent, ozTangent);
+    if (!(incomingLength > 1e-12) && !(outgoingLength > 1e-12)) {
+      throw new Error(`Native tendon wrap geom ${geomId} has no usable incoming or outgoing tangent.`);
+    }
+    let nx: number, ny: number, nz: number;
+    if (incomingLength > 1e-12) {
+      tx /= incomingLength;
+      ty /= incomingLength;
+      tz /= incomingLength;
+      nx = uy * tz - uz * ty;
+      ny = uz * tx - ux * tz;
+      nz = ux * ty - uy * tx;
+    } else {
+      oxTangent /= outgoingLength;
+      oyTangent /= outgoingLength;
+      ozTangent /= outgoingLength;
+      nx = wy * ozTangent - wz * oyTangent;
+      ny = wz * oxTangent - wx * ozTangent;
+      nz = wx * oyTangent - wy * oxTangent;
+    }
+    const normalLength = Math.hypot(nx, ny, nz);
+    if (!(normalLength > 1e-12)) throw new Error(`Native tendon wrap geom ${geomId} has no stable arc plane.`);
+    nx /= normalLength;
+    ny /= normalLength;
+    nz /= normalLength;
+    if (outgoingLength > 1e-12) {
+      const vx1 = ny * wz - nz * wy, vy1 = nz * wx - nx * wz, vz1 = nx * wy - ny * wx;
+      const outgoingAlignment = oxTangent * vx1 + oyTangent * vy1 + ozTangent * vz1;
+      if (outgoingAlignment < -1e-6) throw new Error(`Native tendon wrap geom ${geomId} has inconsistent tangent directions.`);
+    }
+    const vx = ny * uz - nz * uy, vy = nz * ux - nx * uz, vz = nx * uy - ny * ux;
+    const sine = nx * (uy * wz - uz * wy) + ny * (uz * wx - ux * wz) + nz * (ux * wy - uy * wx);
+    const cosine = Math.max(-1, Math.min(1, ux * wx + uy * wy + uz * wz));
+    let angle: number;
+    if (sine === 0 && cosine < 0) angle = Math.PI;
+    else if (sine === 0 && cosine > 0) angle = 0;
+    else {
+      angle = Math.atan2(sine, cosine);
+      if (angle < 0) angle += TWO_PI;
+    }
+    for (let step = 1; step <= WRAP_ARC_SEGMENTS; step++) {
+      if (step === WRAP_ARC_SEGMENTS) {
+        appendTendonPoint(binding, branchIndex, x1, y1, z1, true);
+      } else {
+        const t = step / WRAP_ARC_SEGMENTS;
+        const theta = angle * t;
+        const cosineTheta = Math.cos(theta), sineTheta = Math.sin(theta);
+        appendTendonPoint(binding, branchIndex,
+          cx + radius * (ux * cosineTheta + vx * sineTheta),
+          cy + radius * (uy * cosineTheta + vy * sineTheta),
+          cz + radius * (uz * cosineTheta + vz * sineTheta), true);
+      }
+    }
+    return;
+  }
+
+  const ax = xmat[matrixOffset + 2], ay = xmat[matrixOffset + 5], az = xmat[matrixOffset + 8];
+  const axisLength = Math.hypot(ax, ay, az);
+  if (!(axisLength > 1e-12) || !Number.isFinite(axisLength)) throw new Error(`Native tendon wrap geom ${geomId} has an invalid cylinder axis.`);
+  const axisX = ax / axisLength, axisY = ay / axisLength, axisZ = az / axisLength;
+  const d0x = x0 - cx, d0y = y0 - cy, d0z = z0 - cz;
+  const d1x = x1 - cx, d1y = y1 - cy, d1z = z1 - cz;
+  const axial0 = d0x * axisX + d0y * axisY + d0z * axisZ;
+  const axial1 = d1x * axisX + d1y * axisY + d1z * axisZ;
+  const r0x = d0x - axial0 * axisX, r0y = d0y - axial0 * axisY, r0z = d0z - axial0 * axisZ;
+  const r1x = d1x - axial1 * axisX, r1y = d1y - axial1 * axisY, r1z = d1z - axial1 * axisZ;
+  const r0Length = Math.hypot(r0x, r0y, r0z), r1Length = Math.hypot(r1x, r1y, r1z);
+  if (!(r0Length > 1e-12 && r1Length > 1e-12) || !Number.isFinite(r0Length) || !Number.isFinite(r1Length)) {
+    throw new Error(`Native tendon wrap geom ${geomId} has a degenerate contact point.`);
+  }
+  const ux = r0x / r0Length, uy = r0y / r0Length, uz = r0z / r0Length;
+  const wx = r1x / r1Length, wy = r1y / r1Length, wz = r1z / r1Length;
+  const dx = axisY * uz - axisZ * uy, dy = axisZ * ux - axisX * uz, dz = axisX * uy - axisY * ux;
+  const endDx = axisY * wz - axisZ * wy, endDy = axisZ * wx - axisX * wz, endDz = axisX * wy - axisY * wx;
+  const incomingDirection = (x0 - ix) * dx + (y0 - iy) * dy + (z0 - iz) * dz;
+  const outgoingDirection = (ox - x1) * endDx + (oy - y1) * endDy + (oz - z1) * endDz;
+  if (Math.abs(incomingDirection) <= 1e-12 && Math.abs(outgoingDirection) <= 1e-12) {
+    throw new Error(`Native tendon wrap geom ${geomId} has no usable incoming or outgoing tangent.`);
+  }
+  if (Math.abs(incomingDirection) > 1e-12 && Math.abs(outgoingDirection) > 1e-12
+    && incomingDirection * outgoingDirection < 0) {
+    throw new Error(`Native tendon wrap geom ${geomId} has inconsistent tangent directions.`);
+  }
+  const direction = Math.abs(incomingDirection) > 1e-12 ? incomingDirection : outgoingDirection;
+  const sine = axisX * (uy * wz - uz * wy) + axisY * (uz * wx - ux * wz) + axisZ * (ux * wy - uy * wx);
+  const cosine = Math.max(-1, Math.min(1, ux * wx + uy * wy + uz * wz));
+  let angle: number;
+  if (sine === 0 && cosine < 0) angle = direction > 0 ? Math.PI : -Math.PI;
+  else if (sine === 0 && cosine > 0) angle = 0;
+  else {
+    angle = Math.atan2(sine, cosine);
+    if (direction > 0 && angle < 0) angle += TWO_PI;
+    else if (direction < 0 && angle > 0) angle -= TWO_PI;
+  }
+  for (let step = 1; step <= WRAP_ARC_SEGMENTS; step++) {
+    if (step === WRAP_ARC_SEGMENTS) {
+      appendTendonPoint(binding, branchIndex, x1, y1, z1, true);
+    } else {
+      const t = step / WRAP_ARC_SEGMENTS;
+      const theta = angle * t;
+      const cosineTheta = Math.cos(theta), sineTheta = Math.sin(theta);
+      const radialX = radius * (ux * cosineTheta + dx * sineTheta);
+      const radialY = radius * (uy * cosineTheta + dy * sineTheta);
+      const radialZ = radius * (uz * cosineTheta + dz * sineTheta);
+      const axial = axial0 + (axial1 - axial0) * t;
+      appendTendonPoint(binding, branchIndex,
+        cx + axisX * axial + radialX, cy + axisY * axial + radialY, cz + axisZ * axial + radialZ, true);
+    }
+  }
 }
 
 function makeConnectionBindings(scene: Scene, bodyBindings: BodyBinding[]): ConnectionBinding[] {
@@ -1000,24 +1212,55 @@ class MuJoCoRuntime implements MechanicsRuntime {
     const wrapAddresses = this.data.ten_wrapadr;
     const wrapObjects = this.data.wrap_obj;
     for (const binding of this.tendonBindings) {
-      let branchIndex = 0;
-      let pointIndex = 0;
-      let points = binding.branches[0].points!;
-      const end = wrapAddresses[binding.id] + this.data.ten_wrapnum[binding.id];
-      for (let index = wrapAddresses[binding.id]; index < end; index++) {
-        if (wrapObjects[index] === -2) {
-          points.length = pointIndex;
-          const next = binding.branches[++branchIndex];
-          if (!next) throw new Error('Native cable branches do not match the compiled model.');
-          points = next.points!;
-          pointIndex = 0;
-        } else {
-          if (!points[pointIndex]) points[pointIndex] = [0, 0, 0];
-          setVec(points[pointIndex++], wrapPositions, index * 3);
-        }
+      const { tendon } = binding;
+      const length = this.data.ten_length[binding.id];
+      const velocity = this.data.ten_velocity[binding.id];
+      const generalizedForce = tendon.mode === 'spring'
+        ? tendon.stiffness * (length - tendon.length) + tendon.damping * velocity
+        : this.constraintObservationsValid ? this.tendonTension(binding) : null;
+      for (let branch = 0; branch < binding.branches.length; branch++) {
+        const state = binding.branches[branch]!.tendon!;
+        state.length = length;
+        state.restLength = tendon.length;
+        state.force = generalizedForce === null ? null : generalizedForce / binding.branchDivisors[branch]!;
       }
-      points.length = pointIndex;
+      resetTendonPaths(binding);
+      let branchIndex = 0;
+      let previousIndex = -1;
+      const start = wrapAddresses[binding.id];
+      const end = start + this.data.ten_wrapnum[binding.id];
+      for (let index = start; index < end; index++) {
+        const geomId = wrapObjects[index];
+        if (geomId === -2) {
+          if (!binding.branches[++branchIndex]) throw new Error('Native cable branches do not match the compiled model.');
+          previousIndex = -1;
+          continue;
+        }
+        if (!Number.isInteger(geomId) || geomId < -2) throw new Error('Native cable wrap data contains an invalid object tag.');
+        if (previousIndex >= start && wrapObjects[previousIndex] === geomId && geomId >= 0) {
+          const incomingIndex = previousIndex - 1;
+          const outgoingIndex = index + 1;
+          if (incomingIndex < start || outgoingIndex >= end
+            || wrapObjects[incomingIndex] !== -1 || wrapObjects[outgoingIndex] !== -1) {
+            throw new Error(`Native tendon wrap geom ${geomId} is missing a site tangent endpoint.`);
+          }
+          appendTendonWrapArc(binding, branchIndex, this.mujoco, this.model, this.data,
+            geomId, previousIndex, index, incomingIndex, outgoingIndex);
+          previousIndex = index;
+          continue;
+        }
+        if (geomId >= 0 && (index + 1 >= end || wrapObjects[index + 1] !== geomId)) {
+          throw new Error(`Native tendon wrap geom ${geomId} has an unpaired contact point.`);
+        }
+        appendTendonPoint(binding, branchIndex, wrapPositions[index * 3],
+          wrapPositions[index * 3 + 1], wrapPositions[index * 3 + 2], false);
+        previousIndex = index;
+      }
       if (branchIndex + 1 !== binding.branches.length) throw new Error('Native cable branch data is incomplete.');
+      for (let branch = 0; branch < binding.branches.length; branch++) {
+        binding.branches[branch]!.points!.length = binding.pointCounts[branch]!;
+        binding.branches[branch]!.tendon!.wrapped.length = Math.max(0, binding.pointCounts[branch]! - 1);
+      }
     }
     for (const binding of this.connectionBindings) {
       const { connection, bodyA, bodyB, renderItem } = binding;

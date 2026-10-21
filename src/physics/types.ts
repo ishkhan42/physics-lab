@@ -1,5 +1,19 @@
 import type { Quat, Scene, Shape, Vec3 } from '../../shared/scene.ts';
 
+export interface TendonRenderState {
+  mode: 'fixed' | 'rope' | 'spring';
+  /** Native effective path length, including pulley weighting. */
+  length: number;
+  /** Declared fixed target, rope maximum, or spring rest length. */
+  restLength: number;
+  /** Signed local branch axial force in newtons; positive is tension, negative compression, null unavailable. */
+  force: number | null;
+  /** True only for each points[i] → points[i + 1] native wrapped-arc edge. */
+  wrapped: boolean[];
+  /** Optional presentation-only controls from the scene tendon. */
+  visual?: Scene['tendons'][number]['visual'];
+}
+
 export interface RenderItem {
   id: string;
   entityId: string;
@@ -10,6 +24,7 @@ export interface RenderItem {
   /** Three.js order x,y,z,w, unlike model input w,x,y,z. */
   quaternion: Quat;
   points?: Vec3[];
+  tendon?: TendonRenderState;
   visible?: boolean;
   selectable?: boolean;
 }

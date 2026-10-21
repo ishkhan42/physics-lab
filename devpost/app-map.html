@@ -150,6 +150,7 @@
           <li>
             <h3>Watch the paused preview become observable</h3>
             <p>Back in <code>src/App.tsx</code>, search <code>saveSceneDocument</code> and <code>preparePreview</code>. <code>src/SimulationCanvas.tsx</code> prepares <code>createRuntime</code> and gates playback in <code>toggleRunning</code>. <code>src/ObjectCards.tsx</code> and <code>src/TelemetryPanel.tsx</code> display native observations and sampled motion. The preview begins paused; rendering or inspection does not itself run inference.</p>
+            <p>For loaded connectors, follow <code>src/physics/mujoco.ts</code> into <code>RenderItem.tendon</code> and <code>src/tendon-visuals.ts</code> — <code>TendonVisual</code>. Native routes and signed branch forces drive the shared viewer/inspection geometry. <code>shared/scene.ts</code> — <code>TendonSchema</code> exposes optional presentation-only controls; coils and slack bows do not add material or collision physics.</p>
           </li>
         </ol>
       </section>
@@ -186,7 +187,7 @@ npm run build
 npm start</code></pre>
         <p><code>npm start</code> runs the prestart hook to build/cache the sandbox image and serves the built app at <code>http://127.0.0.1:3001</code>. First sandbox setup needs registry access to fetch the Node base image and pinned packages. The worker container itself has no network access.</p>
         <p>For an authorized provider, use the secret-free <a href="../.env.example"><code>.env.example</code></a> as the server-side template; keep real credentials in a private file outside this public checkout. The map contains no credentials or private data. See <a href="../README.md">README.md</a> for configuration details.</p>
-        <p class="snapshot"><strong>Source snapshot:</strong> the existing runtime and tool route references above match the reviewed release checkpoint <a href="https://github.com/ishkhan42/physics-lab/tree/273d074"><code>273d074</code></a>. The example-library pointers describe additions after that checkpoint and were not present there. This map is versioned with the source and can drift as code changes.</p>
+        <p class="snapshot"><strong>Source snapshot:</strong> the original runtime and tool route references match the reviewed release checkpoint <a href="https://github.com/ishkhan42/physics-lab/tree/273d074"><code>273d074</code></a>. Example-library and loaded-connector visual pointers describe later additions and were not present there. This map is versioned with the source and can drift as code changes.</p>
       </section>
     </main>
     <footer>Standalone technical reference · no scripts, remote fonts, CDN, or network resources required for this page.</footer>

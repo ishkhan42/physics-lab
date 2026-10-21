@@ -659,9 +659,20 @@ details[open] > summary::after { margin-top: 3px; transform: rotate(-135deg); }
   .appearance-close { flex: 0 0 44px; }
   .speed-control input { height: 44px; }
 }
+.tendon-legend { position: absolute; top: 14px; left: 14px; z-index: 2; max-width: calc(100% - 28px); padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r); background: rgb(251 252 251 / 92%); color: var(--ink-2); box-shadow: var(--shadow-1); font-size: 11.5px; line-height: 1.35; pointer-events: none; }
+.tendon-legend > div, .tendon-legend span, .tendon-legend i { display: flex; align-items: center; }
+.tendon-legend > div { gap: 14px; }
+.tendon-legend span { gap: 5px; }
+.tendon-legend i { font-style: normal; }
+.tendon-legend i svg + svg { margin-left: -3px; }
+.tendon-legend small { display: block; margin-top: 4px; color: var(--ink-3); font-size: 10.5px; }
+@media (max-width: 640px) {
+  .tendon-legend { top: 68px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .assembly-progress, .canvas-tools .tool-button, .physical-ground-toggle, .canvas-help { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .assembly-progress, .canvas-tools .tool-button, .physical-ground-toggle, .canvas-help, .tendon-legend { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+

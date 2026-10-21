@@ -24,7 +24,7 @@ The personal learner profile is private and ignored; an ignore rule does not mak
 
 The mechanics lab supports real contacts, friction, recoil, scheduled launches/releases, timed impulses and continuous-load switching. The light workbench uses compact chat and a visual action timeline; saved scenes retain their 24-hour sliding lifetime. Pi works only with trusted lab tools inside a no-network sandbox. Native checks validate execution, not every natural-language interpretation or long-term physical outcome. Final learner approval remains in the [build checklist](devpost/checklist.md).
 
-Current production and inspection/Docker builds pass, along with **184 behavioral checks**. Browser verification opened all nine prepared setups without inference and checked provider-free playback, prompt drafts, save retry, delayed expiry replies, keyboard cancellation and 320px touch/reduced-motion layout. Prior clean-install and authenticated model checks remain in the [build checklist](devpost/checklist.md); this library verification does not claim fresh AI generation from the curated prompts or final learner approval.
+Current production and inspection/Docker builds pass, along with **199 behavioral checks**. Browser verification covers the prepared examples, provider-free playback, prompt drafts, save recovery, keyboard/mobile access, and native spring/cord deformation and load cues. Actual image-capable lab-tool captures exercise the same renderer inside the hardened sandbox. Prior clean-install and authenticated model checks remain in the [build checklist](devpost/checklist.md); these feature checks do not claim fresh model generation or final learner approval.
 
 The application never loads a pretend model when credentials are missing. Earlier browser checks used synthetic assembly responses only at the test boundary; the subsequent authenticated OpenRouter check used no interception or synthetic response. No fake provider is part of the app.
 
@@ -81,6 +81,20 @@ Tests run one file at a time to bound simultaneous WASM/container work. They use
 6. Open **Recent scenes** to see up to eight links kept on this browser across refreshes. The list starts collapsed so it does not crowd the composer. Opening a scene fetches its saved record without another model request; a cached expiry never overrides renewal by another viewer.
 
 Interface text uses short, direct instructions. The assistant is instructed to use plain text, describe the setup or change without promotional filler, and keep assumptions explicit with values and units. This guides model output; it is not a guarantee of every provider's wording.
+
+### Strings, tension and springs
+
+Actual tendons render automatically: spring-mode connectors have shaded round-wire coils that extend and compress with their native route; fixed and tension-only ropes have a solid cord surface. Wrapping follows the native sphere/cylinder route rather than cutting through its guide. Warm inward arrows indicate tension; cool outward arrows indicate compression. The cues are relative, not a calibrated force-to-pixel scale. Select a connector and open Values for its native length, extension and force in SI units.
+
+The model can optionally set presentation-only dimensions on a tendon:
+
+```json
+"visual": { "wireRadius": 0.006, "coilRadius": 0.06, "turns": 10, "forceScale": 25 }
+```
+
+Radii are in metres, turns control the spring winding count, and forceScale is the force reference in newtons for half-strength visual cues. Defaults work without adding these fields to old scenes. None changes stiffness, damping, mass, collision geometry, solver steps or the physical check key; visual inspection still sees the current style.
+
+Slack bows and coil shapes are schematic, not distributed cable, material-strain or wire self-contact simulations. An inextensible cord does not acquire physical stretch from these visuals. Use spring mode with actual stiffness for compliance, and rope mode for a tension-only constraint that can go slack. Thin joint-reference links remain reference guides, not independently simulated strings. Normal viewing and the assistant's image-capable inspection use the same geometry.
 
 ### Surface and sky
 

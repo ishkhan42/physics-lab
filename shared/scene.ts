@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { AppearanceSchema } from './appearance.ts';
-
 const number = z.number().finite();
 const positive = number.positive();
 const nonnegative = number.nonnegative();
@@ -16,6 +15,7 @@ const GroundSchema = z.strictObject({
   restitution: restitution.default(1),
   friction: FrictionSchema,
 });
+
 const id = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
 export const Vec3Schema = z.tuple([number, number, number]);
 export const QuatSchema = z.tuple([number, number, number, number]);
@@ -84,6 +84,12 @@ export const TendonSchema = z.strictObject({
   mode: z.enum(['fixed', 'rope', 'spring']).describe('Rope is a tension-only maximum-length constraint and may go slack; fixed is bilateral fixed length; spring uses a rest length. Only spring uses nonzero stiffness/damping.'),
   length: positive.describe('Native path/constraint length or spring rest length in metres, not a vertical drop/projection. Derive this from actual endpoint geometry (and any wrap/pulley routing).'),
   stiffness: nonnegative.default(0), damping: nonnegative.default(0),
+  visual: z.strictObject({
+    wireRadius: positive.max(100).optional().describe('Visual cord tube radius in metres; automatic when omitted. Appearance only, not wire mechanics.'),
+    coilRadius: positive.max(1000).optional().describe('Visual spring coil radius in metres; automatic when omitted. Appearance only, not material strain or collision geometry.'),
+    turns: number.int().min(2).max(64).optional().describe('Visual spring coil turns; defaults automatically. Appearance only.'),
+    forceScale: positive.max(1e12).optional().describe('Positive newtons at which the relative-force cue reaches half strength; defaults to 25 N and changes no tendon forces.'),
+  }).optional().describe('Optional presentation-only tendon appearance. Changes rendered detail, never physical shape/collisions, mass, stiffness, damping, or time.'),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#f2c178'),
 });
 export type Tendon = z.infer<typeof TendonSchema>;

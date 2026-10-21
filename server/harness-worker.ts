@@ -91,7 +91,7 @@ function endWithRecord(record: unknown, exitCode: number) {
 
 function sceneCheckKey(decision: Decision): string {
   return JSON.stringify([decision.kind, decision.scene], (key, value) =>
-    key === 'title' || key === 'label' || key === 'color' || key === 'appearance' ? undefined : value);
+    key === 'title' || key === 'label' || key === 'color' || key === 'appearance' || key === 'visual' ? undefined : value);
 }
 type WorkerResult = { decision: Decision; verification?: VerificationReceipt } | { proposal: ReviewProposal };
 

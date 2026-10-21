@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, CornersOut, Crosshair, Eye, Pause, Play, X } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, ArrowLeft, ArrowRight, CornersOut, Crosshair, Eye, Pause, Play, X } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   CanvasTexture,
@@ -43,6 +43,7 @@ import { updateMarkers, type Marked } from './markers.ts';
 import { DEFAULT_APPEARANCE, type Appearance } from '../shared/appearance.ts';
 import { SceneEnvironment } from './environment.ts';
 import AppearanceControls from './AppearanceControls.tsx';
+import { TendonVisual, TENDON_COMPRESSION_COLOR, TENDON_TENSION_COLOR } from './tendon-visuals.ts';
 
 export interface CanvasExperiment {
   id: number;
@@ -100,6 +101,7 @@ interface VisualSet {
   group: Group;
   objects: Map<string, Object3D>;
   lines: Map<string, Line>;
+  tendons: Map<string, TendonVisual>;
   tracks: Track[];
   marked: Marked[];
   markerBatch: Points<BufferGeometry, PointsMaterial>;
@@ -144,16 +146,24 @@ function describeError(error: unknown): string {
 }
 
 function disposeGroup(group: Group): void {
-  group.traverse(object => {
-    if (!(object instanceof Mesh) && !(object instanceof Line) && !(object instanceof Points)) return;
-    object.geometry.dispose();
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    for (const material of materials) if (!material.userData.environmentOwned) material.dispose();
-  });
+  const dispose = (object: Object3D) => {
+    if (object instanceof TendonVisual) {
+      object.dispose();
+      return;
+    }
+    if (object instanceof Mesh || object instanceof Line || object instanceof Points) {
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) if (!material.userData.environmentOwned) material.dispose();
+    }
+    for (let index = object.children.length - 1; index >= 0; index--) dispose(object.children[index]);
+  };
+  dispose(group);
   group.removeFromParent();
 }
 
 function createVisual(item: RenderItem): Object3D {
+  if (item.tendon) return new TendonVisual(item);
   if (item.shape.kind === 'line') {
     const points = item.points ?? [];
     const geometry = new BufferGeometry();
@@ -219,6 +229,7 @@ function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet
   const group = new Group();
   const objects = new Map<string, Object3D>();
   const lines = new Map<string, Line>();
+  const tendons = new Map<string, TendonVisual>();
   const tracks: Track[] = [];
   const marked: Marked[] = [];
   const planes: Mesh[] = [];
@@ -238,7 +249,10 @@ function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet
       if (objects.has(item.id)) throw new Error(`The runtime returned a duplicate render ID: ${item.id}.`);
       const object = createVisual(item);
       object.visible = item.visible !== false;
-      if (object instanceof Line) {
+      if (object instanceof TendonVisual) {
+        tendons.set(item.id, object);
+        if (item.selectable !== false) pickTargets.push({ entityId: item.entityId, object, pickLine: object.pickLine });
+      } else if (object instanceof Line) {
         object.position.set(0, 0, 0);
         object.quaternion.identity();
         lines.set(item.id, object);
@@ -276,7 +290,7 @@ function createVisualSet(items: RenderItem[], movingIds: Set<string>): VisualSet
       objects.set(item.id, object);
       group.add(object);
     }
-    const visuals = { group, objects, lines, tracks, marked, markerBatch, planes, pickTargets };
+    const visuals = { group, objects, lines, tendons, tracks, marked, markerBatch, planes, pickTargets };
     clearTrails(visuals);
     return visuals;
   } catch (error) {
@@ -328,7 +342,7 @@ function sceneBounds(visuals: VisualSet): Box3 {
   for (const object of visuals.objects.values()) {
     if (!object.visible) continue;
     if (object instanceof Mesh && object.geometry instanceof PlaneGeometry) bounds.expandByPoint(object.getWorldPosition(point));
-    else bounds.expandByObject(object, true);
+    else bounds.expandByObject(object, !(object instanceof TendonVisual));
   }
   for (const track of visuals.tracks) if (track.object.visible) bounds.union(track.bounds);
   return bounds;
@@ -359,6 +373,12 @@ function scaleReferences(visuals: VisualSet, grid: Object3D, radius: number): nu
 
 function applyFrame(items: RenderItem[], visuals: VisualSet): void {
   for (const item of items) {
+    const tendon = visuals.tendons.get(item.id);
+    if (tendon) {
+      tendon.visible = item.visible !== false;
+      tendon.update(item);
+      continue;
+    }
     const line = visuals.lines.get(item.id);
     if (line) {
       line.visible = item.visible !== false;
@@ -667,7 +687,8 @@ export default function SimulationCanvas({
     const snapshot = runtime.snapshot();
     setTime(snapshot.time);
     callbacksRef.current.onSnapshot(id, snapshot);
-    const extraNotes = [focusNote, environmentIssueRef.current].filter((note): note is string => Boolean(note));
+    const tendonNote = runtime.scene.tendons.length ? 'Connector thickness, spring coils and slack curves are schematic, not collision geometry or a distributed material simulation. Color and arrows show relative signed branch force; native length and force values are authoritative.' : null;
+    const extraNotes = [focusNote, environmentIssueRef.current, tendonNote].filter((note): note is string => Boolean(note));
     const notes = [...snapshot.notes.slice(0, 6 - extraNotes.length), ...extraNotes];
     return {
       simulatedAt: snapshot.time,
@@ -1392,6 +1413,15 @@ export default function SimulationCanvas({
         {candidateError && runtimeRef.current ? <div className="canvas-warning" role="alert">{candidateError}</div> : null}
         {environmentIssue ? <div className="canvas-warning" role="status">{environmentIssue}</div> : null}
         {runtimeRef.current ? <p className="canvas-help">{(appearance ?? experiment?.scene.appearance ?? DEFAULT_APPEARANCE).grid ? <span className="grid-scale">Grid squares {gridCell} m. </span> : null}<span className="hint-pointer">Click to select. Drag to orbit. Scroll to zoom.</span><span className="hint-touch">Tap to select. Drag to orbit. Pinch to zoom.</span></p> : null}
+        {runtimeRef.current?.scene.tendons.length ? (
+          <div className="tendon-legend" role="note" aria-label="Relative connector force: inward arrows show tension, outward arrows show compression. Slack curves are schematic.">
+            <div>
+              <span><i style={{ color: TENDON_TENSION_COLOR }}><ArrowRight size={13} aria-hidden="true" /><ArrowLeft size={13} aria-hidden="true" /></i>Tension</span>
+              <span><i style={{ color: TENDON_COMPRESSION_COLOR }}><ArrowLeft size={13} aria-hidden="true" /><ArrowRight size={13} aria-hidden="true" /></i>Compression</span>
+            </div>
+            <small>Relative force · slack curves are schematic</small>
+          </div>
+        ) : null}
       </div>
       <div className="simulation-controls">
         <div className="playback-control">

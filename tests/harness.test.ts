@@ -168,6 +168,23 @@ test('cached physics still validates metadata and cosmetic final changes do not 
   let observedMetadataRejection = false;
   let nativeChecks = 0;
   let terminal = false;
+  const visualCandidate = validateDecision({
+    ...scheduledDecision,
+    scene: {
+      ...scheduledDecision.scene!,
+      sites: [
+        { id: 'spring_end', label: 'Spring attachment', bodyId: 'ball', position: [0, 0, 0] },
+        { id: 'spring_anchor', label: 'Spring anchor', bodyId: null, position: [1, 0, 20] },
+      ],
+      tendons: [{
+        id: 'spring', label: 'Spatial spring', mode: 'spring', length: 1, stiffness: 1, damping: 0,
+        path: [{ kind: 'site', siteId: 'spring_end' }, { kind: 'site', siteId: 'spring_anchor' }],
+      }],
+    },
+  });
+  const revisedVisualCandidate = structuredClone(visualCandidate);
+  visualCandidate.scene!.tendons[0]!.visual = { wireRadius: 0.005, coilRadius: 0.05, turns: 6, forceScale: 25 };
+  revisedVisualCandidate.scene!.tendons[0]!.visual = { wireRadius: 0.02, coilRadius: 0.1, turns: 12, forceScale: 50 };
   const sandbox = runSandbox(init, value => {
     if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'progress'
       && 'stage' in value && value.stage === 'simulating') nativeChecks++;
@@ -193,10 +210,11 @@ test('cached physics still validates metadata and cosmetic final changes do not 
       observedMetadataRejection = results.some(parsed => parsed.success && parsed.data.toolName === 'finish_experiment' && parsed.data.isError);
       assert.equal(terminal, false);
     }
+    const styled = request.data.id === 3 ? revisedVisualCandidate : visualCandidate;
     const candidate = request.data.id === 2
-      ? { ...scheduledDecision, question: 'An unresolved question.' }
-      : { ...scheduledDecision, scene: { ...scheduledDecision.scene!, title: `Updated display title ${request.data.id}`,
-        appearance: request.data.id === 1 ? scheduledDecision.scene!.appearance : { surface: 'rubber', sky: 'sunset', textured: false } } };
+      ? { ...visualCandidate, question: 'An unresolved question.' }
+      : { ...styled, scene: { ...styled.scene!, title: `Updated display title ${request.data.id}`,
+        appearance: request.data.id === 1 ? visualCandidate.scene!.appearance : { surface: 'rubber', sky: 'sunset', textured: false } } };
     const tool = request.data.id === 1 ? 'check_experiment' : 'finish_experiment';
     for (const event of response(request.data.id, tool, { decision: candidate })) sandbox.send(event);
   }, new AbortController().signal);

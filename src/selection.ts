@@ -4,6 +4,8 @@ export interface PickTarget {
   entityId: string;
   object: Object3D;
   marker?: Points;
+  /** Compound connector visuals own a current, unrendered centerline for pixel-tolerant picking. */
+  pickLine?: Line;
 }
 
 export function entityBounds(targets: PickTarget[], entityId: string, bounds: Box3): Box3 {
@@ -49,14 +51,17 @@ export class ScenePicker {
     for (const target of targets) {
       if (!target.object.visible) continue;
       target.object.updateWorldMatrix(true, false);
-      if (target.object instanceof Line) {
-        target.object.geometry.computeBoundingSphere();
-        const sphere = target.object.geometry.boundingSphere;
-        if (sphere) this.projected.copy(sphere.center).applyMatrix4(target.object.matrixWorld);
+      const line = target.pickLine ?? (target.object instanceof Line ? target.object : null);
+      if (line) {
+        if (target.pickLine) line.updateWorldMatrix(true, false);
+        else line.geometry.computeBoundingSphere();
+        const sphere = line.geometry.boundingSphere;
+        if (sphere) this.projected.copy(sphere.center).applyMatrix4(line.matrixWorld);
         this.raycaster.params.Line.threshold = Math.max(camera.position.distanceTo(this.projected), camera.near) / pixelsAtOne * 6;
       }
       this.intersections.length = 0;
       this.raycaster.intersectObject(target.object, false, this.intersections);
+      if (target.pickLine) this.raycaster.intersectObject(target.pickLine, false, this.intersections);
       for (const hit of this.intersections) if (hit.distance < closest) { closest = hit.distance; selected = target.entityId; }
     }
     return selected;

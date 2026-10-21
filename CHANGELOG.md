@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Render actual tendons as shaded round-wire springs and detailed cords, with native signed tension/compression arrows and schematic slack. Existing scenes receive the visuals automatically.
+- Expose optional model-facing wire radius, coil radius, winding count and relative-force reference without changing mechanics or native-check fingerprints. Image inspection uses the same geometry and refreshes when the style changes.
+- Follow native sphere/cylinder wrapping, preserve routed anchors, and reuse geometry/bounds buffers. Keep compound connectors selectable and GPU-resource disposal explicit.
 - Add a bundled library of five prepared mechanics studies and four comparison setups. Explicit **Open setup** saves a new immutable paused copy without model inference or provider credentials; **Start from prompt** fills a fresh editable draft without saving or sending it. Ordinary AI composition and its real failure handling remain unchanged.
 - Keep example actions available during background expiry renewal and prevent late replies from undoing a new draft. Native dialog keyboard handling preserves the underlying selection and draft on cancellation.
 
