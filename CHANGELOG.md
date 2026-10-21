@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Add a bundled library of five prepared mechanics studies and four comparison setups. Explicit **Open setup** saves a new immutable paused copy without model inference or provider credentials; **Start from prompt** fills a fresh editable draft without saving or sending it. Ordinary AI composition and its real failure handling remain unchanged.
+- Keep example actions available during background expiry renewal and prevent late replies from undoing a new draft. Native dialog keyboard handling preserves the underlying selection and draft on cancellation.
 
 - Polish the light workbench without replacing its visual system: remove repeated welcome/category text, collapse recent scenes and defer empty charts/cards until an experiment exists.
 - Improve conversation readability, reduce the desktop viewer's height, enlarge touch targets and use 16px narrow-screen form text.

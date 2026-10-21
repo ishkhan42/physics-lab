@@ -1,0 +1,1914 @@
+[
+  {
+    "id": "rebound",
+    "title": "Stacked-ball rebound",
+    "question": "How can the small ball rebound above its release height?",
+    "setups": [
+      {
+        "id": "elastic-ground",
+        "label": "Elastic ground",
+        "prompt": "Create two rigid dynamic spheres on the same vertical line above a real fixed horizontal ground plane at z=0 m. Release both from rest: the lower Heavy ball has mass 2 kg, radius 0.18 m and center [0,0,1] m; the upper Light ball has mass 0.1 kg, radius 0.07 m and center [0,0,1.26] m, leaving a 0.01 m surface gap. Use Earth gravity [0,0,-9.81] m/s², zero air drag and zero damping. Both spheres have normal restitution 1; set ground restitution to 1. Set sliding and static friction coefficients, torsional friction and rolling friction to zero for both spheres and the ground. Give both balls zero initial linear and angular velocity; add no impulse, spring, or prescribed velocity. Keep a physical ground collider, plain studio appearance, visible reference grid and distinct readable ball colors.",
+        "summary": "Two vertically aligned spheres fall together; elastic ground and sphere contacts produce the Galilean-cannon rebound.",
+        "assumptions": [
+          "The balls are rigid dynamic spheres with the specified radii and masses; both start from rest with no spin.",
+          "Contact restitution and zero-friction values are finite-step native solver targets; no other loads or damping are present."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Galilean-cannon rebound",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 1,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "heavy",
+              "label": "Heavy ball",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                1
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.18
+              },
+              "mass": 2,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#3978d4"
+            },
+            {
+              "id": "light",
+              "label": "Light ball",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                1.26
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#f1a340"
+            }
+          ],
+          "sites": [],
+          "tendons": [],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Run for about 4 seconds, then compare the Height graph with the other ground setting."
+      },
+      {
+        "id": "non-rebounding-ground",
+        "label": "Non-rebounding ground",
+        "prompt": "Create two rigid dynamic spheres on the same vertical line above a real fixed horizontal ground plane at z=0 m. Release both from rest: the lower Heavy ball has mass 2 kg, radius 0.18 m and center [0,0,1] m; the upper Light ball has mass 0.1 kg, radius 0.07 m and center [0,0,1.26] m, leaving a 0.01 m surface gap. Use Earth gravity [0,0,-9.81] m/s², zero air drag and zero damping. Both spheres have normal restitution 1; set ground restitution to 0. Set sliding and static friction coefficients, torsional friction and rolling friction to zero for both spheres and the ground. Give both balls zero initial linear and angular velocity; add no impulse, spring, or prescribed velocity. Keep a physical ground collider, plain studio appearance, visible reference grid and distinct readable ball colors.",
+        "summary": "The same balls and release conditions meet a zero-restitution ground while their mutual contact remains elastic.",
+        "assumptions": [
+          "The balls are rigid dynamic spheres with the specified radii and masses; both start from rest with no spin.",
+          "Only ground restitution differs; all restitution values are finite-step contact targets, with zero friction, drag, damping and applied loads."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Galilean-cannon rebound",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 0,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "heavy",
+              "label": "Heavy ball",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                1
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.18
+              },
+              "mass": 2,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#3978d4"
+            },
+            {
+              "id": "light",
+              "label": "Light ball",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                1.26
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#f1a340"
+            }
+          ],
+          "sites": [],
+          "tendons": [],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Run for about 4 seconds, then compare the Height graph with the other ground setting."
+      }
+    ]
+  },
+  {
+    "id": "pulley",
+    "title": "Pulley and hanging masses",
+    "question": "Why does doubling both masses keep the acceleration but change the cord tension?",
+    "setups": [
+      {
+        "id": "2kg-3kg",
+        "label": "2 kg / 3 kg",
+        "prompt": "Create an ideal Atwood arrangement in Earth gravity [0,0,-9.81] m/s². A Light mass sphere of 2 kg and radius 0.12 m starts at [-0.5,0,5] m; a Heavy mass sphere of 3 kg and radius 0.12 m starts at [0.5,0,5] m. Both are released from rest and constrained to slide only vertically along z at their fixed x coordinates, with zero guide stiffness and damping. Put fixed, frictionless, massless point guides at [-0.5,0,7] m and [0.5,0,7] m. Attach a cord site to each mass center and use world-fixed sites at the guide points. Route one visible native spatial tendon in this order: Light mass site → left guide → right guide → Heavy mass site. Use mode fixed, the bilateral inextensible constraint (not a spring or one-sided rope), with exactly 5.0 m total path length: 2 m + 1 m + 2 m. Give it zero stiffness and damping; this is one massless cord over ideal point guides, not finite-radius wheels, and the rendered cord must be the constrained tendon. Use ground at z=0 m, ground restitution 1, mass restitution 0, and zero sliding/static/torsional/rolling friction on ground and masses. Keep the ground initially clear of both masses. Add no air drag, forces or impulses. Use plain studio lighting, visible grid, and distinct colors.",
+        "summary": "A 2 kg Light mass and 3 kg Heavy mass move vertically on guides under one 5 m inextensible routed cord.",
+        "assumptions": [
+          "The masses are 0.12 m-radius spheres; the guide points are fixed, frictionless and massless, with no pulley-wheel inertia.",
+          "The cord is one fixed-length native tendon; ground is initially clear and no air drag or added forces act."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Primary 2 kg / 3 kg Atwood setup",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 1,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "light",
+              "label": "Light mass",
+              "parentId": null,
+              "position": [
+                -0.5,
+                0,
+                5
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.12
+              },
+              "mass": 2,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "slide",
+                "axis": [
+                  0,
+                  0,
+                  1
+                ],
+                "anchor": [
+                  -0.5,
+                  0,
+                  5
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#37A7E8"
+            },
+            {
+              "id": "heavy",
+              "label": "Heavy mass",
+              "parentId": null,
+              "position": [
+                0.5,
+                0,
+                5
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.12
+              },
+              "mass": 3,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "slide",
+                "axis": [
+                  0,
+                  0,
+                  1
+                ],
+                "anchor": [
+                  0.5,
+                  0,
+                  5
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#E85C5C"
+            }
+          ],
+          "sites": [
+            {
+              "id": "lightSite",
+              "label": "Light mass cord site",
+              "bodyId": "light",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "leftGuide",
+              "label": "Left fixed guide point",
+              "bodyId": null,
+              "position": [
+                -0.5,
+                0,
+                7
+              ]
+            },
+            {
+              "id": "rightGuide",
+              "label": "Right fixed guide point",
+              "bodyId": null,
+              "position": [
+                0.5,
+                0,
+                7
+              ]
+            },
+            {
+              "id": "heavySite",
+              "label": "Heavy mass cord site",
+              "bodyId": "heavy",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "tendons": [
+            {
+              "id": "cord",
+              "label": "Continuous inextensible cord",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "lightSite"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "leftGuide"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "rightGuide"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "heavySite"
+                }
+              ],
+              "mode": "fixed",
+              "length": 5,
+              "stiffness": 0,
+              "damping": 0,
+              "color": "#F2C178"
+            }
+          ],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Pause within the first second, before a mass reaches a guide. Inspect the cord's Tension value. The guides are ideal fixed points."
+      },
+      {
+        "id": "4kg-6kg",
+        "label": "4 kg / 6 kg",
+        "prompt": "Create an ideal Atwood arrangement in Earth gravity [0,0,-9.81] m/s². A Light mass sphere of 4 kg and radius 0.12 m starts at [-0.5,0,5] m; a Heavy mass sphere of 6 kg and radius 0.12 m starts at [0.5,0,5] m. Both are released from rest and constrained to slide only vertically along z at their fixed x coordinates, with zero guide stiffness and damping. Put fixed, frictionless, massless point guides at [-0.5,0,7] m and [0.5,0,7] m. Attach a cord site to each mass center and use world-fixed sites at the guide points. Route one visible native spatial tendon in this order: Light mass site → left guide → right guide → Heavy mass site. Use mode fixed, the bilateral inextensible constraint (not a spring or one-sided rope), with exactly 5.0 m total path length: 2 m + 1 m + 2 m. Give it zero stiffness and damping; this is one massless cord over ideal point guides, not finite-radius wheels, and the rendered cord must be the constrained tendon. Use ground at z=0 m, ground restitution 1, mass restitution 0, and zero sliding/static/torsional/rolling friction on ground and masses. Keep the ground initially clear of both masses. Add no air drag, forces or impulses. Use plain studio lighting, visible grid, and distinct colors.",
+        "summary": "A 4 kg Light mass and 6 kg Heavy mass use the same geometry, guides and 5 m fixed-length cord.",
+        "assumptions": [
+          "The masses are 0.12 m-radius spheres; the guide points are fixed, frictionless and massless, with no pulley-wheel inertia.",
+          "Only the hanging masses differ from the 2 kg / 3 kg setup; the cord, geometry and release conditions are unchanged."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "4 kg / 6 kg Atwood setup",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 1,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "light",
+              "label": "Light mass",
+              "parentId": null,
+              "position": [
+                -0.5,
+                0,
+                5
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.12
+              },
+              "mass": 4,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "slide",
+                "axis": [
+                  0,
+                  0,
+                  1
+                ],
+                "anchor": [
+                  -0.5,
+                  0,
+                  5
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#37A7E8"
+            },
+            {
+              "id": "heavy",
+              "label": "Heavy mass",
+              "parentId": null,
+              "position": [
+                0.5,
+                0,
+                5
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.12
+              },
+              "mass": 6,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "slide",
+                "axis": [
+                  0,
+                  0,
+                  1
+                ],
+                "anchor": [
+                  0.5,
+                  0,
+                  5
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#E85C5C"
+            }
+          ],
+          "sites": [
+            {
+              "id": "lightSite",
+              "label": "Light mass cord site",
+              "bodyId": "light",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "leftGuide",
+              "label": "Left fixed guide point",
+              "bodyId": null,
+              "position": [
+                -0.5,
+                0,
+                7
+              ]
+            },
+            {
+              "id": "rightGuide",
+              "label": "Right fixed guide point",
+              "bodyId": null,
+              "position": [
+                0.5,
+                0,
+                7
+              ]
+            },
+            {
+              "id": "heavySite",
+              "label": "Heavy mass cord site",
+              "bodyId": "heavy",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "tendons": [
+            {
+              "id": "cord",
+              "label": "Continuous inextensible cord",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "lightSite"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "leftGuide"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "rightGuide"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "heavySite"
+                }
+              ],
+              "mode": "fixed",
+              "length": 5,
+              "stiffness": 0,
+              "damping": 0,
+              "color": "#F2C178"
+            }
+          ],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Pause within the first second, before a mass reaches a guide. Inspect the cord's Tension value. The guides are ideal fixed points."
+      }
+    ]
+  },
+  {
+    "id": "moving-spring",
+    "title": "Spring-coupled carts",
+    "question": "Can two carts oscillate relative to one another while their center of mass translates uniformly?",
+    "setups": [
+      {
+        "id": "12-nm",
+        "label": "12 N/m spring",
+        "prompt": "Create two free rigid box carts on a real level ground plane at z=0 m. Cart A has mass 1 kg, full dimensions [0.3,0.3,0.3] m and center [-0.5,0,0.15] m. Cart B has mass 2 kg, the same dimensions and center [0.9,0,0.15] m. Release both with world velocity [1,0,0] m/s and zero angular velocity. Connect their centers with one actual massless linear spring, attached at body-local center sites, with natural length 1 m, stiffness 12 N/m and damping 0 N·s/m; their initial center separation is 1.4 m. Use Earth gravity [0,0,-9.81] m/s², no air drag, loads or impulses. All ground and cart friction components are zero; ground restitution is 1 and cart restitution is 0. Keep free native cart and spring dynamics rather than a scripted path, with plain ground, studio lighting, a visible reference grid and distinct colors.",
+        "summary": "Two freely moving carts share a center-to-center spring with 1 m natural length and stiffness 12 N/m.",
+        "assumptions": [
+          "The center-attached spring is ideal and massless; its initial length is 1.4 m and damping is zero.",
+          "Ground and cart friction targets are zero; gravity is vertical, so no external horizontal load is applied."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Spring-coupled carts and center-of-mass motion",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 1,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "cartA",
+              "label": "Cart A",
+              "parentId": null,
+              "position": [
+                -0.5,
+                0,
+                0.15
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.3,
+                  0.3,
+                  0.3
+                ]
+              },
+              "mass": 1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  1,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#3978C5"
+            },
+            {
+              "id": "cartB",
+              "label": "Cart B",
+              "parentId": null,
+              "position": [
+                0.9,
+                0,
+                0.15
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.3,
+                  0.3,
+                  0.3
+                ]
+              },
+              "mass": 2,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  1,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#D85A45"
+            }
+          ],
+          "sites": [
+            {
+              "id": "springA",
+              "label": "Spring attachment Cart A center",
+              "bodyId": "cartA",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "springB",
+              "label": "Spring attachment Cart B center",
+              "bodyId": "cartB",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "tendons": [
+            {
+              "id": "cartSpring",
+              "label": "Center-to-center spring",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "springA"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "springB"
+                }
+              ],
+              "mode": "spring",
+              "length": 1,
+              "stiffness": 12,
+              "damping": 0,
+              "color": "#F2C178"
+            }
+          ],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Compare Speed and spring force. Use the cart masses and positions to check the center of mass."
+      },
+      {
+        "id": "24-nm",
+        "label": "24 N/m spring",
+        "prompt": "Create two free rigid box carts on a real level ground plane at z=0 m. Cart A has mass 1 kg, full dimensions [0.3,0.3,0.3] m and center [-0.5,0,0.15] m. Cart B has mass 2 kg, the same dimensions and center [0.9,0,0.15] m. Release both with world velocity [1,0,0] m/s and zero angular velocity. Connect their centers with one actual massless linear spring, attached at body-local center sites, with natural length 1 m, stiffness 24 N/m and damping 0 N·s/m; their initial center separation is 1.4 m. Use Earth gravity [0,0,-9.81] m/s², no air drag, loads or impulses. All ground and cart friction components are zero; ground restitution is 1 and cart restitution is 0. Keep free native cart and spring dynamics rather than a scripted path, with plain ground, studio lighting, a visible reference grid and distinct colors.",
+        "summary": "The same two freely moving carts use a center-to-center spring with stiffness 24 N/m.",
+        "assumptions": [
+          "The center-attached spring is ideal and massless; its initial length is 1.4 m and damping is zero.",
+          "Only spring stiffness differs from the 12 N/m setup; initial state, ground and gravity are unchanged."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Spring-coupled carts and center-of-mass motion",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 1,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "cartA",
+              "label": "Cart A",
+              "parentId": null,
+              "position": [
+                -0.5,
+                0,
+                0.15
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.3,
+                  0.3,
+                  0.3
+                ]
+              },
+              "mass": 1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  1,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#3978C5"
+            },
+            {
+              "id": "cartB",
+              "label": "Cart B",
+              "parentId": null,
+              "position": [
+                0.9,
+                0,
+                0.15
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.3,
+                  0.3,
+                  0.3
+                ]
+              },
+              "mass": 2,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  1,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#D85A45"
+            }
+          ],
+          "sites": [
+            {
+              "id": "springA",
+              "label": "Spring attachment Cart A center",
+              "bodyId": "cartA",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "springB",
+              "label": "Spring attachment Cart B center",
+              "bodyId": "cartB",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "tendons": [
+            {
+              "id": "cartSpring",
+              "label": "Center-to-center spring",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "springA"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "springB"
+                }
+              ],
+              "mode": "spring",
+              "length": 1,
+              "stiffness": 24,
+              "damping": 0,
+              "color": "#F2C178"
+            }
+          ],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Compare Speed and spring force. Use the cart masses and positions to check the center of mass."
+      }
+    ]
+  },
+  {
+    "id": "sensitive-pendulums",
+    "title": "Sensitive double pendulums",
+    "question": "What difference does a 0.1° change make in a double pendulum?",
+    "setups": [
+      {
+        "id": "120-vs-120-1-deg",
+        "label": "120° / 120.1° upper links",
+        "prompt": "Create two independent double-pendulum chains in parallel X-Z planes at y=-0.6 m and y=+0.6 m, each with a fixed pivot at [0,y,3.5] m. Each chain has two rigid spherical bobs of mass 1 kg and radius 0.06 m, joined by ideal massless rigid links of length 1 m. Both chains release from rest. Define signed world angle θ from the downward vertical in each X-Z plane, positive toward +X; a link vector at θ is [sin(θ),0,-cos(θ)] m. Chain A has upper angle +120° and lower angle -10°; chain B has upper angle +120.1° and lower angle -10°. The lower hinge of each chain must be carried by its moving upper bob as a real parent-child hinge, not an independent world hinge. Use zero hinge stiffness and damping, zero friction and drag, Earth gravity [0,0,-9.81] m/s², and a real ground at z=0 m with restitution 1 and zero friction; bob restitution is 0. Use distinct chain colors, plain studio appearance and a visible reference grid.",
+        "summary": "Two independent parallel double-pendulum chains start with upper-link angles 120° and 120.1° and lower-link angles -10°.",
+        "assumptions": [
+          "Ideal massless links are represented by hinges; each lower hinge is attached to its moving upper bob.",
+          "Angles are absolute world angles measured from downward vertical toward +X; all bobs start at rest."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Parallel double pendulums",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 1,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "pivotA",
+              "label": "Chain A pivot",
+              "parentId": null,
+              "position": [
+                0,
+                -0.6,
+                3.5
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.02,
+                  0.02,
+                  0.02
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": null
+              },
+              "color": "#777777"
+            },
+            {
+              "id": "Aupper",
+              "label": "A upper",
+              "parentId": null,
+              "position": [
+                0.8660254038,
+                -0.6,
+                4
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.06
+              },
+              "mass": 1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  0,
+                  1,
+                  0
+                ],
+                "anchor": [
+                  0,
+                  -0.6,
+                  3.5
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#3b82f6"
+            },
+            {
+              "id": "Alower",
+              "label": "A lower",
+              "parentId": "Aupper",
+              "position": [
+                0.6923772261,
+                -0.6,
+                3.015192247
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.06
+              },
+              "mass": 1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  0,
+                  1,
+                  0
+                ],
+                "anchor": [
+                  0.8660254038,
+                  -0.6,
+                  4
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#3b82f6"
+            },
+            {
+              "id": "pivotB",
+              "label": "Chain B pivot",
+              "parentId": null,
+              "position": [
+                0,
+                0.6,
+                3.5
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.02,
+                  0.02,
+                  0.02
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": null
+              },
+              "color": "#777777"
+            },
+            {
+              "id": "Bupper",
+              "label": "B upper",
+              "parentId": null,
+              "position": [
+                0.8651514205697046,
+                0.6,
+                4.001510737159457
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.06
+              },
+              "mass": 1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  0,
+                  1,
+                  0
+                ],
+                "anchor": [
+                  0,
+                  0.6,
+                  3.5
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#ef4444"
+            },
+            {
+              "id": "Blower",
+              "label": "B lower",
+              "parentId": "Bupper",
+              "position": [
+                0.6915032430122082,
+                0.6,
+                3.016702984147249
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.06
+              },
+              "mass": 1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  0,
+                  1,
+                  0
+                ],
+                "anchor": [
+                  0.8651514205697046,
+                  0.6,
+                  4.001510737159457
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#ef4444"
+            }
+          ],
+          "sites": [],
+          "tendons": [],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Compare their X/Z motion, not the fixed spacing between the planes. The difference varies with time."
+      }
+    ]
+  },
+  {
+    "id": "recoil",
+    "title": "Three-shot launcher",
+    "question": "How do repeated launches and ground friction change a free cart’s recoil and remaining loaded mass?",
+    "setups": [
+      {
+        "id": "frictional-contacts",
+        "label": "Frictional contacts",
+        "prompt": "Create a free rigid launcher cart with its own mass 5 kg, full box size [1.2,0.6,0.3] m, center [0,0,0.15] m and zero initial linear and angular velocity, supported by a real level ground plane at z=0 m. The cart carries three separate true 1 kg spherical rounds of radius 0.07 m at world centers [0.75,-0.18,0.25], [0.75,0,0.25] and [0.75,0.18,0.25] m. Physically hold each round to the cart so the rounds' mass and inertia contribute to the loaded cart until launch; their zero velocity/spin fields are held-state placeholders. Keep the specified overhanging round positions. Schedule exactly one launch of Round 1 at t=0 s, Round 2 at t=2 s and Round 3 at t=4 s. Each action sets absolute WORLD velocity [10.392304845413264,0,5.999999999999999] m/s (12 m/s at 30° above the +X ground direction, with y velocity zero), not cart-relative speed. The cart remains free to translate and rotate. Ground, cart and rounds have restitution 0; set their sliding and static friction coefficients to 0.15 and torsional and rolling friction to zero. Use Earth gravity [0,0,-9.81] m/s² and no drag. Name the bodies Launcher cart, Round 1, Round 2, Round 3; use distinct round colors, plain studio appearance and a visible reference grid.",
+        "summary": "A free 5 kg cart carries three 1 kg rounds and launches them at 0, 2 and 4 s with 0.15 static/sliding contact friction.",
+        "assumptions": [
+          "The cart’s 5 kg is its own mass; each held 1 kg round contributes mass and inertia until its launch.",
+          "Launches are instantaneous ideal world-velocity actions, not modeled propellant; there is no air drag."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Staggered launcher-cart rounds",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 0,
+            "friction": {
+              "sliding": 0.15,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0.15
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "cart",
+              "label": "Launcher cart",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                0.15
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  1.2,
+                  0.6,
+                  0.3
+                ]
+              },
+              "mass": 5,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.15,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.15
+              },
+              "color": "#67d9ce"
+            },
+            {
+              "id": "round1",
+              "label": "Round 1",
+              "parentId": null,
+              "position": [
+                0.75,
+                -0.18,
+                0.25
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 1,
+              "heldBy": "cart",
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.15,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.15
+              },
+              "color": "#d96b5f"
+            },
+            {
+              "id": "round2",
+              "label": "Round 2",
+              "parentId": null,
+              "position": [
+                0.75,
+                0,
+                0.25
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 1,
+              "heldBy": "cart",
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.15,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.15
+              },
+              "color": "#e4b64e"
+            },
+            {
+              "id": "round3",
+              "label": "Round 3",
+              "parentId": null,
+              "position": [
+                0.75,
+                0.18,
+                0.25
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 1,
+              "heldBy": "cart",
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.15,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.15
+              },
+              "color": "#5e9eaa"
+            }
+          ],
+          "sites": [],
+          "tendons": [],
+          "connections": [],
+          "loads": [],
+          "events": [
+            {
+              "id": "launch1",
+              "label": "Launch Round 1",
+              "at": 0,
+              "action": {
+                "kind": "launch",
+                "bodyId": "round1",
+                "velocity": [
+                  10.392304845413264,
+                  0,
+                  5.999999999999999
+                ],
+                "frame": "world"
+              }
+            },
+            {
+              "id": "launch2",
+              "label": "Launch Round 2",
+              "at": 2,
+              "action": {
+                "kind": "launch",
+                "bodyId": "round2",
+                "velocity": [
+                  10.392304845413264,
+                  0,
+                  5.999999999999999
+                ],
+                "frame": "world"
+              }
+            },
+            {
+              "id": "launch3",
+              "label": "Launch Round 3",
+              "at": 4,
+              "action": {
+                "kind": "launch",
+                "bodyId": "round3",
+                "velocity": [
+                  10.392304845413264,
+                  0,
+                  5.999999999999999
+                ],
+                "frame": "world"
+              }
+            }
+          ]
+        },
+        "note": "Watch the loaded mass drop at each shot. Launch speed is measured against the ground."
+      },
+      {
+        "id": "frictionless-contacts",
+        "label": "Frictionless contacts",
+        "prompt": "Create a free rigid launcher cart with its own mass 5 kg, full box size [1.2,0.6,0.3] m, center [0,0,0.15] m and zero initial linear and angular velocity, supported by a real level ground plane at z=0 m. The cart carries three separate true 1 kg spherical rounds of radius 0.07 m at world centers [0.75,-0.18,0.25], [0.75,0,0.25] and [0.75,0.18,0.25] m. Physically hold each round to the cart so the rounds' mass and inertia contribute to the loaded cart until launch; their zero velocity/spin fields are held-state placeholders. Keep the specified overhanging round positions. Schedule exactly one launch of Round 1 at t=0 s, Round 2 at t=2 s and Round 3 at t=4 s. Each action sets absolute WORLD velocity [10.392304845413264,0,5.999999999999999] m/s (12 m/s at 30° above the +X ground direction, with y velocity zero), not cart-relative speed. The cart remains free to translate and rotate. Ground, cart and rounds have restitution 0; set their sliding and static friction coefficients to 0 and torsional and rolling friction to zero. Use Earth gravity [0,0,-9.81] m/s² and no drag. Name the bodies Launcher cart, Round 1, Round 2, Round 3; use distinct round colors, plain studio appearance and a visible reference grid.",
+        "summary": "The same loaded launcher and scheduled world-velocity launches use zero static/sliding friction on ground, cart and rounds.",
+        "assumptions": [
+          "The cart’s 5 kg is its own mass; each held 1 kg round contributes mass and inertia until its launch.",
+          "Only static and sliding contact friction differ from the frictional setup; launches remain instantaneous world-velocity targets, with no drag."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Staggered launcher-cart rounds",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 0,
+            "friction": {
+              "sliding": 0,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": true
+          },
+          "bodies": [
+            {
+              "id": "cart",
+              "label": "Launcher cart",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                0.15
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  1.2,
+                  0.6,
+                  0.3
+                ]
+              },
+              "mass": 5,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#67d9ce"
+            },
+            {
+              "id": "round1",
+              "label": "Round 1",
+              "parentId": null,
+              "position": [
+                0.75,
+                -0.18,
+                0.25
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 1,
+              "heldBy": "cart",
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#d96b5f"
+            },
+            {
+              "id": "round2",
+              "label": "Round 2",
+              "parentId": null,
+              "position": [
+                0.75,
+                0,
+                0.25
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 1,
+              "heldBy": "cart",
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#e4b64e"
+            },
+            {
+              "id": "round3",
+              "label": "Round 3",
+              "parentId": null,
+              "position": [
+                0.75,
+                0.18,
+                0.25
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.07
+              },
+              "mass": 1,
+              "heldBy": "cart",
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#5e9eaa"
+            }
+          ],
+          "sites": [],
+          "tendons": [],
+          "connections": [],
+          "loads": [],
+          "events": [
+            {
+              "id": "launch1",
+              "label": "Launch Round 1",
+              "at": 0,
+              "action": {
+                "kind": "launch",
+                "bodyId": "round1",
+                "velocity": [
+                  10.392304845413264,
+                  0,
+                  5.999999999999999
+                ],
+                "frame": "world"
+              }
+            },
+            {
+              "id": "launch2",
+              "label": "Launch Round 2",
+              "at": 2,
+              "action": {
+                "kind": "launch",
+                "bodyId": "round2",
+                "velocity": [
+                  10.392304845413264,
+                  0,
+                  5.999999999999999
+                ],
+                "frame": "world"
+              }
+            },
+            {
+              "id": "launch3",
+              "label": "Launch Round 3",
+              "at": 4,
+              "action": {
+                "kind": "launch",
+                "bodyId": "round3",
+                "velocity": [
+                  10.392304845413264,
+                  0,
+                  5.999999999999999
+                ],
+                "frame": "world"
+              }
+            }
+          ]
+        },
+        "note": "Watch the loaded mass drop at each shot. Launch speed is measured against the ground."
+      }
+    ]
+  }
+]

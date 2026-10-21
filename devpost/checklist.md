@@ -190,3 +190,11 @@ Activity mode: Focused reference recap for an experienced plan-first workflow. F
 - Controlled service-failure and unsupported-alternative responses tested UI recovery only: the draft and existing scene/link remained, and “Use as draft” focused/filled the editor without another build request. No mocked successful model scene is shipped or claimed. The original viewed record, including its lease, stayed unchanged; generated scene definitions stayed immutable during playback/view controls.
 - Final production and inspection/Docker builds pass; all 182 behavioral checks pass with zero failures or skips. The existing upstream MuJoCo browser-externalization and large-chunk warnings remain visible.
 - These are technical verification results, not learner acceptance or completion of the Devpost submission.
+
+### Prepared example library
+
+- Added five studies and four comparison setups with complete standalone prompts. Published scene definitions preserve every physical and appearance field from the verified rehearsals; private session metadata and the incorrect first pendulum are excluded.
+- Open setup explicitly saves a fresh immutable copy and prepares its native paused preview without inference or provider credentials. Start from prompt creates a new editable home draft and requires a separate Build action. Ordinary model failures never substitute a prepared example.
+- Production and inspection/Docker builds pass; all 184 behavioral checks pass with zero failures/skips. New native regressions cover the corrected pendulum's actual angles/moving pivots and the launcher's scheduled releases/recoil/loaded inventory.
+- Actual browser checks opened all nine setups with zero inference attempts, matching saved definitions/prompts and no automatic Run/lease renewal. Provider-free execution, focused prompt drafts, delayed-retention replies, keyboard cancellation, failed-save preservation/explicit retry and 320px touch/reduced-motion layout were exercised. Unrelated saved records and leases stayed unchanged.
+- Curated prompt wording was not regenerated with a live model in this feature check. Existing numerical/model limits, local API prerequisites and the open learner-acceptance checkpoint remain unchanged.

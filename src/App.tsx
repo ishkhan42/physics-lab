@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, Atom, CaretDown, ChatCircleDots, ClockCounterClockwise, Cube, SlidersHorizontal } from '@phosphor-icons/react';
+import { ArrowDown, ArrowRight, Atom, BookOpen, CaretDown, ChatCircleDots, ClockCounterClockwise, Cube, SlidersHorizontal } from '@phosphor-icons/react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ZodError } from 'zod';
 import { CONNECTED_GPT_MODEL, PROVIDER_LABELS, type ModelOption, type ProviderConfig } from '../shared/catalog.ts';
@@ -9,6 +9,8 @@ import { readAssemblyResponse, type AssemblyProgress } from '../shared/assembly-
 import type { VerificationReceipt } from '../shared/verification.ts';
 import type { LabOutcome, ReviewProposal } from '../shared/review-proposal.ts';
 import { AppearanceSchema, type Appearance } from '../shared/appearance.ts';
+import { EXPERIMENT_EXAMPLES, type ExampleSetup } from '../shared/examples.ts';
+import ExampleLibrary from './ExampleLibrary.tsx';
 import AssemblyWork, { type AssemblyActivity } from './AssemblyWork.tsx';
 import ObjectCards from './ObjectCards.tsx';
 import SimulationCanvas, { type CanvasExperiment } from './SimulationCanvas.tsx';
@@ -23,7 +25,7 @@ type PendingConversation = { runtimeId: number; user: string; summary: string };
 const MAX_SAVED_PROMPT_LENGTH = 16000;
 type SceneUrlMode = 'push' | 'pop' | 'initial';
 type SceneOperation = 'idle' | 'saving' | 'loading' | 'renewing';
-type PendingSceneSave = { runtimeId: number; document: SceneDocument; mode: 'prepare' | 'copy' | 'appearance'; urlMode: SceneUrlMode; proposalReplacement?: boolean };
+type PendingSceneSave = { runtimeId: number; document: SceneDocument; mode: 'prepare' | 'copy' | 'appearance'; urlMode: SceneUrlMode; proposalReplacement?: boolean; restorePrompt?: boolean };
 type ActiveSceneBinding = { runtimeId: number; saved: SavedScene };
 type SceneBinding = { saved: SavedScene; urlMode: SceneUrlMode; operationToken: number; restorePrompt: boolean };
 type PreviousPreview = {
@@ -61,20 +63,6 @@ const OPENROUTER_FREE_ROUTE: ModelOption = {
   contextLength: null,
 };
 const PROVIDER_IDS = Object.keys(PROVIDER_LABELS) as Provider[];
-const PROMPT_STARTERS = [
-  {
-    label: 'Falling objects',
-    prompt: 'Drop two spheres of radius 0.15 m, with masses 1 kg and 2 kg, from rest at the same centre height of 5 m, 2 m apart. The 1 kg sphere is elastic (restitution 1); the 2 kg sphere is inelastic (restitution 0). Use gravity [0, 0, -9.81] m/s² and no air resistance. Use the built-in ground at z = 0 with restitution 1 and zero friction. Compare their falls and rebounds.',
-  },
-  {
-    label: 'A collision',
-    prompt: 'Two spheres of radius 0.2 m and masses 1 kg and 2 kg start at [-1, 0, 1] m and [1, 0, 1] m. They move toward each other along x at 1 m/s each with zero spin. Both have restitution 1 and zero friction. Use zero gravity and keep the built-in ground at z = 0. Show collision velocities, linear momentum and translational kinetic energy.',
-  },
-  {
-    label: 'Spring motion',
-    prompt: 'Constrain a 1 kg sphere of radius 0.05 m to move along the x-axis at z = 1 m using an ideal slider. Attach it to a fixed anchor at [0, 0, 1] m with a massless spring of rest length 1 m and stiffness 10 N/m. Use zero damping and zero gravity. Start the sphere at [2, 0, 1] m at rest with zero spin and zero friction. Show its motion and the spring force.',
-  },
-] as const;
 
 
 
@@ -238,6 +226,7 @@ export default function App() {
   const [sceneOperation, setSceneOperation] = useState<SceneOperation>(() => window.location.pathname.startsWith('/scenes/') ? 'loading' : 'idle');
   const [sceneError, setSceneError] = useState('');
   const [recentScenes, setRecentScenes] = useState<RecentScene[]>(() => readRecentScenes());
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [currentSceneId, setCurrentSceneId] = useState<string | null>(null);
   const [clearCanvasToken, setClearCanvasToken] = useState(0);
   const [playback, setPlayback] = useState<{ id: number; playing: boolean } | null>(null);
@@ -554,7 +543,7 @@ export default function App() {
         saved,
         urlMode: pending.urlMode,
         operationToken,
-        restorePrompt: false,
+        restorePrompt: pending.restorePrompt ?? false,
       });
       preparePreview(saved.document.decision, pending.runtimeId, saved.document.userGroundChoice, saved.document.scene);
     } catch (error) {
@@ -571,6 +560,31 @@ export default function App() {
         setFlow(activeRef.current ? { kind: 'ready', message: 'The existing physics preview is unchanged.' } : { kind: 'idle', message: '' });
       }
     }
+  };
+
+  const examplesUnavailable = () => isBusy || requestController.current !== null || candidateRef.current !== null
+    || operationRef.current === 'loading' || operationRef.current === 'saving'
+    || pendingSaveRef.current !== null || reviewProposalRef.current !== null;
+
+  const openExample = (setup: ExampleSetup) => {
+    if (examplesUnavailable()) return;
+    setExamplesOpen(false);
+    pendingPreviewRestoreRef.current = null;
+    invalidateWork('Opening an example. The current preview stays available until it is ready.');
+    setAssemblyBudget(null);
+    setVerificationReceipt(null);
+    setAssemblyProgress(null);
+    setAssemblyActivity([]);
+    requestStartedAt.current = performance.now();
+    setElapsedSeconds(0);
+    void saveSceneDocument({
+      runtimeId: generation.current,
+      document: setup.document,
+      mode: 'prepare',
+      urlMode: 'push',
+      restorePrompt: true,
+    });
+    requestAnimationFrame(() => document.querySelector('.simulation-section')?.scrollIntoView({ block: 'start' }));
   };
 
   const loadSavedScene = async (id: string, urlMode: SceneUrlMode, preserveProposal = false) => {
@@ -1339,6 +1353,15 @@ export default function App() {
     document.title = 'Physics Lab';
   };
 
+  const startExamplePrompt = (prompt: string) => {
+    if (examplesUnavailable()) return;
+    setExamplesOpen(false);
+    if (window.location.pathname !== '/') window.history.pushState(null, '', '/');
+    clearToHome();
+    setDescription(prompt);
+    requestAnimationFrame(() => descriptionRef.current?.focus());
+  };
+
   useEffect(() => {
     const initialPath = window.location.pathname;
     const initialId = sceneIdFromPath(initialPath);
@@ -1393,6 +1416,7 @@ export default function App() {
   ] : []), [activeExperiment]);
   const noProvidersAvailable = config !== null && availableProviders.length === 0;
   const sceneTransitionBusy = sceneOperation === 'loading' || sceneOperation === 'saving';
+  const examplesDisabled = examplesUnavailable();
   const canSubmit = !isBusy && !sceneTransitionBusy && !pendingSaveRef.current && !reviewProposal?.accepted && !reviewProposal?.keeping && !configError && provider !== '' && selectedModel.length > 0 && description.trim().length >= 3;
 
 
@@ -1419,6 +1443,9 @@ export default function App() {
           <div className="setup-panel__heading">
             <div><ChatCircleDots size={22} weight="duotone" aria-hidden="true" /><h1 id="setup-title">Your experiment</h1></div>
           </div>
+          <button className="secondary-button examples-trigger" type="button" disabled={examplesDisabled} onClick={() => setExamplesOpen(true)}>
+            <BookOpen size={18} aria-hidden="true" /><span className="examples-trigger__label">Examples</span><span className="examples-trigger__count">{EXPERIMENT_EXAMPLES.length}</span>
+          </button>
           {conversation.length > 0 ? (
             <section className="conversation-transcript" aria-label="Experiment conversation">
               <ol ref={conversationRef} className="conversation-transcript__messages" role="log" aria-live="polite" aria-relevant="additions">
@@ -1441,7 +1468,7 @@ export default function App() {
             </details>
           ) : null}
 
-          <AssemblyWork
+          {assemblyBudget || assemblyProgress || verificationReceipt || flow.kind === 'requesting' ? <AssemblyWork
             ref={progressRef}
             state={flow.kind === 'requesting' ? 'working' : isBusy ? 'preparing' : proposalPreview ? 'proposal' : flow.kind === 'idle' ? 'stopped' : flow.kind}
             progress={assemblyProgress}
@@ -1453,7 +1480,7 @@ export default function App() {
               cancelCurrentWork('Stopped. Your message and experiment are unchanged.');
               descriptionRef.current?.focus();
             }}
-          />
+          /> : null}
           <form className="assembly-form" onSubmit={handleSubmit}>
             <label className="field description-field">
               <span className="field-label">{activeExperiment ? 'What would you like to change?' : 'What would you like to try?'}</span>
@@ -1476,24 +1503,6 @@ export default function App() {
                 : 'Missing values will be asked for or shown as assumptions.'}</span>
             </label>
 
-            {!activeExperiment ? <div className="prompt-starters" role="group" aria-label="Try an example">
-              <span className="field-label">Examples</span>
-              <div className="prompt-starters__buttons">
-                {PROMPT_STARTERS.map(starter => (
-                  <button
-                    className="starter-button"
-                    type="button"
-                    key={starter.label}
-                    onClick={() => {
-                      handleDescriptionChange(starter.prompt);
-                      descriptionRef.current?.focus();
-                    }}
-                  >
-                    {starter.label}
-                  </button>
-                ))}
-              </div>
-            </div> : null}
 
             <details className="settings-details">
               <summary className="settings-summary">
@@ -1614,7 +1623,7 @@ export default function App() {
             ) : null}
             {noProvidersAvailable ? (
               <div className="notice notice--warning" role="status">
-                <p><strong>Connect an AI service</strong> to build your first experiment.</p>
+                <p><strong>Connect an AI service</strong> to build or edit from a prompt. Examples run without one.</p>
                 <details className="diagnostic-details"><summary>Setup instructions</summary><p>The person running this lab needs to add a private OpenRouter, OpenAI or Anthropic API key to the server environment, then restart the lab. Keys never belong in browser code.</p></details>
                 <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Check connection</button>
               </div>
@@ -1853,6 +1862,13 @@ export default function App() {
         </section>
 
       </main>
+      {examplesOpen ? <ExampleLibrary
+        examples={EXPERIMENT_EXAMPLES}
+        disabled={examplesDisabled}
+        onClose={() => setExamplesOpen(false)}
+        onOpenSetup={openExample}
+        onStartPrompt={startExamplePrompt}
+      /> : null}
       <footer className="page-footer">
         <span>Mechanics only. SI units, Z up. Results are numerical approximations; inspection is read-only.</span>
       </footer>

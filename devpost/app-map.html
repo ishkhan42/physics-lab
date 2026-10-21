@@ -87,8 +87,8 @@
   <div class="page">
     <header>
       <p class="eyebrow">Physics Lab · technical reference</p>
-      <h1>From a mechanics description to a paused experiment</h1>
-      <p class="lede">A compact route through the current implementation: what the browser sends, where assembly and native checks happen, and how the resulting scene becomes something you can inspect.</p>
+      <h1>From a prepared physics example or mechanics description to a paused experiment</h1>
+      <p class="lede">A compact route through both explicit entry paths: bundled prepared setups and ordinary model composition, followed by native checks and an inspectable scene.</p>
       <p class="snapshot"><strong>Reference route only.</strong> This page documents code locations; it does not claim that anyone has toured, practiced, learned, or approved anything.</p>
       <nav aria-label="Map sections">
         <ul>
@@ -132,6 +132,7 @@
           </li>
         </ol>
         <p class="callout"><strong>Storage and services:</strong> inference uses the configured external provider through the server-side broker; worker networking is disabled. Saved scene documents live in private SQLite outside the project tree and last 24 hours, renewed by Run/Resume. Browser recents retain link metadata, not scene definitions. Credentials and provider settings are not saved with scenes.</p>
+        <p><strong>Prepared examples:</strong> The composer offers an explicit <strong>Open setup</strong> path and a separate <strong>Start from prompt</strong> path. The bundled definitions in <code>shared/examples.json</code> / <code>shared/examples.ts</code> are not saved-link references and remain available when old URLs expire. Open setup makes no <code>/api/lab</code> inference request and needs no provider credential, but saving a fresh immutable copy and preparing its native preview still require the normal local API/storage service and MuJoCo runtime. Only after save and native readiness succeeds does it replace the visible preview and clear the active draft/conversation; it remains paused until Run, and failures preserve the previous usable state. The copy follows the ordinary 24-hour retention rules. Start from prompt resets only the active draft/conversation and fills/focuses an editable prompt; it does not save or send it. Build experiment is the user's explicit action to use ordinary AI composition. Neither entry path changes freeform prompting, and failures never fall back to an example.</p>
       </section>
 
       <section id="route" aria-labelledby="route-title">
@@ -161,6 +162,7 @@
           <li><strong>Agent tools and limits</strong><code>server/harness-worker.ts</code> — tool registrations and check/review sequence; <code>shared/harness.ts</code> — shared request/time/tool limits; <code>server/lab-resources.ts</code> — <code>withLabResources</code> exposes remaining allowances.</li>
           <li><strong>Readouts and visuals</strong><code>src/physics/mujoco.ts</code> — runtime snapshots; <code>src/ObjectCards.tsx</code> — <code>ObjectCards</code>; <code>src/TelemetryPanel.tsx</code> — <code>TelemetryPanel</code>; <code>src/SimulationCanvas.tsx</code> — <code>createVisualSet</code>.</li>
           <li><strong>Saved-scene retention</strong><code>server/scenes.ts</code> — <code>SceneStore.create</code>/<code>SceneStore.run</code>; <code>shared/saved-scene.ts</code> — <code>SCENE_RETENTION_MS</code>; <code>src/saved-scenes.ts</code> — browser recent-link metadata.</li>
+          <li><strong>Prepared examples</strong><code>src/ExampleLibrary.tsx</code> — explicit Open setup/Start from prompt choices; <code>shared/examples.ts</code> / <code>shared/examples.json</code> — bundled prompts and validated prepared scenes, separate from the normal <code>/api/lab</code> inference path.</li>
         </ul>
       </section>
 
@@ -184,7 +186,7 @@ npm run build
 npm start</code></pre>
         <p><code>npm start</code> runs the prestart hook to build/cache the sandbox image and serves the built app at <code>http://127.0.0.1:3001</code>. First sandbox setup needs registry access to fetch the Node base image and pinned packages. The worker container itself has no network access.</p>
         <p>For an authorized provider, use the secret-free <a href="../.env.example"><code>.env.example</code></a> as the server-side template; keep real credentials in a private file outside this public checkout. The map contains no credentials or private data. See <a href="../README.md">README.md</a> for configuration details.</p>
-        <p class="snapshot"><strong>Source snapshot:</strong> the runtime, tools and source references in this map match the reviewed release checkpoint <a href="https://github.com/ishkhan42/physics-lab/tree/273d074"><code>273d074</code></a>. The map is versioned with the source and can drift as code changes.</p>
+        <p class="snapshot"><strong>Source snapshot:</strong> the existing runtime and tool route references above match the reviewed release checkpoint <a href="https://github.com/ishkhan42/physics-lab/tree/273d074"><code>273d074</code></a>. The example-library pointers describe additions after that checkpoint and were not present there. This map is versioned with the source and can drift as code changes.</p>
       </section>
     </main>
     <footer>Standalone technical reference · no scripts, remote fonts, CDN, or network resources required for this page.</footer>

@@ -13,7 +13,7 @@ The student describes an experiment. A small Node API sends the description, sup
 
 The official MuJoCo WASM engine compiles and simulates the model in the browser. Three.js renders its geometry; the object cards read its actual physical state. The assembled experiment first appears paused, with assumptions and initial conditions visible. Only Run starts motion. Playback and inspection do not make more model requests.
 
-The first implementation is mechanics-only and compositional, not a menu of complete presets. Thermodynamics, aerodynamics, quantum physics, orbital mechanics and relativity remain future categories, with their own equations, state and observables rather than a forced rigid-body representation.
+The mechanics runtime remains compositional for ordinary prompts, and the composer also offers five curated prepared studies with four comparison setups. The prepared library is a separate explicit entry path, not model output or a substitute on failure. Thermodynamics, aerodynamics, quantum physics, orbital mechanics and relativity remain future categories, with their own equations, state and observables rather than a forced rigid-body representation.
 
 ## Accepted Stack
 
@@ -73,8 +73,11 @@ The short themed intro is skippable and has a reduced-motion alternative. It is 
 
 Implements `prd.md > The Core Journey`.
 
-1. Intro leads to an empty Mission Board. Mechanics is the only active category.
-2. The student selects an available provider/model and submits the scenario.
+The composer has two explicit entry paths. **Open setup** loads a deliberately selected bundled scene as a paused native preview and saves it as a new immutable URL; it does not call `/api/lab` or require provider credentials. It still needs the normal local API/save service and native MuJoCo preparation. Only after save and native readiness succeed does the paused scene replace the current preview and clear its active draft/conversation; Run remains explicit, and failures preserve the prior preview/draft. Bundled definitions are independent of expiring saved links; saved copies use the standard 24-hour lifetime from creation or last Run/Resume. **Start from prompt** begins a fresh editable draft, focuses the composer, leaves saved scenes intact, and neither saves nor contacts a model. The student must press Build experiment to send it through the ordinary AI composition path. No library entry is used as a fallback.
+
+
+1. Intro leads to an empty Mission Board. Mechanics is the only active category; the user may explicitly choose a prepared example.
+2. For ordinary composition, the student selects an available provider/model and submits a scenario.
 3. POST /api/lab sends the latest description, clarifications, recent history, actual scene, saved human request and prior assumptions. The sandbox computes a measured initial-state snapshot, including startup impulses, so follow-ups do not mistake old momentum fields for velocity or inherit missing context after refresh.
 4. Make the best meaningful model within Mechanics. A paused approximate model explicitly names requested behavior it cannot reproduce and the actual approximation. Ask a consequential clarification when necessary; explain unsupported only when no meaningful category model can be made. No fabricated capability or silent change.
 5. A validated scene passes through the trusted MJCF builder and actual MuJoCo compilation/initialization. Only successful initialization replaces the previous paused experiment.
@@ -92,9 +95,15 @@ Implements `prd.md > Mission Board`, `prd.md > Scenario Prompt and Assembly`.
 
 Report only real stages, without fabricated percentages or agent-log walls. Prevent duplicate in-flight submissions and stale responses replacing newer state. Pause the current experiment while preparing its replacement; retain it if replacement fails. Valid scene definitions are persisted privately before native preparation, and only successful native readiness changes the visible scene and URL. Restore opens paused at initial conditions, never by replaying inference or silently resuming a trajectory.
 
-Desktop uses a composer beside the simulation and inspection directly below the canvas; narrow screens stack them. A brief CSS entrance never blocks typing and respects reduced motion. Editable prompt starters fill descriptions only. Model settings are secondary, with route/cost warnings. Clarification focuses its answer field; current response and preserved-preview assumptions stay distinguishable. Stop waiting aborts the local fetch/candidate, invalidates stale work and preserves the active model; upstream computation and charges may continue.
+Desktop uses a composer beside the simulation and inspection directly below the canvas; narrow screens stack them. The `src/ExampleLibrary.tsx` entry exposes the prepared studies and their comparison setups. **Open setup** uses the bundled, validated `shared/examples.ts` / `shared/examples.json` definitions, then follows the ordinary native-preview and saved-copy path without inference. **Start from prompt** uses the complete standalone prompt to start a fresh editable draft, but neither persists nor sends it until Build experiment. A brief CSS entrance never blocks typing and respects reduced motion. Model settings are secondary, with route/cost warnings. Clarification focuses its answer field; current response and preserved-preview assumptions stay distinguishable. Stop waiting aborts the local fetch/candidate, invalidates stale work and preserves the active model; upstream computation and charges may continue.
 
 Real progress appears in the conversation panel without covering the canvas. Plain-language phase names and elapsed time are visible; raw activity and model IDs stay behind details. Chat text is compact but expandable, and a restored scene exposes its saved request without pre-filling the follow-up composer. Source assumptions keep their provenance; calculated facts come from the solver, not AI arithmetic. Stop aborts further model work and preserves draft/preview, with focus returned to the editor. Reduced motion and visible keyboard focus remain.
+
+### Prepared Example Library
+
+`shared/examples.json` holds five physics studies and four comparison setups. `shared/examples.ts` imports each scene once and validates it into a `SceneDocument`; its curated decision wrapper does not claim fresh inference or review. The UI presents a concise question and validity note with an expandable complete prompt.
+
+Opening a selected setup does not call `/api/lab` and does not need provider credentials, but it does use the normal API/save service and native MuJoCo preparation to create a fresh immutable saved copy. Only after save and native readiness succeed does it replace the visible preview and clear the active draft/conversation; it remains paused until Run. The bundled definitions do not expire with old rehearsal or saved-scene URLs. A saved copy retains standard 24-hour behavior, renewed only by Run/Resume activity. Starting from a prompt is a separate home-reset action that fills/focuses the editable composer without persistence or inference. Ordinary prompt composition remains unchanged; errors never substitute a prepared example.
 
 ### Model Contract and Catalog
 
@@ -341,7 +350,7 @@ index.html / vite.config.ts             browser entry, WASM asset serving, local
 tsconfig.json                          strict no-emit UI/server/shared checks
 src/
   main.tsx                             React entry
-  App.tsx                              intro, Mission Board and assembly/clarification flow
+  ExampleLibrary.tsx                  explicit prepared-scene and prompt entry
   styles.css                           lab/glass layout, motion and accessibility
   SimulationCanvas.tsx                 native-scene rendering and view-only camera
   selection.ts                         ray/marker/path picking and visible entity bounds
@@ -356,7 +365,7 @@ src/
     types.ts                           renderer/inspection boundary without native handles
 shared/
   scene.ts                             decision/model schemas and semantic admission
-  catalog.ts                           supported blocks, units and observation metadata
+  examples.json / examples.ts         curated scenes and validated SceneDocuments
   saved-scene.ts                       saved document and retention contracts
   harness.ts                           conversation, run budgets and progress contract
   assembly-stream.ts                   bounded NDJSON progress/text/final admission

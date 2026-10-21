@@ -60,7 +60,9 @@ Source: `scope.md > Inspiration & Identity`.
 
 ### Scenario Prompt and Assembly
 
-The student supplies a scenario rather than choosing only a complete preset. The LLM composes premade physics building blocks and their conditions, parameters, and constants. Scene feasibility and practical cost remain the coverage boundary.
+Ordinary prompt composition remains open-ended within the mechanics system: the student describes a situation and the LLM composes premade physics building blocks, conditions, parameters, and constants. The composer also offers five deliberately curated mechanics studies with four comparison setups. These are prepared examples, not fresh model outputs or a claim that their curated prompt wording has been regenerated successfully.
+
+**Open setup** requires explicit selection and uses the bundled scene definition directly; it makes no `/api/lab` inference request and needs no provider credential. Saving a fresh immutable copy and preparing its paused native preview still require the normal API/save service and MuJoCo runtime. Only after save and native readiness succeed does the paused scene replace the current preview and clear its active draft/conversation; Run remains explicit, and failures preserve the prior preview/draft. The bundled definitions are independent of saved-link expiry; saved copies follow the standard 24-hour lifetime from creation or last Run/Resume. **Start from prompt** resets only the active draft/conversation, fills and focuses an editable standalone prompt, and does not save or call a model. Pressing Build experiment submits through normal model composition. Neither route restricts ordinary prompts, and failures never substitute a library scene.
 
 The user approved the assemble–preview–run flow:
 
@@ -93,7 +95,7 @@ Source: `scope.md > What "Working" Looks Like`.
 
 ### Saved Scenes
 
-Each scene is saved server-side and shareable by URL, including its source prompt, assumptions and actual physical setup. New records have 24 hours; running/resuming and continuing playback renew retention from server-recorded activity. Opening, copying links and paused view/reset controls do not renew it. Expired URLs are unavailable, while a still-open setup may be saved as a new copy. Ground changes create a separate URL, leaving existing shared records unchanged. This feature saves definitions, not mid-flight state.
+Each scene is saved server-side and shareable by URL, including its source prompt, assumptions and actual physical setup. New records have 24 hours; running/resuming and continuing playback renew retention from server-recorded activity. Opening, copying links and paused view/reset controls do not renew it. Expired URLs are unavailable, while a still-open setup may be saved as a new copy. Prepared-library definitions are bundled independently of those URLs; Open setup creates a new immutable saved copy with the same retention rules. Ground changes also create a separate URL, leaving existing shared records unchanged. This feature saves definitions, not mid-flight state.
 
 Source: user's scene URL and 24-hour retention request.
 
@@ -113,7 +115,12 @@ Source: `scope.md > What "Working" Looks Like` and `scope.md > Later`.
 - Opening the web app leads through a thematic animated intro into one Mission Board.
 - The board contains the prompt section, category selector, and simulation canvas, with object cards below the canvas.
 - Mechanics is the only active category.
-- A supported student-described scene is assembled from premade physics blocks rather than a fixed complete-experiment menu.
+- A supported student-described scene is composed from premade physics blocks; the curated example library is a separate explicit route, not a constraint on ordinary prompting.
+- The composer exposes five prepared mechanics studies and four comparison setups alongside unrestricted ordinary prompt composition; the numerical test fixtures are not product examples.
+- **Open setup** loads only after explicit user selection, sends no `/api/lab` inference request and needs no provider credential. It still requires the normal local API/save service and native MuJoCo preparation, and creates a new immutable saved URL.
+- **Start from prompt** begins a fresh editable draft from a complete standalone example prompt without saving or contacting a model. Build experiment is the user's explicit action to submit through ordinary AI composition.
+- The bundled library remains available independently of any saved URL expiry. Saved copies use the usual 24-hour retention from creation or last Run/Resume; opening alone does not renew it.
+- Provider, API, save or native-preparation failures remain failures with the prompt/previous usable preview preserved; they never load a prepared example as fallback.
 - Missing information that materially changes the experiment triggers clarification before scene readiness.
 - A successfully assembled scene is initially paused, with its interpretation, initial conditions, assumptions, and object cards available for checking.
 - Motion begins only after the student presses Run.
@@ -131,7 +138,7 @@ These criteria are requirements, not claims of an existing implementation or suc
 - Web app, not a native application.
 - Thematic animated entrance followed by a single main workspace named Mission Board.
 - Physics-lab aesthetic combined with Apple-inspired glass and a requested motion style.
-- Prompt, category selector, canvas, and object cards form the initial layout; cards belong below the simulation.
+- The initial workbench keeps the prompt, category selector, canvas, and object cards below the simulation; the composer also provides explicit access to prepared examples.
 - Mechanics only is active.
 - This is the initial product design, to be improved through iteration without silently dropping the agreed scope.
 - Assemble–preview–run, including consequential clarification, real progress feedback, an inspectable paused preview, explicit Run, and honest unsupported-request handling: the user approved this proposed behavior with “looks good.”
@@ -139,7 +146,7 @@ These criteria are requirements, not claims of an existing implementation or suc
 
 ## Approved Conventional Defaults
 
-- Before the first submitted scenario, show an empty canvas rather than a fabricated simulation or fabricated object values. The current polish defers charts and object cards until an experiment is being prepared.
+- Before any user action, show an empty canvas rather than a fabricated simulation or object values. A user may explicitly open a prepared example as a real scene; charts and object cards remain deferred until an experiment is being prepared or is loaded.
 - If assembly fails, keep the student's prompt and show an understandable failure message rather than claiming scene readiness.
 
 These defaults were originally agent-proposed and approved by the user with the completed product definition.

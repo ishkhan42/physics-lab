@@ -1307,6 +1307,7 @@ export default function SimulationCanvas({
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target;
       if (event.isComposing || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (document.querySelector('dialog[open]')) return;
       if (event.code === 'Escape' && !(target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]'))) {
         selectEntity(null);
         rendererRef.current?.domElement.focus({ preventScroll: true });
