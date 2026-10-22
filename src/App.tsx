@@ -279,6 +279,7 @@ export default function App() {
   const clearAfterPauseRef = useRef(false);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const answerRef = useRef<HTMLTextAreaElement>(null);
+  const preferredViewRef = useRef<{ runtimeId: number; view: NonNullable<CanvasExperiment['view']> } | null>(null);
   const setReviewProposalContext = (next: ReviewProposalContext | null) => {
     reviewProposalRef.current = next;
     setReviewProposal(next);
@@ -497,7 +498,8 @@ export default function App() {
     scene = decision.scene,
   ) => {
     if (id !== generation.current) return;
-    const experiment: CanvasExperiment = { id, scene, decision, userGroundChoice };
+    const view = preferredViewRef.current?.runtimeId === id ? preferredViewRef.current.view : undefined;
+    const experiment: CanvasExperiment = { id, scene, decision, userGroundChoice, ...(view ? { view } : {}) };
     candidateRef.current = experiment;
     setPendingExperiment(experiment);
     setAssemblyProgress(null);
@@ -588,6 +590,7 @@ export default function App() {
     setAssemblyActivity([]);
     requestStartedAt.current = performance.now();
     setElapsedSeconds(0);
+    preferredViewRef.current = setup.view ? { runtimeId: generation.current, view: setup.view } : null;
     void saveSceneDocument({
       runtimeId: generation.current,
       document: setup.document,

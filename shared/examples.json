@@ -3345,7 +3345,8 @@
           ],
           "events": []
         },
-        "note": "Run for about 6.3 seconds. Switch to Speed to compare the changing velocities."
+        "note": "Run for about 6.3 seconds. Switch to Speed to compare the changing velocities.",
+        "view": "top"
       }
     ]
   },

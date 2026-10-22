@@ -50,6 +50,8 @@ export interface CanvasExperiment {
   scene: Scene;
   decision: Decision;
   userGroundChoice?: 'default' | 'none';
+  /** Optional opening camera direction; prepared examples use it when the default angle hides the motion. */
+  view?: 'top';
 }
 export interface CanvasInspectionCapture {
   simulatedAt: number;
@@ -138,6 +140,11 @@ function markerTexture(): CanvasTexture {
 }
 
 const initialCameraDirection = new Vector3(1, -1.25, 0.9).normalize();
+// Nearly overhead but still Z-up, so orbiting afterwards behaves as usual.
+const topCameraDirection = new Vector3(0.12, -0.42, 1).normalize();
+function cameraDirection(view: CanvasExperiment['view']): Vector3 {
+  return view === 'top' ? topCameraDirection : initialCameraDirection;
+}
 const TIME_FORMAT = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 5 });
 const selectionColor = new Color(0x0f6b62);
 
@@ -412,9 +419,9 @@ function applyFrame(items: RenderItem[], visuals: VisualSet): void {
 }
 
 /** Snaps to the default viewing direction; returns the framed radius. */
-function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, visuals: VisualSet): number {
+function fitCamera(camera: PerspectiveCamera, controls: OrbitControls, visuals: VisualSet, direction = initialCameraDirection): number {
   const { center, distance, radius } = framing(camera, sceneBounds(visuals));
-  camera.position.copy(center).addScaledVector(initialCameraDirection, distance);
+  camera.position.copy(center).addScaledVector(direction, distance);
   applyCameraRange(camera, distance);
   controls.target.copy(center);
   controls.update();
@@ -532,6 +539,13 @@ export default function SimulationCanvas({
   const [interacted, setInteracted] = useState(false);
   const gridCellRef = useRef(GRID_SIZE / GRID_DIVISIONS);
   const gridRef = useRef<Object3D | null>(null);
+  const axesRef = useRef<Object3D | null>(null);
+  const viewDirectionRef = useRef(initialCameraDirection);
+  // The grid and origin axes are one visual guide. Inspection captures keep the axes for orientation.
+  const setGuides = useCallback((visible: boolean) => {
+    if (gridRef.current) gridRef.current.visible = visible;
+    if (axesRef.current) axesRef.current.visible = visible || Boolean(callbacksRef.current.onInspectionController);
+  }, []);
 
   const rescaleReferences = useCallback((visuals: VisualSet, radius: number) => {
     const grid = gridRef.current;
@@ -570,9 +584,9 @@ export default function SimulationCanvas({
   useEffect(() => {
     if (!appearance || !visualSetRef.current) return;
     environmentRef.current?.setAppearance(appearance, visualSetRef.current.planes);
-    if (gridRef.current) gridRef.current.visible = appearance.grid;
+    setGuides(appearance.grid);
     scheduleRef.current?.();
-  }, [appearance]);
+  }, [appearance, setGuides]);
 
   const focusSelection = useCallback(() => {
     const camera = cameraRef.current;
@@ -790,7 +804,9 @@ export default function SimulationCanvas({
         material.transparent = true;
         material.opacity = 0.82;
       }
+      axes.visible = DEFAULT_APPEARANCE.grid || Boolean(callbacksRef.current.onInspectionController);
       scene.add(axes);
+      axesRef.current = axes;
       const selectionHelper = new Box3Helper(new Box3(), selectionColor);
       selectionHelper.visible = false;
       selectionHelper.renderOrder = 4;
@@ -1103,9 +1119,9 @@ export default function SimulationCanvas({
         const previousFar = camera.far;
         scene.add(candidateVisuals.group);
         try {
-          rescaleReferences(candidateVisuals, fitCamera(camera, controls, candidateVisuals));
+          rescaleReferences(candidateVisuals, fitCamera(camera, controls, candidateVisuals, cameraDirection(experiment.view)));
           environmentRef.current?.setAppearance(experiment.scene.appearance, candidateVisuals.planes);
-          if (gridRef.current) gridRef.current.visible = experiment.scene.appearance.grid;
+          setGuides(experiment.scene.appearance.grid);
           updateMarkers(candidateVisuals, camera, viewportRef.current?.clientHeight ?? 640, null, selectionColor);
           renderer.render(scene, camera);
           if (previousVisuals) scene.remove(previousVisuals.group);
@@ -1120,7 +1136,7 @@ export default function SimulationCanvas({
           controls.target.copy(previousTarget);
           controls.update();
           environmentRef.current?.setAppearance(appearance ?? DEFAULT_APPEARANCE, previousVisuals?.planes ?? []);
-          if (gridRef.current) gridRef.current.visible = (appearance ?? DEFAULT_APPEARANCE).grid;
+          setGuides((appearance ?? DEFAULT_APPEARANCE).grid);
           try { renderer.render(scene, camera); } catch { /* Keep the previous runtime alive if WebGL has failed. */ }
           throw error;
         }
@@ -1128,6 +1144,7 @@ export default function SimulationCanvas({
         const installedRuntime = candidateRuntime;
         if (!installedRuntime) throw new Error('The replacement runtime was not initialized.');
         runtimeRef.current = installedRuntime;
+        viewDirectionRef.current = cameraDirection(experiment.view);
         visualSetRef.current = candidateVisuals;
         activeIdRef.current = id;
         selectEntity(null);
@@ -1320,7 +1337,7 @@ export default function SimulationCanvas({
     followTargetRef.current = 'all';
     setFollowTarget('all');
     followVisibleRef.current = false;
-    rescaleReferences(visuals, fitCamera(camera, controls, visuals));
+    rescaleReferences(visuals, fitCamera(camera, controls, visuals, viewDirectionRef.current));
     scheduleRef.current?.();
   };
   useEffect(() => {
@@ -1355,7 +1372,7 @@ export default function SimulationCanvas({
   const selectedVisible = Boolean(selectedEntityId && visualSetRef.current?.pickTargets.some(target => target.entityId === selectedEntityId && target.object.visible));
   const hasRuntime = Boolean(runtimeRef.current);
   const statusText = canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? (throttled ? 'Running below the selected speed on this device. No physics steps are skipped.' : 'Running. Values and graphs update as it moves.') : hasRuntime ? 'Paused at the start. Press Run to begin.' : 'The experiment opens paused.');
-  const notice = canvasIssue || candidateError || (pauseReason && !ROUTINE_PAUSES.has(pauseReason) ? pauseReason : '') || (running && throttled ? 'This device is running the simulation slower than the selected speed. No steps are skipped.' : '');
+  const notice = canvasIssue || candidateError || (pauseReason && !ROUTINE_PAUSES.has(pauseReason) ? pauseReason : '');
   const speedOptions = SPEED_OPTIONS.includes(speed) ? SPEED_OPTIONS : [...SPEED_OPTIONS, speed].sort((a, b) => a - b);
 
   return (
@@ -1418,6 +1435,7 @@ export default function SimulationCanvas({
             <button className="transport__button" type="button" onClick={resetSimulation} disabled={preparing || replacementPending || Boolean(canvasIssue)} title="Back to the start (R)" aria-label="Reset to the start" aria-keyshortcuts="R">
               <ArrowCounterClockwise size={18} aria-hidden="true" />
             </button>
+            {running && throttled ? <span className="transport__slow" title="This device cannot keep up with the selected speed, so the simulation plays slower. No steps are skipped.">Slow motion</span> : null}
             <output className="simulation-clock" aria-label="Simulated time" aria-live="off"><strong>{TIME_FORMAT.format(time)}</strong><small>s</small></output>
             <label className="speed-select" title="Playback speed">
               <span className="visually-hidden">Playback speed</span>

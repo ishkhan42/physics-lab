@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Open the three-body example from nearly overhead so its figure eight reads at once; Fit and Reset return to that view. Show the origin axes only with the reference grid (inspection captures keep them), move the spring legend away from the canvas hint, and replace the slow-device warning toast with a quiet "Slow motion" label in the play bar.
 - Redesign the workspace around the simulation: a full-height stage with a floating play bar (Run/Pause, Reset, time, speed menu) and icon view controls, and one side panel that reads as a conversation, then the scene summary, motion graph and objects, with the message box pinned below. Settings, link sharing and the capability notes move into top-bar menus; the physical Ground switch moves next to the scene facts.
 - Show the prepared examples on the empty stage, add three starter prompts, keep assumptions visible, and list objects compactly: identical fixed parts are grouped, a selected object shows speed, height, mass and kinetic energy, and solver noise below 0.1 mm or 0.1 mm/s reads as 0 outside "All values".
 - Show all five prepared examples in the README with labeled, consistently sized five-second GIFs sampled from native simulation states.

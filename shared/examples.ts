@@ -6,6 +6,8 @@ export interface ExampleSetup {
   label: string;
   document: SceneDocument;
   note: string;
+  /** Opening camera direction for the viewer only; not part of the saved scene. */
+  view?: 'top';
 }
 
 export interface ExperimentExample {
@@ -19,7 +21,7 @@ export const EXPERIMENT_EXAMPLES: ExperimentExample[] = rawExamples.map(({ id, t
   id,
   title,
   question,
-  setups: setups.map(({ id: setupId, label, prompt, summary, assumptions, scene, note }) => ({
+  setups: setups.map(({ id: setupId, label, prompt, summary, assumptions, scene, note, ...rest }) => ({
     id: setupId,
     label,
     document: validateSceneDocument({
@@ -37,5 +39,6 @@ export const EXPERIMENT_EXAMPLES: ExperimentExample[] = rawExamples.map(({ id, t
       scene,
     }),
     note,
+    ...('view' in rest && rest.view === 'top' ? { view: 'top' as const } : {}),
   })),
 }));
