@@ -7,9 +7,12 @@ Describe a mechanics problem, run a 3D simulation, then change the experiment in
 <p>
   <img src="media/double-pendulum.gif" alt="Two double pendulums diverge after starting five degrees apart." width="49%">
   <img src="media/spring-net.gif" alt="A falling ball stretches a spring net and rebounds." width="49%">
+  <img src="media/three-body-figure-eight.gif" alt="Three equal masses trace a figure-eight orbit under mutual gravity." width="49%">
+  <img src="media/frictionless-loop.gif" alt="Two beads on a frictionless loop respond differently to normal impacts." width="49%">
+  <img src="media/domino-cascade.gif" alt="A falling domino starts a cascade around a curved line of twenty blocks." width="49%">
 </p>
 
-Recorded from the app's prepared experiments. Open **Examples** to try the double pendulum, spring net, three-body figure eight, frictionless loop or domino cascade without an AI request.
+Five-second clips from the app's simulation renderer; playback speeds vary to show each experiment's motion. Open **Examples** to try any of the five prepared setups without an AI request.
 
 ## Use it
 

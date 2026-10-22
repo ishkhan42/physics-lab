@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Show all five prepared examples in the README with labeled, consistently sized five-second GIFs sampled from native simulation states.
 - Replace the README's development log with usage, local setup, architecture and limits; add GIFs recorded from real pendulum and spring-net playback.
 - Record final acceptance of the contest POC and update the technical app map. Submission materials remain separate.
 - Default the reference grid off when unspecified, preserving explicit saved choices and the independent physical ground.
