@@ -38,7 +38,7 @@ One main page with these logical sections:
 - **Simulation canvas:** the scene and simulated motion.
 - **Object cards below the canvas:** every participating object is listed with its properties.
 
-The implementation places the composer beside the canvas on desktop, with object cards directly below the canvas so long interpretations do not bury the measurements. Narrow screens stack the same sections. Provider/category controls remain accessible in a secondary model-settings disclosure.
+The implementation gives the canvas a full-height stage on desktop and places the conversation, assumptions, graph and objects in one side panel with the composer pinned below, so the motion stays visible while the user reads or asks for a change. Narrow screens stack the same sections. Provider controls remain accessible in a secondary settings menu.
 
 Source: `scope.md > The POC Boundary`.
 

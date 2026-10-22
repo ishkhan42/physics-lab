@@ -24,6 +24,7 @@ html, body, #root, .inspection-root {
   max-height: 640px;
 }
 
-.canvas-tools, .canvas-selection, .canvas-help, .simulation-controls, .canvas-footer {
+.canvas-tools, .canvas-selection, .canvas-help, .simulation-controls, .canvas-footer,
+.selection-pill, .transport, .canvas-toast, .grid-scale, .canvas-welcome {
   display: none !important;
 }

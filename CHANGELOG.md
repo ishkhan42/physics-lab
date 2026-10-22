@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Redesign the workspace around the simulation: a full-height stage with a floating play bar (Run/Pause, Reset, time, speed menu) and icon view controls, and one side panel that reads as a conversation, then the scene summary, motion graph and objects, with the message box pinned below. Settings, link sharing and the capability notes move into top-bar menus; the physical Ground switch moves next to the scene facts.
+- Show the prepared examples on the empty stage, add three starter prompts, keep assumptions visible, and list objects compactly: identical fixed parts are grouped, a selected object shows speed, height, mass and kinetic energy, and solver noise below 0.1 mm or 0.1 mm/s reads as 0 outside "All values".
 - Show all five prepared examples in the README with labeled, consistently sized five-second GIFs sampled from native simulation states.
 - Replace the README's development log with usage, local setup, architecture and limits; add GIFs recorded from real pendulum and spring-net playback.
 - Record final acceptance of the contest POC and update the technical app map. Submission materials remain separate.

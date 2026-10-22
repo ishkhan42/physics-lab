@@ -1,5 +1,5 @@
-import { ArrowCounterClockwise, ArrowLeft, ArrowRight, CornersOut, Crosshair, Eye, Pause, Play, X } from '@phosphor-icons/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowCounterClockwise, ArrowLeft, ArrowRight, CaretDown, CornersOut, Crosshair, Pause, Play, X } from '@phosphor-icons/react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   CanvasTexture,
   AxesHelper,
@@ -75,16 +75,13 @@ interface SimulationCanvasProps {
   playbackBlocked: boolean;
   runToken: number;
   clearToken: number;
-  physicalGround: boolean;
-  groundDisabled: boolean;
-  onPhysicalGroundChange: (enabled: boolean) => void;
   appearance?: Appearance;
   appearanceDisabled?: boolean;
   appearanceSaving?: boolean;
   onAppearanceChange?: (appearance: Appearance) => void;
   selectedEntityId: string | null;
   onSelectEntity: (id: string | null) => void;
-  onInspectEntity: () => void;
+  emptyContent?: ReactNode;
   onInspectionController?: (controller: CanvasInspectionController | null) => void;
 }
 
@@ -110,6 +107,9 @@ interface VisualSet {
 }
 
 const TRAIL_CAPACITY = 2048;
+const SPEED_OPTIONS = [0.1, 0.25, 0.5, 1, 2, 5, 10];
+// Pauses the user caused; everything else is shown on the stage.
+const ROUTINE_PAUSES = new Set(['Paused. Values show the current state.', 'Reset to the initial conditions. Press Run to repeat the experiment.']);
 const GRID_SIZE = 12;
 const GRID_DIVISIONS = 24;
 let markerTextureCache: CanvasTexture | null = null;
@@ -470,16 +470,13 @@ export default function SimulationCanvas({
   playbackBlocked,
   runToken,
   clearToken,
-  physicalGround,
-  groundDisabled,
-  onPhysicalGroundChange,
   appearance,
   appearanceDisabled = false,
   appearanceSaving = false,
   onAppearanceChange,
   selectedEntityId,
   onSelectEntity,
-  onInspectEntity,
+  emptyContent,
   onInspectionController,
 }: SimulationCanvasProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -532,6 +529,7 @@ export default function SimulationCanvas({
   const selectionHelperRef = useRef<Box3Helper | null>(null);
   const [objectChoices, setObjectChoices] = useState<{ id: string; label: string }[]>([]);
   const [gridCell, setGridCell] = useState(GRID_SIZE / GRID_DIVISIONS);
+  const [interacted, setInteracted] = useState(false);
   const gridCellRef = useRef(GRID_SIZE / GRID_DIVISIONS);
   const gridRef = useRef<Object3D | null>(null);
 
@@ -1355,65 +1353,52 @@ export default function SimulationCanvas({
 
   const selectedChoice = objectChoices.find(choice => choice.id === selectedEntityId);
   const selectedVisible = Boolean(selectedEntityId && visualSetRef.current?.pickTargets.some(target => target.entityId === selectedEntityId && target.object.visible));
+  const hasRuntime = Boolean(runtimeRef.current);
+  const statusText = canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? (throttled ? 'Running below the selected speed on this device. No physics steps are skipped.' : 'Running. Values and graphs update as it moves.') : hasRuntime ? 'Paused at the start. Press Run to begin.' : 'The experiment opens paused.');
+  const notice = canvasIssue || candidateError || (pauseReason && !ROUTINE_PAUSES.has(pauseReason) ? pauseReason : '') || (running && throttled ? 'This device is running the simulation slower than the selected speed. No steps are skipped.' : '');
+  const speedOptions = SPEED_OPTIONS.includes(speed) ? SPEED_OPTIONS : [...SPEED_OPTIONS, speed].sort((a, b) => a - b);
 
   return (
     <div className="simulation-frame">
-      <div className="simulation-viewport" ref={viewportRef}>
-        <div className="canvas-tools">
-          {runtimeRef.current ? (
-            <label className="physical-ground-toggle">
-              <input
-                type="checkbox"
-                role="switch"
-                checked={physicalGround}
-                onChange={event => onPhysicalGroundChange(event.currentTarget.checked)}
-                disabled={groundDisabled || preparing || replacementPending}
-              />
-              <span>Ground</span>
-            </label>
-          ) : null}
-          {runtimeRef.current && onAppearanceChange ? <AppearanceControls
-            value={appearance ?? DEFAULT_APPEARANCE}
-            onChange={onAppearanceChange}
-            disabled={appearanceDisabled || preparing || replacementPending}
-            saving={appearanceSaving}
-          /> : null}
-          {runtimeRef.current ? (
-            <button className="tool-button" type="button" onClick={toggleFollow} aria-pressed={follow && followTarget === 'all'} aria-label="Follow all objects" title="Keep all moving objects and paths in view">
-              <Crosshair size={16} aria-hidden="true" />
-              <span>Follow all</span>
+      <div className="simulation-viewport" ref={viewportRef} onPointerDown={event => { if (!interacted && event.target instanceof HTMLCanvasElement) setInteracted(true); }}>
+        {hasRuntime ? (
+          <div className="canvas-tools" role="toolbar" aria-label="View">
+            {onAppearanceChange ? <AppearanceControls
+              value={appearance ?? DEFAULT_APPEARANCE}
+              onChange={onAppearanceChange}
+              disabled={appearanceDisabled || preparing || replacementPending}
+              saving={appearanceSaving}
+            /> : null}
+            <button className="icon-button" type="button" onClick={toggleFollow} aria-pressed={follow && followTarget === 'all'} aria-label="Follow moving objects" title="Follow moving objects">
+              <Crosshair size={18} aria-hidden="true" />
             </button>
-          ) : null}
-          <button className="tool-button" type="button" onClick={fitView} disabled={!runtimeRef.current || preparing} title="Frame all objects (F)" aria-label="Fit view" aria-keyshortcuts="F">
-            <CornersOut size={16} aria-hidden="true" />
-            <span>Fit all</span>
-          </button>
-        </div>
-        {objectChoices.length > 0 ? <div className="canvas-selection" role="group" aria-label="Object selection">
-          <select aria-label="Choose object" value={selectedEntityId ?? ''} onChange={event => selectEntity(event.target.value || null)} disabled={preparing || replacementPending}>
-            <option value="">Choose an object…</option>
-            {objectChoices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
-          </select>
-          {selectedChoice ? <>
-            <span className="selection-state" role="status">{!selectedVisible ? 'Waiting to appear' : follow && followTarget === 'selection' ? 'Following' : 'Selected'}</span>
-            <div className="selection-actions">
-              <button className="tool-button" type="button" aria-label="Focus selected object" disabled={!selectedVisible || preparing} onClick={() => { followRef.current = false; setFollow(false); focusSelection(); }}><CornersOut size={15} aria-hidden="true" /><span>Focus</span></button>
-              <button className="tool-button" type="button" aria-label="Follow selected object" aria-pressed={follow && followTarget === 'selection'} disabled={preparing} onClick={toggleSelectedFollow}><Crosshair size={15} aria-hidden="true" /><span>Follow</span></button>
-              <button className="tool-button" type="button" aria-label="Show selected object values" onClick={onInspectEntity}><Eye size={15} aria-hidden="true" /><span>Values</span></button>
-              <button className="tool-button" type="button" aria-label="Clear selection" onClick={() => { selectEntity(null); rendererRef.current?.domElement.focus({ preventScroll: true }); }}><X size={15} aria-hidden="true" /></button>
-            </div>
-          </> : null}
-        </div> : null}
-        {!runtimeRef.current ? (
-          <div className="canvas-empty-state" role="status">
-            <strong>{preparing ? 'Preparing your model' : canvasIssue || candidateError ? 'Preview unavailable' : 'No experiment yet'}</strong>
-            <p>{canvasIssue || candidateError || 'Describe a setup and choose Build experiment.'}</p>
+            <button className="icon-button" type="button" onClick={fitView} disabled={preparing} title="Fit everything in view (F)" aria-label="Fit view" aria-keyshortcuts="F">
+              <CornersOut size={18} aria-hidden="true" />
+            </button>
           </div>
         ) : null}
-        {preparing && runtimeRef.current ? <div className="replacement-indicator" role="status">Preparing replacement. Current preview is paused and preserved.</div> : null}
-        {candidateError && runtimeRef.current ? <div className="canvas-warning" role="alert">{candidateError}</div> : null}
+        {selectedChoice ? (
+          <div className="selection-pill" role="group" aria-label={`Selected: ${selectedChoice.label}`}>
+            <span className="selection-pill__label">{selectedChoice.label}</span>
+            {!selectedVisible ? <span className="selection-pill__state" role="status">Not visible yet</span> : null}
+            <button className="pill-button" type="button" disabled={!selectedVisible || preparing} onClick={() => { followRef.current = false; setFollow(false); focusSelection(); }}>Focus</button>
+            <button className="pill-button" type="button" aria-pressed={follow && followTarget === 'selection'} disabled={preparing} onClick={toggleSelectedFollow}>Follow</button>
+            <button className="pill-button pill-button--icon" type="button" aria-label="Clear selection" onClick={() => { selectEntity(null); rendererRef.current?.domElement.focus({ preventScroll: true }); }}><X size={14} aria-hidden="true" /></button>
+          </div>
+        ) : null}
+        {!hasRuntime ? (
+          emptyContent && !preparing && !canvasIssue && !candidateError ? <div className="canvas-welcome">{emptyContent}</div> : (
+            <div className="canvas-empty-state" role="status">
+              {preparing ? <span className="spinner" aria-hidden="true" /> : null}
+              <strong>{preparing ? 'Preparing the experiment' : canvasIssue || candidateError ? 'Preview unavailable' : 'Nothing here yet'}</strong>
+              <p>{canvasIssue || candidateError || (preparing ? 'It opens paused, so you can look before it runs.' : 'Describe an experiment to build one.')}</p>
+            </div>
+          )
+        ) : null}
+        {preparing && hasRuntime ? <div className="replacement-indicator" role="status"><span className="spinner" aria-hidden="true" />Preparing the new version. This one stays paused until it is ready.</div> : null}
         {environmentIssue ? <div className="canvas-warning" role="status">{environmentIssue}</div> : null}
-        {runtimeRef.current ? <p className="canvas-help">{(appearance ?? experiment?.scene.appearance ?? DEFAULT_APPEARANCE).grid ? <span className="grid-scale">Grid squares {gridCell} m. </span> : null}<span className="hint-pointer">Click to select. Drag to orbit. Scroll to zoom.</span><span className="hint-touch">Tap to select. Drag to orbit. Pinch to zoom.</span></p> : null}
+        {hasRuntime && !interacted && !selectedChoice ? <p className="canvas-help"><span className="hint-pointer">Drag to turn · Scroll to zoom · Click an object to inspect it</span><span className="hint-touch">Drag to turn · Pinch to zoom · Tap an object to inspect it</span></p> : null}
+        {hasRuntime && (appearance ?? experiment?.scene.appearance ?? DEFAULT_APPEARANCE).grid ? <p className="grid-scale">Grid {gridCell} m</p> : null}
         {runtimeRef.current?.scene.tendons.length ? (
           <div className="tendon-legend" role="note" aria-label="Relative connector force: inward arrows show tension, outward arrows show compression. Slack curves are schematic.">
             <div>
@@ -1423,36 +1408,28 @@ export default function SimulationCanvas({
             <small>Relative force · slack curves are schematic</small>
           </div>
         ) : null}
+        {notice && hasRuntime ? <p className="canvas-toast" role="alert">{notice}</p> : null}
+        {hasRuntime ? (
+          <div className="transport" role="group" aria-label="Playback">
+            <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={() => { void toggleRunning(); }} disabled={Boolean(onInspectionController) || preparing || replacementPending || runPending || playbackBlocked || Boolean(canvasIssue)} aria-keyshortcuts="Space" aria-busy={runPending} title={running ? 'Pause (Space)' : 'Run (Space)'}>
+              {running ? <Pause size={18} weight="fill" aria-hidden="true" /> : <Play size={18} weight="fill" aria-hidden="true" />}
+              <span>{runPending ? 'Checking' : running ? 'Pause' : 'Run'}</span>
+            </button>
+            <button className="transport__button" type="button" onClick={resetSimulation} disabled={preparing || replacementPending || Boolean(canvasIssue)} title="Back to the start (R)" aria-label="Reset to the start" aria-keyshortcuts="R">
+              <ArrowCounterClockwise size={18} aria-hidden="true" />
+            </button>
+            <output className="simulation-clock" aria-label="Simulated time" aria-live="off"><strong>{TIME_FORMAT.format(time)}</strong><small>s</small></output>
+            <label className="speed-select" title="Playback speed">
+              <span className="visually-hidden">Playback speed</span>
+              <select value={speed} onChange={event => updateSpeed(event.target.value)}>
+                {speedOptions.map(option => <option key={option} value={option}>{option}×</option>)}
+              </select>
+              <CaretDown size={12} weight="bold" aria-hidden="true" />
+            </label>
+          </div>
+        ) : null}
       </div>
-      <div className="simulation-controls">
-        <div className="playback-control">
-          <button className={`run-button ${running ? 'is-running' : ''}`} type="button" onClick={() => { void toggleRunning(); }} disabled={!runtimeRef.current || Boolean(onInspectionController) || preparing || replacementPending || runPending || playbackBlocked || Boolean(canvasIssue)} aria-keyshortcuts="Space" aria-busy={runPending}>
-            {running ? <Pause size={16} weight="fill" aria-hidden="true" /> : <Play size={16} weight="fill" aria-hidden="true" />}
-            <span>{runPending ? 'Checking scene' : running ? 'Pause' : 'Run'}</span>
-          </button>
-          <button className="tool-button" type="button" onClick={resetSimulation} disabled={!runtimeRef.current || preparing || replacementPending || Boolean(canvasIssue)} title="Return to the initial state without a model request (R)" aria-label="Reset" aria-keyshortcuts="R">
-            <ArrowCounterClockwise size={16} aria-hidden="true" />
-            <span>Reset</span>
-          </button>
-        </div>
-        <div className="speed-control">
-          <label htmlFor="playback-speed">Speed</label>
-          <input id="playback-speed" type="range" min="0.1" max="10" step="0.1" value={speed} onChange={event => updateSpeed(event.target.value)} aria-label="Playback speed from 0.1 to 10 times" />
-          <output>{speed.toFixed(1)}×</output>
-          <span className="speed-presets" role="group" aria-label="Playback speed shortcuts">
-            {[0.1, 1, 10].map(preset => (
-              <button type="button" key={preset} value={preset} aria-pressed={speed === preset} onClick={event => updateSpeed(event.currentTarget.value)}>{preset}×</button>
-            ))}
-          </span>
-        </div>
-        <output className="simulation-clock" aria-live="off"><span>t</span><strong>{TIME_FORMAT.format(time)}</strong><small>s</small></output>
-      </div>
-      <div className="canvas-footer">
-        <p className="canvas-status" role="status" aria-live="polite">
-          {canvasIssue || candidateError || pauseReason || (preparing ? 'Preparing a paused replacement.' : running ? (throttled ? 'Running below the selected speed on this device. No physics steps are skipped.' : 'Running. Values and graphs update as it moves.') : runtimeRef.current ? 'Paused at the start. Press Run to begin.' : 'The experiment opens paused.')}
-        </p>
-        <p className="keyboard-hint" aria-hidden="true"><kbd>Space</kbd> run <kbd>R</kbd> reset <kbd>F</kbd> fit</p>
-      </div>
+      <p className="visually-hidden" role="status" aria-live="polite">{statusText}</p>
     </div>
   );
 }

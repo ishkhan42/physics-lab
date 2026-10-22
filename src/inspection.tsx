@@ -102,12 +102,8 @@ function InspectionApp() {
         playbackBlocked={false}
         runToken={0}
         clearToken={0}
-        physicalGround={Boolean(experiment?.scene.ground)}
-        groundDisabled
-        onPhysicalGroundChange={ignoreCallback}
         selectedEntityId={selectedEntityId}
         onSelectEntity={setSelectedEntityId}
-        onInspectEntity={ignoreCallback}
         onInspectionController={handleController}
       />
     </main>

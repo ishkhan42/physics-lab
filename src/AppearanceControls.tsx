@@ -33,12 +33,12 @@ export default function AppearanceControls({ value, onChange, disabled, saving }
   }, []);
 
   return <details className="appearance-controls" ref={detailsRef}>
-    <summary className="tool-button" aria-label="Scene appearance" title="Scene appearance">
-      <Palette size={16} aria-hidden="true" /><span>Appearance</span>
+    <summary className="icon-button" aria-label="Scene appearance" title="Appearance">
+      <Palette size={18} aria-hidden="true" />
     </summary>
     <div className="appearance-panel" role="group" aria-labelledby={`${id}-title`}>
       <div className="appearance-heading">
-        <h3 id={`${id}-title`}>Scene appearance</h3>
+        <h3 id={`${id}-title`}>Appearance</h3>
         <button type="button" className="appearance-close" aria-label="Close appearance" onClick={() => {
           if (detailsRef.current) detailsRef.current.open = false;
           detailsRef.current?.querySelector('summary')?.focus();
@@ -77,7 +77,7 @@ export default function AppearanceControls({ value, onChange, disabled, saving }
           <input type="checkbox" role="switch" checked={value.grid} onChange={event => onChange({ ...value, grid: event.currentTarget.checked })} />
         </label>
       </fieldset>
-      <p className="appearance-note" role="status">{saving ? 'Saving this look…' : 'Visual only. Friction and physics stay unchanged.'}</p>
+      <p className="appearance-note" role="status">{saving ? 'Saving this look…' : 'Changes how it looks, not how it moves.'}</p>
     </div>
   </details>;
 }

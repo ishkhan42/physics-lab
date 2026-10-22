@@ -214,3 +214,11 @@ Activity mode: Focused reference recap for an experienced plan-first workflow. F
 - Production, inspection and all three container targets build; all 233 behavioral checks pass with zero failures or skips. Browser playback exercised the restored spring net beyond impact, grid toggling without a time reset, saved-choice refresh, unchanged original scene records and a 320px layout without horizontal overflow or browser errors.
 - The restored hosted viewer passed desktop/mobile playback, grid defaults and persistence across the rollout; anonymous configuration and the existing subscription deadline remain unchanged. The private renderer returned an actual 960×640 frame. This rollback check did not invoke fresh AI generation or establish long-duration uptime.
 
+### Stage-first redesign for new users
+
+- Owner-requested UI/UX pass before filming. The physics, scene contract, AI flow, saved links and honesty notes are unchanged; the layout, controls and interface text changed.
+- Audit of the previous hosted UI: the 3D view took about half of a 1440×900 window, a loaded loop example produced a page about 5,450 px tall with 35 object cards, and AI usage/provider details were shown before any experiment.
+- New layout: full-height stage with a floating play bar, side panel with conversation, scene summary, graph and grouped object list, pinned composer, top-bar Settings/Share menus and examples on the empty stage. Narrow screens stack stage and panel.
+- Checked in a real browser at 1440×900 and 390×844: empty state, all menus, opening an example, Run/Pause, object selection and graph emphasis. Build progress, a clarifying question and a provider timeout were exercised with a browser-side mocked response stream to test the UI only; no mocked scene is shipped or claimed as AI output.
+- Production and inspection builds pass; all 233 behavioral checks pass with zero failures or skips (Firestore emulator running).
+

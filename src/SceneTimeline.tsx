@@ -41,9 +41,9 @@ export default function SceneTimeline({ scene, snapshot }: { scene: Scene; snaps
   const time = snapshot?.time ?? 0;
   const progress = lastTime > 0 ? Math.min(1, time / lastTime) : completed === events.length ? 1 : 0;
   return (
-    <section className="scene-timeline" aria-labelledby="timeline-title">
+    <section className="panel-section scene-timeline" aria-labelledby="timeline-title">
       <header className="scene-timeline__heading">
-        <div><Clock size={18} aria-hidden="true" /><h2 id="timeline-title">What happens when</h2></div>
+        <div><Clock size={17} aria-hidden="true" /><h2 id="timeline-title">Planned actions</h2></div>
         <span aria-live="polite">{completed} / {events.length} done</span>
       </header>
       <div className="scene-timeline__rail" aria-hidden="true"><span style={{ width: `${progress * 100}%` }} /></div>
@@ -69,7 +69,7 @@ export default function SceneTimeline({ scene, snapshot }: { scene: Scene; snaps
       {inventories.length > 0 ? <div className="timeline-inventories">{inventories.map(inventory => (
         <span key={inventory.id}><strong title={inventory.label}>{inventory.label}</strong>{timeFormat.format(inventory.mass)} kg loaded<span>{inventory.waiting} waiting</span></span>
       ))}</div> : null}
-      <p>{completed === events.length ? 'All planned actions have happened. Motion continues.' : time === 0 ? 'Times start when you press Run.' : next ? <>Next at <strong>{timeFormat.format(next.at)} s</strong></> : null}</p>
+      <p>{completed === events.length ? 'All planned actions have happened. Motion continues.' : time === 0 ? 'These happen at the listed times after you press Run.' : next ? <>Next at <strong>{timeFormat.format(next.at)} s</strong></> : null}</p>
     </section>
   );
 }

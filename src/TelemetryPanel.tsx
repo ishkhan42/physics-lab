@@ -178,9 +178,12 @@ function nearestSampleIndex(samples: Sample[], time: number): number {
   return time - samples[low - 1]!.time <= samples[low]!.time - time ? low - 1 : low;
 }
 
-export default function TelemetryPanel({ experimentId, snapshot }: {
+const LEGEND_LIMIT = 6;
+
+export default function TelemetryPanel({ experimentId, snapshot, selectedEntityId = null }: {
   experimentId: number | null;
   snapshot: InspectionSnapshot | null;
+  selectedEntityId?: string | null;
 }) {
   const samplesRef = useRef<Sample[]>([]);
   const chartRefreshTimer = useRef<number | null>(null);
@@ -279,13 +282,15 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
     }
   }
 
+  const focusId = selectedEntityId && chart?.series.some(series => series.id === selectedEntityId) ? selectedEntityId : null;
+  const ordered = chart ? (focusId ? [...chart.series.filter(series => series.id === focusId), ...chart.series.filter(series => series.id !== focusId)] : chart.series) : [];
+  const legend = ordered.slice(0, LEGEND_LIMIT);
+  const hiddenCount = ordered.length - legend.length;
+
   return (
-    <section className="telemetry-panel" aria-labelledby="telemetry-title">
+    <section className="panel-section telemetry-panel" aria-labelledby="telemetry-title">
       <header className="telemetry__header">
-        <div>
-          <h2 id="telemetry-title">Motion over time</h2>
-          <p>Recorded about 20 times per second. Brief impacts may fall between samples.</p>
-        </div>
+        <h2 id="telemetry-title">Motion</h2>
         <div className="telemetry__metrics" role="group" aria-label="Measurement">
           {(Object.keys(METRICS) as Metric[]).map(key => (
             <button
@@ -301,7 +306,7 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
       </header>
       <div className="telemetry__plot" ref={plotRef} onPointerLeave={() => setActiveIndex(null)}>
         {samples.length < 2 ? (
-          <p className="telemetry__empty">Press Run to start recording.</p>
+          <p className="telemetry__empty">Press Run to draw the graph.</p>
         ) : chart && chart.series.length === 0 ? (
           <p className="telemetry__empty">This measurement is unavailable for these objects.</p>
         ) : chart ? (
@@ -341,7 +346,7 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
               {chart.series.map(series => (
                 <path
                   key={series.id}
-                  className="telemetry__line"
+                  className={`telemetry__line${focusId && series.id !== focusId ? ' is-dim' : ''}`}
                   d={series.path}
                   stroke={series.color}
                 />
@@ -380,16 +385,18 @@ export default function TelemetryPanel({ experimentId, snapshot }: {
           </>
         ) : null}
       </div>
-      {chart && chart.series.length > 0 ? (
+      {legend.length > 0 ? (
         <ul className="telemetry__legend" aria-label="Latest body measurements">
-          {chart.series.map(series => (
-            <li key={series.id}>
+          {legend.map(series => (
+            <li key={series.id} className={focusId && series.id !== focusId ? 'is-dim' : undefined}>
               <span aria-hidden="true" style={{ backgroundColor: series.color }} />
               <span>{series.label}: {formatNumber(series.latestValue)} {METRICS[metric].unit}</span>
             </li>
           ))}
+          {hiddenCount > 0 ? <li className="telemetry__more">and {hiddenCount} more</li> : null}
         </ul>
       ) : null}
+      {samples.length >= 2 ? <p className="telemetry__note">Sampled 20 times a second, so a very short impact can fall between samples.</p> : null}
     </section>
   );
 }

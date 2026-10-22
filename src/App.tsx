@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowRight, Atom, BookOpen, CaretDown, ChatCircleDots, ClockCounterClockwise, Cube, SlidersHorizontal } from '@phosphor-icons/react';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ArrowUp, Atom, BookOpen, ClockCounterClockwise, GearSix, Plus, SlidersHorizontal } from '@phosphor-icons/react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ZodError } from 'zod';
 import { CONNECTED_GPT_MODEL, PROVIDER_LABELS, type ModelOption, type ProviderConfig } from '../shared/catalog.ts';
 import { HARNESS_MAX_TURNS, HARNESS_TIMEOUT_MS, HarnessRequestSchema, type HarnessBudget, type HarnessRequest } from '../shared/harness.ts';
@@ -15,6 +15,10 @@ import AssemblyWork, { type AssemblyActivity } from './AssemblyWork.tsx';
 import ObjectCards from './ObjectCards.tsx';
 import SimulationCanvas, { type CanvasExperiment } from './SimulationCanvas.tsx';
 import SceneLinkBar from './SceneLinkBar.tsx';
+import ShareMenu from './ShareMenu.tsx';
+import Popover from './Popover.tsx';
+import Welcome from './Welcome.tsx';
+import { Bubble, SceneSummary } from './PanelParts.tsx';
 import { createSavedScene, forgetRecentScene, getSavedScene, readRecentScenes, rememberRecentScene, renewSavedScene, SavedSceneApiError, type RecentScene } from './saved-scenes.ts';
 import TelemetryPanel from './TelemetryPanel.tsx';
 import SceneTimeline from './SceneTimeline.tsx';
@@ -189,6 +193,12 @@ function sceneIdFromPath(pathname: string): string | null {
   return match[1];
 }
 
+const PROMPT_SUGGESTIONS = [
+  'Two balls of different mass fall from the same height. One bounces, the other does not.',
+  'A 1 kg block slides down a 30° ramp with friction 0.2.',
+  'A pendulum on a 1 m string is released from 45°.',
+];
+
 const REVIEW_CONCERN_CATEGORIES: Record<string, string> = {
   relationship: 'Connections',
   parameter: 'Settings',
@@ -279,8 +289,7 @@ export default function App() {
   }, [flow.kind, question]);
 
   useEffect(() => {
-    const list = conversationRef.current;
-    if (list) list.scrollTop = list.scrollHeight;
+    conversationRef.current?.lastElementChild?.scrollIntoView({ block: 'nearest' });
   }, [conversation]);
 
 
@@ -458,7 +467,8 @@ export default function App() {
 
   useEffect(() => {
     if (!isBusy) return;
-    progressRef.current?.scrollIntoView({ block: 'nearest' });
+    // On narrow screens the page scrolls, so keep the stage in view instead of jumping to the panel.
+    if (window.matchMedia('(min-width: 900px)').matches) progressRef.current?.scrollIntoView({ block: 'nearest' });
     progressRef.current?.focus({ preventScroll: true });
     const timer = window.setInterval(() => {
       setElapsedSeconds(Math.floor((performance.now() - requestStartedAt.current) / 1000));
@@ -585,7 +595,7 @@ export default function App() {
       urlMode: 'push',
       restorePrompt: true,
     });
-    requestAnimationFrame(() => document.querySelector('.simulation-section')?.scrollIntoView({ block: 'start' }));
+    requestAnimationFrame(() => document.querySelector('.stage-area')?.scrollIntoView({ block: 'nearest' }));
   };
 
   const loadSavedScene = async (id: string, urlMode: SceneUrlMode, preserveProposal = false) => {
@@ -1406,10 +1416,6 @@ export default function App() {
       ? reviewProposal
       : reviewProposal.priorProposal?.runtimeId === activeExperiment.id ? reviewProposal.priorProposal : null
     : null;
-  const experimentFacts = useMemo(() => {
-    const scene = activeExperiment?.scene;
-    return scene ? { objects: scene.bodies.length, gravity: Math.hypot(...scene.gravity), ground: scene.ground !== null } : null;
-  }, [activeExperiment]);
   const selectableEntities = useMemo(() => new Set(activeExperiment ? [
     ...activeExperiment.scene.bodies.filter(body => body.shape.kind !== 'plane').map(body => body.id),
     ...activeExperiment.scene.tendons.map(tendon => tendon.id),
@@ -1421,95 +1427,55 @@ export default function App() {
   const canSubmit = !isBusy && !sceneTransitionBusy && !pendingSaveRef.current && !reviewProposal?.accepted && !reviewProposal?.keeping && !configError && provider !== '' && selectedModel.length > 0 && description.trim().length >= 3;
 
 
+  const threadText = question ? answer.trim() : description.trim();
+  const sendingText = flow.kind === 'requesting' ? threadText
+    : flow.kind === 'preparing' && pendingConversationRef.current ? pendingConversationRef.current.user : '';
+  const savedRequest = proposalPreview?.sourcePrompt ?? activeSourcePromptRef.current;
+  const showIntro = !activeExperiment && !pendingExperiment && conversation.length === 0 && !isBusy && !question && sceneOperation === 'idle';
+  const submitLabel = isBusy ? 'Working' : flow.kind === 'error' ? 'Try again' : question ? 'Send answer' : activeExperiment ? 'Update experiment' : 'Build experiment';
+  const submitDisabled = !canSubmit || (question !== '' && answer.trim().length === 0);
+  const composerValue = isBusy ? '' : question ? answer : description;
+  const submitOnEnter = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    if (!submitDisabled) event.currentTarget.form?.requestSubmit();
+  };
+  useEffect(() => {
+    const input = document.getElementById('composer-input');
+    if (!(input instanceof HTMLTextAreaElement)) return;
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
+  }, [composerValue]);
+  const goHome = () => {
+    if (window.location.pathname !== '/') window.history.pushState(null, '', '/');
+    clearToHome();
+    requestAnimationFrame(() => descriptionRef.current?.focus());
+  };
+
   return (
     <div className="lab-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Physics Lab home" onClick={event => {
           event.preventDefault();
-          if (window.location.pathname !== '/') window.history.pushState(null, '', '/');
-          clearToHome();
+          goHome();
         }}>
-          <Atom className="brand__icon" size={22} aria-hidden="true" />
+          <Atom className="brand__icon" size={22} weight="duotone" aria-hidden="true" />
           <span className="brand__name">Physics Lab</span>
-          <span className="brand__scope">Mechanics</span>
         </a>
-        <div className="service-state" aria-live="polite">
-          <span className={`service-state__signal ${config && !configError ? 'is-live' : ''}`} aria-hidden="true" />
-          {configError ? 'Lab offline' : config ? 'Lab online' : 'Connecting'}
-        </div>
-      </header>
-
-      <main id="main" className="mission-board">
-        <section className="setup-panel" aria-labelledby="setup-title">
-          <div className="setup-panel__heading">
-            <div><ChatCircleDots size={22} weight="duotone" aria-hidden="true" /><h1 id="setup-title">Your experiment</h1></div>
-          </div>
-          <button className="secondary-button examples-trigger" type="button" disabled={examplesDisabled} onClick={() => setExamplesOpen(true)}>
-            <BookOpen size={18} aria-hidden="true" /><span className="examples-trigger__label">Examples</span><span className="examples-trigger__count">{EXPERIMENT_EXAMPLES.length}</span>
-          </button>
-          {conversation.length > 0 ? (
-            <section className="conversation-transcript" aria-label="Experiment conversation">
-              <ol ref={conversationRef} className="conversation-transcript__messages" role="log" aria-live="polite" aria-relevant="additions">
-                {conversation.slice(-8).map((message, index) => (
-                  <li className={`conversation-transcript__message conversation-transcript__message--${message.role}`} key={`${message.role}-${index}`}>
-                    <details className="chat-message">
-                      <summary>
-                        <span className="chat-message__author">{message.role === 'user' ? 'You' : 'Lab assistant'}<CaretDown size={13} aria-hidden="true" /></span>
-                        <span className="chat-message__text">{message.content}</span>
-                      </summary>
-                    </details>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ) : activeExperiment ? (
-            <details className="saved-request response-details">
-              <summary><Cube size={16} aria-hidden="true" /><span>{proposalPreview ? 'Request' : 'Saved request'}</span></summary>
-              <p>{proposalPreview?.sourcePrompt ?? activeSourcePromptRef.current}</p>
-            </details>
+        <nav className="topbar__actions" aria-label="Lab">
+          {configError ? <span className="service-state" role="status"><span className="service-state__signal" aria-hidden="true" />Offline</span> : null}
+          {activeExperiment || conversation.length > 0 ? (
+            <button className="toolbar-button" type="button" onClick={goHome} disabled={isBusy}><Plus size={17} aria-hidden="true" /><span>New</span></button>
           ) : null}
-
-          {assemblyBudget || assemblyProgress || verificationReceipt || flow.kind === 'requesting' ? <AssemblyWork
-            ref={progressRef}
-            state={flow.kind === 'requesting' ? 'working' : isBusy ? 'preparing' : proposalPreview ? 'proposal' : flow.kind === 'idle' ? 'stopped' : flow.kind}
-            progress={assemblyProgress}
-            budget={assemblyBudget}
-            activity={assemblyActivity}
-            verificationReceipt={proposalPreview && !isBusy ? proposalPreview.proposal.verification : verificationReceipt}
-            seconds={elapsedSeconds}
-            onStop={() => {
-              cancelCurrentWork('Stopped. Your message and experiment are unchanged.');
-              descriptionRef.current?.focus();
-            }}
-          /> : null}
-          <form className="assembly-form" onSubmit={handleSubmit}>
-            <label className="field description-field">
-              <span className="field-label">{activeExperiment ? 'What would you like to change?' : 'What would you like to try?'}</span>
-              <textarea
-                ref={descriptionRef}
-                value={description}
-                onChange={event => handleDescriptionChange(event.target.value)}
-                placeholder={activeExperiment
-                  ? 'Change a mass, add an object, or adjust the timing.'
-                  : 'Two balls fall from 2 m. One bounces; the other does not.'}
-                minLength={3}
-                maxLength={16000}
-                required
-                rows={3}
-                aria-describedby="description-hint"
-                disabled={Boolean(reviewProposal?.accepted || reviewProposal?.keeping)}
-              />
-              <span className="field-hint" id="description-hint">{activeExperiment
-                ? 'Your current experiment is included.'
-                : 'Missing values will be asked for or shown as assumptions.'}</span>
-            </label>
-
-
+          <button className="toolbar-button" type="button" disabled={examplesDisabled} onClick={() => setExamplesOpen(true)}>
+            <BookOpen size={17} aria-hidden="true" /><span>Examples</span>
+          </button>
+          {savedScene && !proposalPreview && sceneOperation === 'idle' ? <ShareMenu saved={savedScene} /> : null}
+          <Popover label="Settings" icon={<GearSix size={18} aria-hidden="true" />} className="settings-menu">
+            <h3>AI service</h3>
+            <p className="settings-current">{selectedProviderLabel || 'Not connected'}{provider === 'openai-codex' ? ' · GPT-6 Luna, high reasoning' : selectedModel ? ` · ${selectedModel}` : ''}</p>
             <details className="settings-details">
-              <summary className="settings-summary">
-                <SlidersHorizontal size={16} aria-hidden="true" /><span className="settings-summary__title">AI settings</span>
-                <span className="settings-summary__selection">{selectedProviderLabel || 'Not connected'}</span>
-              </summary>
+              <summary className="settings-summary"><SlidersHorizontal size={15} aria-hidden="true" /><span className="settings-summary__title">Change</span></summary>
               <div className="settings-content">
                 <p className="settings-intro">Your request and experiment go to this service. Each update can use up to {HARNESS_MAX_TURNS} AI requests within {HARNESS_TIMEOUT_MS / 60_000} minutes, including reserved review capacity. No paid alternative is selected automatically.</p>
                 <div className="provider-fields">
@@ -1595,38 +1561,234 @@ export default function App() {
 
               </div>
             </details>
+            <p className="settings-usage">Each build or change can use up to {HARNESS_MAX_TURNS} AI requests. {provider === 'openai-codex' ? 'This demo uses a subscription with usage limits.' : 'Charges may apply.'}</p>
+            <h3>What it can simulate</h3>
+            <div className="capabilities-copy">
+              <p>Classical mechanics: rigid bodies and point masses, gravity and other forces, collisions with bounce and friction, hinges and other joints, springs, cords and pulleys.</p>
+              <p>Not fluids, heat, or objects that bend or break. Contacts are numerical approximations, so check the assumptions and the values.</p>
+              <p>Units are SI. Z points up. The grid and axes are visual guides, not a floor.</p>
+            </div>
+          </Popover>
+        </nav>
+      </header>
 
-            {question ? (
-              <div className="clarification-panel" aria-labelledby="clarification-question">
-                <span className="field-label">A detail is needed</span>
-                <p id="clarification-question">{question}</p>
-                <label className="field">
-                  <span className="field-label">Your answer</span>
-                  <textarea
-                    ref={answerRef}
-                    value={answer}
-                    onChange={event => handleAnswerChange(event.target.value)}
-                    maxLength={4000}
-                    required
-                    rows={2}
-                    placeholder="Your answer…"
-                  />
-                </label>
+      <main id="main" className="workspace">
+        <section className={`stage-area${activeExperiment?.scene.events.length ? ' stage-area--scheduled' : ''}`} aria-labelledby="simulation-title">
+          <h2 id="simulation-title" className="visually-hidden">Simulation</h2>
+          <SimulationCanvas
+            experiment={pendingExperiment}
+            replacementPending={isBusy || (sceneTransitionBusy && pendingSaveRef.current?.mode !== 'appearance')}
+            onStatus={handleCanvasStatus}
+            onReady={handleCanvasReady}
+            onSnapshot={handleCanvasSnapshot}
+            onFailure={handleCanvasFailure}
+            onBeforeRun={handleBeforeRun}
+            onPlaybackChange={handlePlaybackChange}
+            playbackBlocked={blockedRuntimeId === activeExperiment?.id || Boolean(proposalPreview)}
+            runToken={generation.current}
+            clearToken={clearCanvasToken}
+            appearance={pendingSaveRef.current?.mode === 'appearance' ? pendingSaveRef.current.document.scene.appearance : activeExperiment?.scene.appearance}
+            appearanceDisabled={!activeExperiment || Boolean(reviewProposal) || isBusy || sceneOperation !== 'idle' || pendingSaveRef.current !== null}
+            appearanceSaving={sceneOperation === 'saving' && pendingSaveRef.current?.mode === 'appearance'}
+            onAppearanceChange={changeAppearance}
+            selectedEntityId={selectedEntityId}
+            onSelectEntity={setSelectedEntityId}
+            emptyContent={showIntro ? <Welcome examples={EXPERIMENT_EXAMPLES} disabled={examplesDisabled} onOpen={openExample} onBrowse={() => setExamplesOpen(true)} />
+              : flow.kind === 'requesting' ? <div className="stage-status" role="status"><span className="spinner" aria-hidden="true" /><strong>Building your experiment</strong><p>It appears here, paused, when it is ready.</p></div>
+              : sceneOperation === 'loading' ? <div className="stage-status" role="status"><span className="spinner" aria-hidden="true" /><strong>Opening the experiment</strong></div>
+              : question ? <div className="stage-status"><strong>One question first</strong><p>Answer it on the right and the lab will build the experiment.</p></div>
+              : undefined}
+          />
+        </section>
+
+        <aside className="side-panel" aria-label="Experiment">
+          <div className="side-panel__scroll">
+            {showIntro ? (
+              <section className="intro">
+                <h1>New experiment</h1>
+                <p>Describe the objects, where they start and what should happen. Add numbers if you have them. If something important is missing, the lab will ask.</p>
+                <h2 className="intro__label">Try one</h2>
+                <ul className="suggestions">
+                  {PROMPT_SUGGESTIONS.map(suggestion => (
+                    <li key={suggestion}><button className="suggestion" type="button" onClick={() => {
+                      handleDescriptionChange(suggestion);
+                      requestAnimationFrame(() => descriptionRef.current?.focus());
+                    }}>{suggestion}</button></li>
+                  ))}
+                </ul>
+                {recentScenes.length > 0 ? <>
+                  <h2 className="intro__label">Recent</h2>
+                  <ul className="recent-list">
+                    {recentScenes.map(item => (
+                      <li key={item.id}>
+                        <button className="recent-item" type="button" onClick={() => loadRecentScene(item)} title="Open without a new AI request">
+                          <ClockCounterClockwise size={15} aria-hidden="true" /><strong>{item.title}</strong>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </> : null}
+              </section>
+            ) : (
+              <h1 className="visually-hidden">Your experiment</h1>
+            )}
+
+            {!showIntro ? (
+              <ol className="thread" ref={conversationRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation">
+                {conversation.length > 0 ? conversation.slice(-8).map((message, index) => (
+                  <Bubble role={message.role} text={message.content} key={`${message.role}-${index}`} />
+                )) : activeExperiment && savedRequest ? <>
+                  <Bubble role="user" label="Request" text={savedRequest} />
+                  {interpretation?.summary ? <Bubble role="assistant" text={interpretation.summary} /> : null}
+                </> : null}
+                {sendingText ? <Bubble role="user" text={sendingText} pending /> : null}
+                {question && !isBusy ? <Bubble role="assistant" label="A detail is needed" text={question} highlight /> : null}
+              </ol>
+            ) : null}
+
+            {assemblyBudget || assemblyProgress || verificationReceipt || flow.kind === 'requesting' ? <AssemblyWork
+              ref={progressRef}
+              state={flow.kind === 'requesting' ? 'working' : isBusy ? 'preparing' : proposalPreview ? 'proposal' : flow.kind === 'idle' ? 'stopped' : flow.kind}
+              progress={assemblyProgress}
+              budget={assemblyBudget}
+              activity={assemblyActivity}
+              verificationReceipt={proposalPreview && !isBusy ? proposalPreview.proposal.verification : verificationReceipt}
+              seconds={elapsedSeconds}
+              onStop={() => {
+                cancelCurrentWork('Stopped. Your message and experiment are unchanged.');
+                descriptionRef.current?.focus();
+              }}
+            /> : null}
+
+            {flow.message && !isBusy && flow.kind !== 'unsupported' && flow.kind !== 'clarification' && flow.kind !== 'ready' && flow.kind !== 'proposal' ? (
+              <div ref={flow.kind === 'error' ? flowMessageRef : undefined} tabIndex={flow.kind === 'error' ? -1 : undefined} className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live={flow.kind === 'error' ? 'assertive' : 'polite'}>
+                <p>{flow.message}</p>
+                {flow.kind === 'error' ? <p className="flow-message__next">Your message and experiment are unchanged.</p> : null}
+                {flow.kind === 'error' && flow.detail ? <details className="diagnostic-details"><summary>Technical details</summary><p>{flow.detail}</p></details> : null}
               </div>
             ) : null}
 
+            {responseDecision && (responseDecision.kind === 'unsupported' || responseDecision.alternative) ? (
+              <section className="response-panel response-panel--unsupported" ref={responseRef} tabIndex={-1} aria-labelledby="response-title">
+                <h2 id="response-title">{responseDecision.kind === 'unsupported' ? 'This needs a change' : 'Suggested setup'}</h2>
+                {conversation.at(-1)?.content !== responseDecision.summary ? <p>{responseDecision.summary}</p> : null}
+                {responseDecision.alternative ? (
+                  <div className="response-proposal">
+                    <h3>{responseDecision.alternative.label}</h3>
+                    <p>{responseDecision.alternative.description}</p>
+                    <button className="primary-button" type="button" onClick={() => {
+                      handleDescriptionChange(responseDecision.alternative!.description);
+                      descriptionRef.current?.focus();
+                    }}>Use this as my draft</button>
+                    <small>Nothing is sent until you press Build.</small>
+                  </div>
+                ) : null}
+                {responseDecision.reason ? (
+                  <details className="response-details">
+                    <summary>Why</summary>
+                    <p>{responseDecision.reason}</p>
+                  </details>
+                ) : null}
+                <p className="field-hint">{activeExperiment ? 'Your current experiment is unchanged.' : 'No simulation was created.'}</p>
+              </section>
+            ) : null}
+
+            {proposalPreview && !isBusy ? (
+              <section className="review-proposal" aria-labelledby="review-proposal-title">
+                <span className="review-proposal__badge">Not saved yet</span>
+                <h2 id="review-proposal-title">Take a look before using this</h2>
+                <p>It passed the first checks, but the assistant could not settle a few details. Run stays off until you choose.</p>
+                <details className="review-proposal__concerns" open>
+                  <summary>What to check</summary>
+                  <p>These are the assistant’s concerns, not verified facts.</p>
+                  <ul>
+                    {proposalPreview.proposal.concerns.map((concern, index) => (
+                      <li key={`${concern.code}-${index}`}>
+                        <strong>{Object.hasOwn(REVIEW_CONCERN_CATEGORIES, concern.code) ? REVIEW_CONCERN_CATEGORIES[concern.code] : 'Setup'}</strong>
+                        <p>{concern.message}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+                {proposalPreview.accepted ? (
+                  <div className="notice notice--warning" role="status">
+                    <p>The setup was saved, but its preview could not be reopened. {proposalPreview.previous.savedScene ? 'Your previous link is unchanged.' : 'Nothing was replaced.'}</p>
+                    <button className="secondary-button" type="button" onClick={retryPersistence}>Try again</button>
+                  </div>
+                ) : proposalPreview.keeping ? (
+                  <div className="notice notice--warning" role="status">
+                    <p>{proposalPreview.previous.savedScene ? 'Your previous experiment and link are unchanged.' : proposalPreview.previous.experiment ? 'Your previous setup is unchanged.' : 'Nothing new was saved or replaced.'}</p>
+                    <button className="secondary-button" type="button" onClick={retryPersistence}>Reopen previous</button>
+                  </div>
+                ) : pendingSaveRef.current?.mode === 'prepare' && sceneOperation === 'idle' ? (
+                  <div className="notice notice--warning" role="status">
+                    <p>This setup could not be saved yet. {proposalPreview.previous.savedScene ? 'Your previous experiment and link are unchanged.' : proposalPreview.previous.experiment ? 'Your previous setup is unchanged.' : 'Nothing has been saved or replaced.'}</p>
+                    <button className="secondary-button" type="button" onClick={retryPersistence}>Try saving again</button>
+                    <button className="secondary-button" type="button" onClick={keepPrevious}>
+                      {proposalPreview.previous.experiment ? 'Keep previous' : 'Back to my request'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="review-proposal__actions">
+                    <button className="primary-button" type="button" onClick={useReviewProposal} disabled={isBusy || sceneOperation !== 'idle' || pendingSaveRef.current !== null}>Use this setup</button>
+                    <button className="secondary-button" type="button" onClick={keepPrevious} disabled={isBusy || sceneOperation !== 'idle'}>
+                      {proposalPreview.previous.experiment ? 'Keep previous' : 'Back to my request'}
+                    </button>
+                    <button className="secondary-button" type="button" onClick={() => descriptionRef.current?.focus()} disabled={Boolean(proposalPreview.accepted || proposalPreview.keeping) || sceneOperation !== 'idle'}>
+                      Adjust it
+                    </button>
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {!proposalPreview ? (
+              <SceneLinkBar
+                saved={pendingSaveRef.current?.mode === 'appearance' ? null : savedScene}
+                operation={sceneOperation}
+                error={sceneError}
+                onRetry={retryPersistence}
+                onKeepPreviousLook={pendingSaveRef.current?.mode === 'appearance' ? () => {
+                  pendingSaveRef.current = null;
+                  retryActionRef.current = null;
+                  setSceneError('');
+                } : undefined}
+                onSaveCopy={activeExperiment && !savedScene && !pendingSaveRef.current && sceneOperation === 'idle' && !isBusy ? saveCurrentCopy : undefined}
+              />
+            ) : null}
+
+            {interpretation && activeExperiment ? (
+              <SceneSummary
+                key={activeExperiment.id}
+                title={interpretation.scene?.title ?? 'This experiment'}
+                tag={proposalPreview ? 'Not saved yet' : responseDecision ? 'Unchanged' : null}
+                scene={activeExperiment.scene}
+                assumptions={interpretation.assumptions}
+                approximation={interpretation.approximation}
+                groundDisabled={Boolean(reviewProposal) || isBusy || sceneTransitionBusy}
+                onGroundChange={togglePhysicalGround}
+              />
+            ) : null}
+            {activeExperiment ? <SceneTimeline scene={activeExperiment.scene} snapshot={snapshot} /> : null}
+            {activeExperiment || pendingExperiment ? <>
+              <TelemetryPanel experimentId={activeExperiment?.id ?? null} snapshot={snapshot} selectedEntityId={selectedEntityId} />
+              <ObjectCards snapshot={snapshot} hasExperiment selectedEntityId={selectedEntityId} selectableEntities={selectableEntities} onSelectEntity={setSelectedEntityId} />
+            </> : null}
+          </div>
+
+          <form className="composer" onSubmit={handleSubmit}>
             {configError ? (
               <div className="notice notice--error" role="alert">
-                <p><strong>Couldn’t connect to the lab.</strong> Your draft is kept. Check the connection and try again.</p>
-                <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Retry connection</button>
-                <details className="diagnostic-details"><summary>Setup details</summary><p>Start the local service with npm run api.</p><p>{configError}</p></details>
+                <p><strong>Can’t reach the lab.</strong> Your draft is kept.</p>
+                <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Try again</button>
+                <details className="diagnostic-details"><summary>Details</summary><p>{configError}</p></details>
               </div>
             ) : null}
             {noProvidersAvailable ? (
               <div className="notice notice--warning" role="status">
-                <p><strong>Connect an AI service</strong> to build or edit from a prompt. Examples run without one.</p>
-                <details className="diagnostic-details"><summary>Setup instructions</summary><p>The person running this lab needs to add a private OpenRouter, OpenAI or Anthropic API key to the server environment, then restart the lab. Keys never belong in browser code.</p></details>
-                <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Check connection</button>
+                <p><strong>No AI service is connected.</strong> You can still open the examples.</p>
+                <details className="diagnostic-details"><summary>For the person running this lab</summary><p>Add a private OpenRouter, OpenAI or Anthropic API key to the server environment, then restart the lab. Keys never belong in browser code.</p></details>
+                <button className="secondary-button" type="button" onClick={() => setConfigAttempt(current => current + 1)}>Check again</button>
               </div>
             ) : null}
             {formError ? (
@@ -1635,233 +1797,30 @@ export default function App() {
                 {formErrorDetail ? <details className="diagnostic-details"><summary>Technical details</summary><p>{formErrorDetail}</p></details> : null}
               </div>
             ) : null}
-
-            <div className="submit-row">
-              <p className="privacy-note">Up to {HARNESS_MAX_TURNS} AI requests per update. {provider === 'openai-codex' ? 'Subscription usage limits apply.' : 'Charges may apply.'}</p>
-              <div className="submit-actions">
-                <button className="primary-button" type="submit" disabled={!canSubmit || (question !== '' && answer.trim().length === 0)}>
-                  <span>{isBusy ? 'Working…' : flow.kind === 'error' ? 'Try again' : question ? 'Continue' : activeExperiment ? 'Update experiment' : 'Build experiment'}</span>
-                  {isBusy ? null : <ArrowRight size={16} weight="bold" aria-hidden="true" />}
-                </button>
-              </div>
+            <div className={`composer__box${isBusy ? ' is-busy' : ''}`}>
+              <label className="visually-hidden" htmlFor="composer-input">{question ? 'Your answer' : activeExperiment ? 'What would you like to change?' : 'Describe an experiment'}</label>
+              <textarea
+                id="composer-input"
+                ref={question ? answerRef : descriptionRef}
+                value={composerValue}
+                onChange={event => question ? handleAnswerChange(event.target.value) : handleDescriptionChange(event.target.value)}
+                onKeyDown={submitOnEnter}
+                placeholder={isBusy ? 'Working on it…' : question ? 'Your answer' : activeExperiment ? 'Ask for a change' : 'Describe an experiment'}
+                minLength={question ? undefined : 3}
+                maxLength={question ? 4000 : 16000}
+                required
+                rows={1}
+                readOnly={isBusy}
+                aria-describedby="composer-hint"
+                disabled={Boolean(reviewProposal?.accepted || reviewProposal?.keeping)}
+              />
+              <button className="send-button" type="submit" disabled={submitDisabled} aria-label={submitLabel} title={submitLabel}>
+                {isBusy ? <span className="spinner spinner--light" aria-hidden="true" /> : <ArrowUp size={18} weight="bold" aria-hidden="true" />}
+              </button>
             </div>
+            <p className="composer__hint" id="composer-hint">{activeExperiment && !question ? 'The current experiment is included, so describe only what changes.' : 'Enter to send · Shift+Enter for a new line'}</p>
           </form>
-
-          {flow.message && !isBusy && flow.kind !== 'unsupported' && flow.kind !== 'clarification' && flow.kind !== 'ready' ? (
-            <div ref={flow.kind === 'error' ? flowMessageRef : undefined} tabIndex={flow.kind === 'error' ? -1 : undefined} className={`flow-message flow-message--${flow.kind}`} role={flow.kind === 'error' ? 'alert' : 'status'} aria-live={flow.kind === 'error' ? 'assertive' : 'polite'}>
-              <span className="flow-message__line" aria-hidden="true" />
-              <div className="flow-message__content">
-                <p>{flow.message}</p>
-                {flow.kind === 'error' ? <p className="flow-message__next">Your message and experiment are unchanged.</p> : null}
-                {flow.kind === 'error' && flow.detail ? <details className="diagnostic-details"><summary>Technical details</summary><p>{flow.detail}</p></details> : null}
-              </div>
-            </div>
-          ) : null}
-
-          {responseDecision && (responseDecision.kind === 'unsupported' || responseDecision.alternative) ? (
-            <section className="response-panel response-panel--unsupported" ref={responseRef} tabIndex={-1} aria-labelledby="response-title">
-              <h2 id="response-title">{responseDecision.kind === 'unsupported' ? 'This setup needs a change' : 'Suggested setup'}</h2>
-              {conversation.at(-1)?.content !== responseDecision.summary ? <p>{responseDecision.summary}</p> : null}
-              {responseDecision.alternative ? (
-                <div className="response-proposal">
-                  <h3>{responseDecision.alternative.label}</h3>
-                  <p>{responseDecision.alternative.description}</p>
-                  <button className="primary-button" type="button" onClick={() => {
-                    handleDescriptionChange(responseDecision.alternative!.description);
-                    descriptionRef.current?.focus();
-                  }}>Use as draft</button>
-                  <small>Review the draft, then send it to build.</small>
-                </div>
-              ) : null}
-              <div className="response-panel__actions">
-                <button className="secondary-button" type="button" onClick={() => descriptionRef.current?.focus()}>Edit my request</button>
-              </div>
-              {responseDecision.reason ? (
-                <details className="response-details">
-                  <summary>Why this needs a change</summary>
-                  <p>{responseDecision.reason}</p>
-                </details>
-              ) : null}
-              <p className="field-hint">{activeExperiment ? 'Your existing experiment is unchanged.' : 'No simulation has been created.'}</p>
-            </section>
-          ) : null}
-
-
-          {recentScenes.length > 0 ? (
-            <details className="recent-section">
-              <summary><ClockCounterClockwise size={16} aria-hidden="true" /><span>Recent scenes</span><span className="recent-count">{recentScenes.length}</span></summary>
-              <ul className="recent-list">
-                {recentScenes.map(item => (
-                  <li key={item.id}>
-                    <button
-                      className="recent-item"
-                      type="button"
-                      onClick={() => loadRecentScene(item)}
-                      aria-current={!proposalPreview && currentSceneId === item.id ? 'true' : undefined}
-                      title="Load the saved scene without a model request"
-                    >
-                      <strong>{item.title}</strong>
-                      {!proposalPreview && currentSceneId === item.id ? <small>Open</small> : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-
-          <details className="capabilities-details">
-            <summary>What this lab can model</summary>
-            <div className="capabilities-copy">
-              <p>Classical mechanics with rigid bodies and point particles, gravity and applied loads, collisions and contacts, joints, and cable or spring connections.</p>
-              <p>Contacts include elastic, partially elastic and inelastic restitution targets, static and kinetic sliding friction, and torsional/rolling resistance. Pair restitution uses the lower coefficient; pair friction uses the higher. Ground is a real physical surface by default.</p>
-              <p><strong>Model boundaries:</strong> rigid bodies and compliant numerical contacts, not deformation or fluid fields. Material coefficients are numerical targets with finite-step error; inspect the declared assumptions and actual results.</p>
-              <p><strong>Display:</strong> the grid and 1 m axes are visual aids, not a floor. Infinite planes render as finite patches, and point markers are not physical radii.</p>
-            </div>
-          </details>
-        </section>
-
-        <section className={`simulation-section${activeExperiment?.scene.events.length ? ' simulation-section--scheduled' : ''}`} aria-labelledby="simulation-title">
-          <h2 id="simulation-title" className="visually-hidden">Simulation</h2>
-          {interpretation?.approximation ? (
-            <div className="approximation-notice" role="note">
-              <strong>Some behavior is approximated</strong>
-              <p>{interpretation.approximation}</p>
-            </div>
-          ) : null}
-          {proposalPreview && !isBusy ? (
-            <section className="review-proposal" aria-labelledby="review-proposal-title">
-              <div className="review-proposal__heading">
-                <span className="review-proposal__badge">Unsaved proposal</span>
-                <h2 id="review-proposal-title">Take a look before using this</h2>
-              </div>
-              <p>The setup passed its initial checks, but the assistant couldn’t settle a few details.</p>
-              <p className="field-hint">Run stays disabled until you choose “Use this setup”.</p>
-              <details className="review-proposal__concerns">
-                <summary>What needs a look</summary>
-                <p>These are assistant concerns, not verified facts.</p>
-                <ul>
-                  {proposalPreview.proposal.concerns.map((concern, index) => (
-                    <li key={`${concern.code}-${index}`}>
-                      <strong>{Object.hasOwn(REVIEW_CONCERN_CATEGORIES, concern.code) ? REVIEW_CONCERN_CATEGORIES[concern.code] : 'Setup'}</strong>
-                      <p>{concern.message}</p>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-              {proposalPreview.accepted ? (
-                <div className="notice notice--warning" role="status">
-                  <p>The setup was saved, but its paused preview could not be reopened. {proposalPreview.previous.savedScene ? 'Your previous scene link is unchanged.' : 'No previous scene was replaced.'}</p>
-                  <button className="secondary-button" type="button" onClick={retryPersistence}>Retry opening</button>
-                </div>
-              ) : proposalPreview.keeping ? (
-                <div className="notice notice--warning" role="status">
-                  <p>{proposalPreview.previous.savedScene ? 'Your previous scene and link are unchanged.' : proposalPreview.previous.experiment ? 'Your previous setup is unchanged.' : 'Nothing new was saved or replaced.'}</p>
-                  <button className="secondary-button" type="button" onClick={retryPersistence}>Retry previous setup</button>
-                </div>
-              ) : pendingSaveRef.current?.mode === 'prepare' && sceneOperation === 'idle' ? (
-                <div className="notice notice--warning" role="status">
-                  <p>This setup could not be saved yet. {proposalPreview.previous.savedScene ? 'Your previous scene and link are unchanged.' : proposalPreview.previous.experiment ? 'Your previous setup is unchanged.' : 'Nothing has been saved or replaced.'}</p>
-                  <button className="secondary-button" type="button" onClick={retryPersistence}>Retry save</button>
-                  <button className="secondary-button" type="button" onClick={keepPrevious}>
-                    {proposalPreview.previous.experiment ? 'Keep previous' : 'Back to request'}
-                  </button>
-                </div>
-              ) : (
-                <div className="review-proposal__actions">
-                  <button className="primary-button" type="button" onClick={useReviewProposal} disabled={isBusy || sceneOperation !== 'idle' || pendingSaveRef.current !== null}>Use this setup</button>
-                  <button className="secondary-button" type="button" onClick={keepPrevious} disabled={isBusy || sceneOperation !== 'idle'}>
-                    {proposalPreview.previous.experiment ? 'Keep previous' : 'Back to request'}
-                  </button>
-                  <button className="secondary-button" type="button" onClick={() => {
-                    descriptionRef.current?.scrollIntoView({ block: 'nearest' });
-                    descriptionRef.current?.focus({ preventScroll: true });
-                  }} disabled={Boolean(proposalPreview.accepted || proposalPreview.keeping) || sceneOperation !== 'idle'}>
-                    Adjust this setup
-                  </button>
-                </div>
-              )}
-            </section>
-          ) : null}
-          {!proposalPreview ? (
-            <SceneLinkBar
-              saved={pendingSaveRef.current?.mode === 'appearance' ? null : savedScene}
-              operation={sceneOperation}
-              error={sceneError}
-              onRetry={retryPersistence}
-              onKeepPreviousLook={pendingSaveRef.current?.mode === 'appearance' ? () => {
-                pendingSaveRef.current = null;
-                retryActionRef.current = null;
-                setSceneError('');
-              } : undefined}
-              onSaveCopy={activeExperiment && !savedScene && !pendingSaveRef.current && sceneOperation === 'idle' && !isBusy ? saveCurrentCopy : undefined}
-            />
-          ) : null}
-          {activeExperiment ? <SceneTimeline scene={activeExperiment.scene} snapshot={snapshot} /> : null}
-          <div className="stage">
-            <SimulationCanvas
-              experiment={pendingExperiment}
-              replacementPending={isBusy || (sceneTransitionBusy && pendingSaveRef.current?.mode !== 'appearance')}
-              onStatus={handleCanvasStatus}
-              onReady={handleCanvasReady}
-              onSnapshot={handleCanvasSnapshot}
-              onFailure={handleCanvasFailure}
-              onBeforeRun={handleBeforeRun}
-              onPlaybackChange={handlePlaybackChange}
-              playbackBlocked={blockedRuntimeId === activeExperiment?.id || Boolean(proposalPreview)}
-              runToken={generation.current}
-              clearToken={clearCanvasToken}
-              physicalGround={Boolean(activeExperiment?.scene.ground)}
-              groundDisabled={!activeExperiment || Boolean(reviewProposal) || isBusy || sceneTransitionBusy}
-              onPhysicalGroundChange={togglePhysicalGround}
-              appearance={pendingSaveRef.current?.mode === 'appearance' ? pendingSaveRef.current.document.scene.appearance : activeExperiment?.scene.appearance}
-              appearanceDisabled={!activeExperiment || Boolean(reviewProposal) || isBusy || sceneOperation !== 'idle' || pendingSaveRef.current !== null}
-              appearanceSaving={sceneOperation === 'saving' && pendingSaveRef.current?.mode === 'appearance'}
-              onAppearanceChange={changeAppearance}
-              selectedEntityId={selectedEntityId}
-              onSelectEntity={setSelectedEntityId}
-              onInspectEntity={() => {
-                const card = selectedEntityId ? document.getElementById(`object-${selectedEntityId}`) : null;
-                card?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
-                card?.querySelector<HTMLButtonElement>('.object-select')?.focus({ preventScroll: true });
-              }}
-            />
-          </div>
-          {interpretation ? (
-            <section className={`interpretation-panel${responseDecision ? ' interpretation-panel--preserved' : ''}`} aria-labelledby="interpretation-title">
-              <div className="interpretation-heading">
-                <h2 id="interpretation-title">{interpretation.scene?.title ?? 'This scene'}</h2>
-                {proposalPreview ? <span className="interpretation-tag">Unsaved proposal</span> : responseDecision ? <span className="interpretation-tag">Unchanged preview</span> : null}
-              </div>
-              {experimentFacts ? <div className="scene-facts">
-                <span><Cube size={15} aria-hidden="true" />{experimentFacts.objects} {experimentFacts.objects === 1 ? 'object' : 'objects'}</span>
-                <span><ArrowDown size={15} aria-hidden="true" />{Number(experimentFacts.gravity.toPrecision(4))} m/s²</span>
-                <span><Atom size={15} aria-hidden="true" />Ground {experimentFacts.ground ? 'on' : 'off'}</span>
-              </div> : null}
-              {conversation.at(-1)?.content !== interpretation.summary ? <details className="response-details"><summary>Experiment notes</summary><p>{interpretation.summary}</p></details> : null}
-              <div className="interpretation-body">
-                {interpretation.assumptions.length > 0 ? (
-                  <details className="assumption-list">
-                    <summary>Assumptions &amp; details ({interpretation.assumptions.length})</summary>
-                    <ul>{interpretation.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
-                  </details>
-                ) : <p className="assumption-empty">No additional assumptions reported.</p>}
-                <details className="ground-facts response-details">
-                  <summary>Ground details</summary>
-                  {activeExperiment && activeExperiment.scene.ground ? (
-                    <p className="ground-line">
-                      <strong>Ground</strong> at z = {activeExperiment.scene.ground.height} m, restitution {activeExperiment.scene.ground.restitution}, sliding friction {activeExperiment.scene.ground.friction.sliding}.
-                    </p>
-                  ) : <p className="ground-line"><strong>Ground</strong> off. Modeled supports are listed under Objects.</p>}
-                </details>
-              </div>
-            </section>
-          ) : null}
-          {activeExperiment || pendingExperiment ? <>
-            <TelemetryPanel experimentId={activeExperiment?.id ?? null} snapshot={snapshot} />
-            <ObjectCards snapshot={snapshot} hasExperiment selectedEntityId={selectedEntityId} selectableEntities={selectableEntities} onSelectEntity={setSelectedEntityId} />
-          </> : null}
-        </section>
-
+        </aside>
       </main>
       {examplesOpen ? <ExampleLibrary
         examples={EXPERIMENT_EXAMPLES}
@@ -1870,10 +1829,6 @@ export default function App() {
         onOpenSetup={openExample}
         onStartPrompt={startExamplePrompt}
       /> : null}
-      <footer className="page-footer">
-        <span>Mechanics only. SI units, Z up. Results are numerical approximations; inspection is read-only.</span>
-      </footer>
     </div>
   );
 }
-
