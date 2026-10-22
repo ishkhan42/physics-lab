@@ -784,6 +784,7 @@ export default function SimulationCanvas({
       grid.material.transparent = true;
       grid.material.opacity = 0.6;
       grid.material.depthWrite = false;
+      grid.visible = DEFAULT_APPEARANCE.grid;
       scene.add(grid);
       gridRef.current = grid;
       const axes = new AxesHelper(1);

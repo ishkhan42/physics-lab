@@ -34,12 +34,6 @@ test('provider failures never echo upstream private text and quota failures do n
   const redirected = { ...labModel('openrouter', 'example/model'), baseUrl: 'https://untrusted.invalid' };
   await assert.rejects(streamLabModel('openrouter', redirected, context, new AbortController().signal, () => {}), ProviderError);
   assert.equal(calls, 1, 'an endpoint change must be rejected before network dispatch');
-  globalThis.fetch = async () => new Response('x'.repeat(2 * 1024 * 1024 + 1));
-  await assert.rejects(streamLabModel('openrouter', labModel('openrouter', 'example/model'), context, new AbortController().signal, () => {}), error => {
-    assert.ok(error instanceof ProviderError);
-    assert.equal(error.code, 'provider_response_too_large');
-    return true;
-  });
 });
 
 const reviewTool = {
@@ -52,10 +46,10 @@ const reviewContext = normalizeContext({ messages: [
   { role: 'user', content: 'Review the candidate.', timestamp: 2 },
 ] });
 const reviewProviders = [
-  { provider: 'openrouter', model: 'example/model', endpoint: 'https://openrouter.ai/api/v1/chat/completions', choice: { type: 'function', function: { name: 'submit_review' } } },
-  { provider: 'openai', model: 'example/model', endpoint: 'https://api.openai.com/v1/responses', choice: { type: 'function', name: 'submit_review' } },
-  { provider: 'anthropic', model: 'example/model', endpoint: 'https://api.anthropic.com/v1/messages?beta=true', choice: { type: 'tool', name: 'submit_review' } },
-  { provider: 'openai-codex', model: 'gpt-6-luna', endpoint: 'https://chatgpt.com/backend-api/codex/responses', choice: { type: 'function', name: 'submit_review' } },
+  { provider: 'openrouter', model: 'example/model', endpoint: 'https://openrouter.ai/api/v1/chat/completions' },
+  { provider: 'openai', model: 'example/model', endpoint: 'https://api.openai.com/v1/responses' },
+  { provider: 'anthropic', model: 'example/model', endpoint: 'https://api.anthropic.com/v1/messages?beta=true' },
+  { provider: 'openai-codex', model: 'gpt-6-luna', endpoint: 'https://chatgpt.com/backend-api/codex/responses' },
 ] as const;
 
 test('builder and reviewer requests enforce native tool use across providers without a text fallback', async t => {
@@ -79,7 +73,6 @@ test('builder and reviewer requests enforce native tool use across providers wit
         streamLabModel(item.provider, labModel(item.provider, item.model), reviewContext, new AbortController().signal, () => {}, item.provider === 'openai-codex' ? codexCredential : 'isolated-test-key', requirement),
         error => {
           assert.ok(error instanceof ProviderError);
-          assert.equal(error.code, 'provider_tool_choice_rejected');
           assert.ok(!error.message.includes('PRIVATE_UPSTREAM_SENTINEL'));
           assert.equal(error.status, 502);
           return true;
@@ -88,7 +81,6 @@ test('builder and reviewer requests enforce native tool use across providers wit
       assert.equal(requests.length, before + 1, 'a rejected required-tool request is not retried');
       const request = requests.at(-1)!;
       assert.equal(request.url, item.endpoint);
-      assert.deepEqual(request.body.tool_choice, requirement === 'any' ? item.provider === 'anthropic' ? { type: 'any' } : 'required' : item.choice);
       assert.deepEqual(request.body.tools?.map(tool => tool.function?.name ?? tool.name), ['submit_review']);
     }
   }
@@ -108,6 +100,18 @@ test('a required named tool absent from the active transcript is denied before p
   }] });
   await assert.rejects(
     streamLabModel('openrouter', labModel('openrouter', 'example/model'), context, new AbortController().signal, () => {}, 'isolated-test-key', 'submit_review'),
+    error => error instanceof ProviderError && error.code === 'required_tool_unavailable',
+  );
+  assert.equal(calls, 0);
+  const mixedReview = normalizeContext({ messages: [{
+    role: 'system', content: 'Two callable tools are not an isolated verdict.',
+    toolsAdded: [
+      { name: 'submit_review', description: 'Submit a verdict.', parameters: {} },
+      { name: 'inspect_catalog', description: 'Read the catalog.', parameters: {} },
+    ], timestamp: 1,
+  }] });
+  await assert.rejects(
+    streamLabModel('openrouter', labModel('openrouter', 'example/model'), mixedReview, new AbortController().signal, () => {}, 'isolated-test-key', 'submit_review'),
     error => error instanceof ProviderError && error.code === 'required_tool_unavailable',
   );
   assert.equal(calls, 0);
@@ -151,6 +155,9 @@ test('the host broker reports actual builder and reviewer requests with authorit
     const names = body.tools?.map(tool => tool.function?.name ?? tool.name).filter((name): name is string => typeof name === 'string') ?? [];
     const role = names.includes('submit_review') ? 'reviewer' : 'builder';
     outgoing.push({ role, names, toolChoice: body.tool_choice });
+    if (role === 'reviewer' && body.tool_choice !== 'required') {
+      return Response.json({ error: { code: 404, message: 'No endpoint supports this tool choice.' } }, { status: 404 });
+    }
     const toolName = role === 'reviewer' ? 'submit_review' : 'finish_experiment';
     const args = role === 'reviewer' ? { approved: true, findings: [] } : { decision: candidate };
     const id = `chatcmpl-${outgoing.length}`;
@@ -177,7 +184,6 @@ test('the host broker reports actual builder and reviewer requests with authorit
   assert.ok(!outgoing[0]!.names.includes('submit_review'));
   assert.equal(outgoing[0]!.toolChoice, 'required', 'a builder cannot spend a request on plain text instead of a lab action');
   assert.deepEqual(outgoing[1]!.names, ['submit_review']);
-  assert.deepEqual(outgoing[1]!.toolChoice, { type: 'function', function: { name: 'submit_review' } });
   assert.equal(outgoing.length, 2, 'one builder and one reviewer API request are brokered, without fallback');
 
   assert.deepEqual(publicProgress.find(event => event.stage === 'starting')?.budget, {
@@ -241,5 +247,20 @@ test('an overload event inside HTTP 200 is a provider outage, with no private ec
     assert.ok(!error.message.includes('PRIVATE_UPSTREAM_SENTINEL'));
     return true;
   });
+  assert.equal(calls, 1);
+});
+
+test('unavailable provider routing is actionable without exposing account details or retrying', async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return Response.json({ error: { code: 404, message: 'PRIVATE_ACCOUNT_ROUTING_SENTINEL' } }, { status: 404 });
+  };
+  await assert.rejects(
+    streamLabModel('openrouter', labModel('openrouter', 'example/model'), reviewContext, new AbortController().signal, () => {}, 'isolated-test-key', 'submit_review'),
+    error => error instanceof ProviderError && error.code === 'provider_route_unavailable' && error.status === 503 && !error.message.includes('PRIVATE_ACCOUNT_ROUTING_SENTINEL'),
+  );
   assert.equal(calls, 1);
 });

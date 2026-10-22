@@ -10,12 +10,13 @@
 .example-library__heading h2 svg { flex: 0 0 auto; color: var(--accent-strong); }
 .example-library__heading p { max-width: 60ch; margin-top: 7px; color: var(--ink-3); font-size: 13px; line-height: 1.5; }
 .example-library__close { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; }
-.example-library__studies { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 20px 24px; }
-.example-study { min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+.example-library__studies { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 24px; }
+.example-study { min-width: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr); align-items: start; gap: 18px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+.example-study__preview { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--r); }
+.example-study__content { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .example-study h3 { color: var(--ink); font-size: 15px; font-weight: 620; letter-spacing: -.01em; }
 .example-study__question { color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 .example-study__note, .example-study__setup { color: var(--ink-3); font-size: 12px; line-height: 1.5; }
-.example-study__setup { min-height: 65px; display: flex; align-items: center; }
 .example-study__prompt > p { max-height: 240px; overflow: auto; font-size: 13px; line-height: 1.6; }
 .example-study__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
 .example-study__actions > button { min-height: 44px; }
@@ -26,8 +27,7 @@
   .example-library__heading { padding: 16px; gap: 10px; }
   .example-library__heading h2 { font-size: 17px; }
   .example-library__studies { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 12px; }
-  .example-study { padding: 14px; }
+  .example-study { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 14px; }
   .example-study__actions { display: grid; grid-template-columns: minmax(0, 1fr); }
-  .example-study__setup { min-height: 44px; }
   .example-library__footer { padding: 0 16px 16px; }
 }

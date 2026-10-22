@@ -8,10 +8,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { HarnessRequestSchema } from '../shared/harness.ts';
 import { SavedSceneIdSchema } from '../shared/saved-scene.ts';
 import { InvalidSceneDocumentError, SceneStore } from './scenes.ts';
+import { FirestoreSceneStore } from './firestore-scenes.ts';
 import { getProviderConfig, listOpenRouterModels, ProviderError } from './providers.ts';
 import { runLab } from './harness.ts';
+import { hostedDemo } from './demo.ts';
 
-const PORT = 3001;
+const DEFAULT_PORT = 3001;
 const MAX_ASSEMBLY_BYTES = 64 * 1024;
 const MAX_SCENE_BYTES = 1024 * 1024;
 const MAX_API_RESPONSE_BYTES = 8 * 1024 * 1024;
@@ -29,6 +31,21 @@ const ALLOWED_ORIGINS: Record<string, true> = {
   'http://127.0.0.1:5173': true,
   'http://localhost:5173': true,
 };
+type SceneRepository = Pick<SceneStore, 'initialize' | 'create' | 'get' | 'run' | 'cleanupExpired'> & { close(): void | Promise<void> };
+type RequestPolicy = { hosts: ReadonlySet<string>; origins: ReadonlySet<string> };
+
+function requestPolicy(): RequestPolicy {
+  const configured = process.env.PUBLIC_ORIGINS?.trim();
+  if (!configured) return { hosts: new Set(Object.keys(ALLOWED_HOSTS)), origins: new Set(Object.keys(ALLOWED_ORIGINS)) };
+  const origins = configured.split(',').map(value => {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
+      throw new Error('PUBLIC_ORIGINS must contain HTTPS origins only.');
+    }
+    return url;
+  });
+  return { hosts: new Set(origins.map(url => url.host)), origins: new Set(origins.map(url => url.origin)) };
+}
 const MIME_TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -88,11 +105,11 @@ function sendJson(
   response.end(body);
 }
 
-function enforceLocalRequest(request: IncomingMessage): void {
+function enforceRequest(request: IncomingMessage, policy: RequestPolicy): void {
   const host = request.headers.host?.toLowerCase();
-  if (!host || !Object.hasOwn(ALLOWED_HOSTS, host)) throw new ApiError(403, 'forbidden_host', 'Requests must use the local application host.');
+  if (!host || !policy.hosts.has(host)) throw new ApiError(403, 'forbidden_host', 'Use this lab’s application address.');
   const origin = request.headers.origin?.toLowerCase();
-  if (origin && !Object.hasOwn(ALLOWED_ORIGINS, origin)) throw new ApiError(403, 'forbidden_origin', 'Requests must come from the local application.');
+  if (origin && !policy.origins.has(origin)) throw new ApiError(403, 'forbidden_origin', 'Requests must come from this lab.');
 }
 
 async function readJsonBody(
@@ -172,7 +189,7 @@ async function serveStatic(
   setSafeHeaders(response);
   const extension = extname(target).toLowerCase();
   response.writeHead(200, {
-    'cache-control': 'no-cache',
+    'cache-control': /^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/.test(pathname) ? 'public, max-age=31536000, immutable' : 'no-cache',
     'content-length': file.size,
     'content-type': Object.hasOwn(MIME_TYPES, extension) ? MIME_TYPES[extension] : 'application/octet-stream',
   });
@@ -191,11 +208,12 @@ async function serveStatic(
 async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
-  sceneStore: SceneStore,
+  sceneStore: SceneRepository,
+  policy: RequestPolicy,
 ): Promise<void> {
   let streaming = false;
   try {
-    enforceLocalRequest(request);
+    enforceRequest(request, policy);
     if (!request.url?.startsWith('/')) throw new ApiError(400, 'invalid_path', 'The requested path is invalid.');
     let url: URL;
     try {
@@ -324,11 +342,31 @@ export type ApiServerOptions = {
 };
 
 export function createApiServer(options: ApiServerOptions = {}) {
-  const sceneStore = new SceneStore({ path: options.sceneDbPath, now: options.now });
+  const policy = requestPolicy();
+  hostedDemo();
+  const projectId = process.env.FIRESTORE_PROJECT_ID;
+  if (process.env.K_SERVICE && (!process.env.PUBLIC_ORIGINS || !projectId || !process.env.LAB_WORKER_URL || !process.env.LAB_RENDERER_URL || !process.env.WORKER_AUTH_TOKEN)) {
+    throw new Error('Hosted labs require public origins, durable storage, a private renderer and an authenticated isolated worker.');
+  }
+  const sceneStore: SceneRepository = projectId
+    ? new FirestoreSceneStore({ projectId, now: options.now })
+    : new SceneStore({ path: options.sceneDbPath, now: options.now });
   const server = createHttpServer((request, response) => {
-    void handleRequest(request, response, sceneStore).catch(() => response.destroy());
+    void handleRequest(request, response, sceneStore, policy).catch(() => response.destroy());
   });
-  server.on('close', () => sceneStore.close());
+  let maintenance: NodeJS.Timeout | undefined;
+  if (projectId) {
+    server.once('listening', () => {
+      maintenance = setInterval(() => {
+        void sceneStore.cleanupExpired().catch(() => console.error('Could not remove expired saved scenes.'));
+      }, 60_000);
+      maintenance.unref();
+    });
+  }
+  server.on('close', () => {
+    clearInterval(maintenance);
+    void Promise.resolve(sceneStore.close()).catch(() => console.error('Could not close saved-scene storage.'));
+  });
   if (options.initializeSceneStore) {
     server.on('listening', () => {
       void sceneStore.initialize().catch(() => {
@@ -345,13 +383,16 @@ export function createApiServer(options: ApiServerOptions = {}) {
 }
 
 export function startServer() {
+  const port = process.env.PORT ? Number(process.env.PORT) : DEFAULT_PORT;
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port.');
+  const host = process.env.PUBLIC_ORIGINS ? '0.0.0.0' : '127.0.0.1';
   const server = createApiServer({ initializeSceneStore: true });
   server.on('error', () => {
-    console.error('Could not start the local physics-lab server on port 3001.');
+    console.error(`Could not start the physics-lab server on port ${port}.`);
     process.exitCode = 1;
   });
-  server.listen(PORT, '127.0.0.1', () => {
-    console.log('Physics lab server listening on http://127.0.0.1:3001');
+  server.listen(port, host, () => {
+    console.log(`Physics lab server listening on ${host}:${port}`);
   });
   return server;
 }

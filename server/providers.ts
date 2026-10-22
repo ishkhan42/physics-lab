@@ -10,13 +10,24 @@ import { z } from 'zod';
 import { CONNECTED_GPT_MODEL, PROVIDER_LABELS, type ModelOption, type ProviderConfig } from '../shared/catalog.ts';
 import type { Provider } from '../shared/scene.ts';
 import { getCurrentTools } from '@earendil-works/pi-ai/utils/transcript';
+import { HarnessRequestSchema } from '../shared/harness.ts';
+import { hostedDemo } from './demo.ts';
+import { hostedSubscriptionKey } from './subscription-auth.ts';
 
 const PROVIDER_ENV_KEYS: Record<Exclude<Provider, 'openai-codex'>, string> = { openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY', openrouter: 'OPENROUTER_API_KEY' };
 const PROVIDERS = ['openrouter', 'openai', 'anthropic', 'openai-codex'] satisfies readonly Provider[];
 const adapters: Record<Provider, PiProvider> = { openrouter: openrouterProvider(), openai: openaiProvider(), anthropic: anthropicProvider(), 'openai-codex': openaiCodexProvider() };
 const ENDPOINTS = { openrouter: 'https://openrouter.ai/api/v1', openai: 'https://api.openai.com/v1', anthropic: 'https://api.anthropic.com', 'openai-codex': 'https://chatgpt.com/backend-api' };
 const execFileAsync = promisify(execFile);
-const connectedGptEnabled = () => process.env.PHYSICS_LAB_CONNECTED_GPT === '1';
+const hostedFreeOnly = () => Boolean(process.env.PUBLIC_ORIGINS?.trim());
+const connectedGptEnabled = () => process.env.PHYSICS_LAB_CONNECTED_GPT === '1'
+  && (!hostedFreeOnly() || hostedDemo()!.deadline > Date.now());
+function enforceHostedModel(provider: Provider, id: string): void {
+  if (hostedFreeOnly() && provider === 'openai-codex' && connectedGptEnabled() && id === CONNECTED_GPT_MODEL) return;
+  if (hostedFreeOnly() && (provider !== 'openrouter' || !(id.endsWith(':free') || id === 'openrouter/free'))) {
+    throw new ProviderError('hosted_free_only', 'This public lab supports free OpenRouter models only.', 403);
+  }
+}
 type OpenRouterCatalog = { at: number; models: ModelOption[]; imageInputs: Map<string, boolean> };
 let cachedModels: OpenRouterCatalog | null = null;
 let cachedConnectedGptInput: { at: number; input: Model<Api>['input'] } | null = null;
@@ -32,16 +43,21 @@ export class ProviderError extends Error {
   }
 }
 export async function providerKey(provider: Provider, signal?: AbortSignal): Promise<string> {
+  if (hostedFreeOnly() && provider !== 'openrouter' && !(provider === 'openai-codex' && connectedGptEnabled())) {
+    throw new ProviderError('hosted_free_only', 'This lab permits only free OpenRouter models or its active, authorized subscription demo.', 403);
+  }
   if (provider === 'openai-codex') {
     if (!connectedGptEnabled()) throw new ProviderError('connection_not_enabled', 'Connected GPT has not been enabled by the person running this lab.', 403);
     try {
+      const demo = hostedDemo();
+      if (demo) return await hostedSubscriptionKey(demo.credentialSecret, demo.deadline, signal);
       const { stdout } = await execFileAsync('omp', ['token', 'openai-codex'], { timeout: 15_000, killSignal: 'SIGKILL', maxBuffer: 64 * 1024, signal });
       const token = stdout.trim();
       if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) throw new Error('Unsupported credential format.');
       return token;
     } catch {
       if (signal?.aborted) throw signal.reason;
-      throw new ProviderError('missing_credentials', 'The existing GPT login could not be read. Sign in through OMP, then try again.', 503);
+      throw new ProviderError('missing_credentials', 'The authorized GPT connection could not be read or renewed. Ask the person running this lab to reconnect it.', 503);
     }
   }
   const key = process.env[PROVIDER_ENV_KEYS[provider]]?.trim();
@@ -49,11 +65,13 @@ export async function providerKey(provider: Provider, signal?: AbortSignal): Pro
   return key;
 }
 export function getProviderConfig(): ProviderConfig {
-  const providers = PROVIDERS.map(id => ({ id, label: PROVIDER_LABELS[id], available: id === 'openai-codex' ? connectedGptEnabled() : Boolean(process.env[PROVIDER_ENV_KEYS[id]]?.trim()) }));
+  const choices = hostedFreeOnly() ? connectedGptEnabled() ? ['openai-codex', 'openrouter'] as const : ['openrouter'] as const : PROVIDERS;
+  const providers = choices.map(id => ({ id, label: PROVIDER_LABELS[id], available: id === 'openai-codex' ? connectedGptEnabled() : Boolean(process.env[PROVIDER_ENV_KEYS[id]]?.trim()) }));
   const available = connectedGptEnabled() ? providers.find(provider => provider.id === 'openai-codex') : providers.find(provider => provider.available);
-  return { providers, defaultProvider: available?.id ?? null, defaultModel: available?.id === 'openai-codex' ? CONNECTED_GPT_MODEL : available?.id === 'openrouter' ? 'nvidia/nemotron-3.5-super-vl:free' : null };
+  return { providers, defaultProvider: available?.id ?? null, defaultModel: available?.id === 'openai-codex' ? CONNECTED_GPT_MODEL : available?.id === 'openrouter' ? 'openrouter/free' : null };
 }
 export function labModel(provider: Provider, id: string): Model<Api> {
+  enforceHostedModel(provider, id);
   if (provider === 'openai-codex' && id !== CONNECTED_GPT_MODEL) throw new ProviderError('unsupported_model', 'Connected GPT is configured for GPT-6 Luna.', 400);
   const known = adapters[provider].getModels().find(model => model.id === id);
   return {
@@ -62,7 +80,7 @@ export function labModel(provider: Provider, id: string): Model<Api> {
     api: provider === 'openai-codex' ? 'openai-codex-responses' : provider === 'openai' ? 'openai-responses' : provider === 'anthropic' ? 'anthropic-messages' : 'openai-completions',
     // No model-supplied headers, endpoints or sampling parameters cross the broker.
     headers: undefined, samplingParams: undefined,
-    ...(provider === 'openai-codex' ? { thinkingLevelMap: { off: null, low: 'low' } } : {}),
+    ...(provider === 'openai-codex' ? { thinkingLevelMap: { off: null, low: 'low', high: 'high' } } : {}),
   };
 }
 const ConnectedGptModelSchema = z.object({
@@ -72,6 +90,7 @@ const ConnectedGptModelSchema = z.object({
 });
 async function connectedGptInput(signal: AbortSignal): Promise<Model<Api>['input']> {
   if (!connectedGptEnabled()) throw new ProviderError('connection_not_enabled', 'Connected GPT has not been enabled by the person running this lab.', 403);
+  if (hostedFreeOnly()) return labModel('openai-codex', CONNECTED_GPT_MODEL).input;
   signal.throwIfAborted();
   if (cachedConnectedGptInput && Date.now() - cachedConnectedGptInput.at < 300_000) return cachedConnectedGptInput.input;
   let stdout: string;
@@ -110,7 +129,11 @@ export async function resolveLabModel(provider: Provider, id: string, signal: Ab
       catalog = await openRouterCatalog(signal);
     } catch {
       if (signal.aborted) throw signal.reason;
+      if (hostedFreeOnly()) throw new ProviderError('provider_unavailable', 'The free model catalog could not be checked. Please try again shortly.', 503);
       return { ...model, input: ['text'] };
+    }
+    if (hostedFreeOnly() && !catalog.models.some(option => option.id === id && option.free)) {
+      throw new ProviderError('unsupported_model', 'Choose an available free model from AI settings.', 400);
     }
     const textInput = catalog.imageInputs.get(id);
     return { ...model, input: textInput === undefined ? ['text'] : textInput ? ['text', 'image'] : ['image'] };
@@ -127,9 +150,10 @@ const ProviderStreamFailureSchema = z.object({
 
 
 export async function streamLabModel(provider: Provider, model: Model<Api>, context: TranscriptContext, signal: AbortSignal, emit: (event: AssistantMessageEvent) => void, credential?: string, requiredTool?: 'submit_review' | 'any'): Promise<void> {
+  enforceHostedModel(provider, model.id);
   if (requiredTool) {
     const tools = getCurrentTools(context.messages);
-    if (tools.length === 0 || (requiredTool !== 'any' && !tools.some(tool => tool.name === requiredTool))) {
+    if (tools.length === 0 || (requiredTool !== 'any' && (tools.length !== 1 || tools[0]?.name !== requiredTool))) {
       throw new ProviderError('required_tool_unavailable', 'The required lab tool is not active for this model request.', 502);
     }
   }
@@ -138,10 +162,11 @@ export async function streamLabModel(provider: Provider, model: Model<Api>, cont
   let bytes = 0;
   let oversized = false;
   let overloaded = false;
-  const timeout = AbortSignal.any([signal, AbortSignal.timeout(120_000)]);
+  const demo = provider === 'openai-codex' ? hostedDemo() : null;
+  const timeout = AbortSignal.any([signal, AbortSignal.timeout(Math.max(1, Math.min(120_000, demo ? demo.deadline - Date.now() : 120_000)))]);
   const stream = adapters[provider].streamSimple(model, context, {
     apiKey: key, signal: timeout, maxTokens: 8192, timeoutMs: 120_000, maxRetries: 0,
-    transport: 'sse', ...(provider === 'openai-codex' ? { reasoning: 'low' as const } : {}),
+    transport: 'sse', ...(provider === 'openai-codex' ? { reasoning: 'high' as const } : provider === 'openrouter' && model.reasoning ? { reasoning: 'low' as const } : {}),
     onProviderStreamEvent: value => {
       if (typeof value !== 'object' || value === null || !('type' in value) || (value.type !== 'error' && value.type !== 'response.failed')) return;
       const parsed = ProviderStreamFailureSchema.safeParse(value);
@@ -159,7 +184,8 @@ export async function streamLabModel(provider: Provider, model: Model<Api>, cont
       const body = response.body?.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
         transform(chunk, controller) {
           received += chunk.byteLength;
-          if (received > 2 * 1024 * 1024) {
+          // SSE repeats envelope metadata; generated deltas retain their separate 512 KiB limit.
+          if (received > 16 * 1024 * 1024) {
             oversized = true;
             controller.error(new Error('Provider response exceeded the lab limit.'));
           } else controller.enqueue(chunk);
@@ -173,17 +199,21 @@ export async function streamLabModel(provider: Provider, model: Model<Api>, cont
         if (typeof request !== 'object' || request === null || Array.isArray(request)) {
           throw new ProviderError('provider_request_invalid', 'The provider SDK did not produce a valid model request.', 502);
         }
-        const toolChoice = requiredTool === 'any'
+        const toolChoice = requiredTool === 'any' || provider === 'openrouter'
           ? provider === 'anthropic' ? { type: 'any' } : 'required'
-          : provider === 'openrouter'
-            ? { type: 'function', function: { name: requiredTool } }
-            : provider === 'anthropic'
-              ? { type: 'tool', name: requiredTool }
-              : { type: 'function', name: requiredTool };
+          : provider === 'anthropic' ? { type: 'tool', name: requiredTool } : { type: 'function', name: requiredTool };
         request = { ...request, tool_choice: toolChoice };
       }
       if (provider === 'openrouter' && typeof request === 'object' && request !== null) {
-        return { ...request, provider: { require_parameters: true }, plugins: [] };
+        if (hostedFreeOnly() && (!('model' in request) || request.model !== model.id || 'models' in request)) {
+          throw new ProviderError('provider_request_invalid', 'The provider request did not preserve the selected free model.', 502);
+        }
+        // Keep deliberation bounded where supported; never disable mandatory model reasoning.
+        const routed = { ...request } as Record<string, unknown>;
+        if (!model.reasoning) delete routed.reasoning;
+        routed.provider = { require_parameters: true, ...(hostedFreeOnly() ? { max_price: { prompt: 0, completion: 0 } } : {}) };
+        routed.plugins = [];
+        return routed;
       }
       return request;
     },
@@ -194,7 +224,8 @@ export async function streamLabModel(provider: Provider, model: Model<Api>, cont
       if (oversized) throw new ProviderError('provider_response_too_large', 'The model response exceeded the lab limit.', 502);
       if (status === 429) throw new ProviderError('provider_rate_limited', 'The selected provider is rate-limiting this model. Your draft and current scene are preserved.', 429);
       if (status === 401 || status === 403) throw new ProviderError('provider_authentication_failed', 'The provider rejected the configured credentials.', 502);
-      if (requiredTool && (status === 400 || status === 422)) throw new ProviderError('provider_tool_choice_rejected', 'The AI service rejected the required lab-tool request. No plain-text fallback was attempted.', 502);
+      if (provider === 'openrouter' && status === 404) throw new ProviderError('provider_route_unavailable', 'OpenRouter has no eligible provider for this model. Check its provider/privacy settings or choose another model. No paid fallback was used.', 503);
+      if (status === 400 || status === 422) throw new ProviderError('provider_request_rejected', 'The AI service rejected its request parameters. This is a provider compatibility issue; your experiment is unchanged.', 502);
       if (timeout.aborted) throw new ProviderError('provider_timeout', 'The selected model exceeded its 120-second response deadline.', 504);
       if (overloaded || status >= 500) throw new ProviderError('provider_busy', 'The selected AI service is temporarily overloaded. Your request and previous experiment are preserved; changing the physics request will not fix this.', 503);
       throw new ProviderError('provider_unavailable', 'The selected AI service stopped before completing this turn. Your request and previous experiment are preserved.', 502);
@@ -207,11 +238,12 @@ export async function streamLabModel(provider: Provider, model: Model<Api>, cont
   }
 }
 
-const CatalogSchema = z.object({ data: z.array(z.object({
-  id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,199}$/), name: z.string().optional(),
+const CatalogModelSchema = z.object({
+  id: HarnessRequestSchema.shape.model, name: z.string().optional(),
   architecture: z.object({ input_modalities: z.array(z.string()), output_modalities: z.array(z.string()) }),
   supported_parameters: z.array(z.string()).optional(), context_length: z.number().positive().nullable().optional(),
-})) });
+});
+const CatalogSchema = z.object({ data: z.array(z.unknown()) });
 async function openRouterCatalog(signal?: AbortSignal): Promise<OpenRouterCatalog> {
   signal?.throwIfAborted();
   if (cachedModels && Date.now() - cachedModels.at < 300_000) return cachedModels;
@@ -235,21 +267,30 @@ async function openRouterCatalog(signal?: AbortSignal): Promise<OpenRouterCatalo
   catch { throw new ProviderError('invalid_provider_response', 'The model catalog format is invalid.', 502); }
   const parsed = CatalogSchema.safeParse(raw);
   if (!parsed.success) throw new ProviderError('invalid_provider_response', 'The model catalog format is invalid.', 502);
-  const models = parsed.data.data.filter(model => model.architecture.input_modalities.includes('text') && model.architecture.output_modalities.includes('text') && model.supported_parameters?.includes('tools')).map(model => ({
-    id: model.id, name: model.name || model.id, free: model.id.endsWith(':free') || model.id === 'openrouter/free',
-    contextLength: model.context_length ?? null,
-  }));
-  if (!models.some(model => model.id === 'openrouter/free')) models.unshift({ id: 'openrouter/free', name: 'OpenRouter Free Router', free: true, contextLength: null });
+  const models: OpenRouterCatalog['models'] = [];
   const imageInputs = new Map<string, boolean>();
-  const seen = new Set<string>();
-  for (const model of parsed.data.data) {
-    if (seen.has(model.id)) imageInputs.delete(model.id);
-    else if (model.architecture.input_modalities.includes('image')) imageInputs.set(model.id, model.architecture.input_modalities.includes('text'));
-    seen.add(model.id);
+  const declarations = new Map<string, number>();
+  const listed = new Set<string>();
+  for (const value of parsed.data.data) {
+    if (typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string') {
+      const id = value.id.trim();
+      if (id && id.length <= 200) declarations.set(id, (declarations.get(id) ?? 0) + 1);
+    }
+    const row = CatalogModelSchema.safeParse(value);
+    if (!row.success) continue;
+    const model = row.data;
+    const textInput = model.architecture.input_modalities.includes('text');
+    if (textInput && model.architecture.input_modalities.includes('image')) imageInputs.set(model.id, true);
+    if (!textInput || !model.architecture.output_modalities.includes('text') || !model.supported_parameters?.includes('tools') || listed.has(model.id)) continue;
+    listed.add(model.id);
+    models.push({ id: model.id, name: model.name || model.id, free: model.id.endsWith(':free') || model.id === 'openrouter/free', contextLength: model.context_length ?? null });
   }
+  for (const [id, count] of declarations) if (count !== 1) imageInputs.delete(id);
+  if (!listed.has('openrouter/free')) models.unshift({ id: 'openrouter/free', name: 'OpenRouter Free Router', free: true, contextLength: null });
   cachedModels = { at: Date.now(), models, imageInputs };
   return cachedModels;
 }
 export async function listOpenRouterModels(signal?: AbortSignal): Promise<ModelOption[]> {
-  return (await openRouterCatalog(signal)).models;
+  const models = (await openRouterCatalog(signal)).models;
+  return hostedFreeOnly() ? models.filter(model => model.free) : models;
 }

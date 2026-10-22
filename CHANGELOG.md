@@ -1,10 +1,25 @@
 # Changelog
 
 ## Unreleased
+- Replace the README's development log with usage, local setup, architecture and limits; add GIFs recorded from real pendulum and spring-net playback.
+- Record final acceptance of the contest POC and update the technical app map. Submission materials remain separate.
+- Default the reference grid off when unspecified, preserving explicit saved choices and the independent physical ground.
+- Withdraw the experimental body-force overlay and its native decomposition after visual review; retain the existing native spring/tension visuals and numeric mechanics readouts.
+- Replace the four rejected study families and their variants with spring-net impact, three-body choreography, a frictionless contact-loss loop and a curved domino cascade. Retain the double pendulum with a measured 5° difference in its actual upper-link poses, not just its description.
+- Show cropped native-simulation frame previews in a compact responsive example gallery, with complete standalone prompts and no inference required to open a setup. Keep existing saved copies unchanged.
+- Rehearse every study through native dynamics and browser playback; add regressions for spring energy return/scheduled release, impact losses without friction, orbital near-return/center-of-mass stability and cascade propagation. Make renderer readiness use the first bundled scene rather than a retired example ID.
+- Add an explicitly authorized public hosted GPT-6 Luna High demo with a fixed expiry and a separate renewable OAuth session in Secret Manager. Remove Basic Auth and password configuration; retain exact expiry, bounded requests and free-only OpenRouter alternatives without automatic fallback.
+- Verify the original elastic/inelastic two-ball prompt through the real hosted subscription, visual inspection, independent review, saved-scene playback and refresh; add admission, token-lifetime and exact-expiry regressions.
+- Serialize credential rotation with a durable lease, persist rotated credentials before use, and finish in-progress rotation after browser cancellation without exposing credentials to the browser, agent or saved scenes.
+- Add a hosted API mode with explicit HTTPS origin admission, free-only OpenRouter routing and zero upstream token-price ceilings; keep local provider choices and loopback defaults unchanged.
+- Persist hosted scenes in Firestore with bounded JSON chunks, immutable links, exact logical expiry and transactional renewal/cleanup. Preserve the local private SQLite store.
+- Connect the trusted broker to a private authenticated Docker gateway without moving provider credentials into the worker. Keep the existing sandbox limits, stream budgets and independent review.
+- Build API, worker and keyless renderer targets from one Dockerfile. Qualify agent isolation/native motion on the private VM and actual scene rendering before the renderer becomes ready; use a bounded inspection RPC without giving the agent network or browser-command access.
+- Isolate malformed model-catalog rows, support current routing aliases, preserve required single-tool review across free endpoints, and request low reasoning only from models that support it. Distinguish unavailable provider routes from scene errors and bound generated content separately from repeated SSE transport metadata; never retry or add a paid fallback.
 - Render actual tendons as shaded round-wire springs and detailed cords, with native signed tension/compression arrows and schematic slack. Existing scenes receive the visuals automatically.
 - Expose optional model-facing wire radius, coil radius, winding count and relative-force reference without changing mechanics or native-check fingerprints. Image inspection uses the same geometry and refreshes when the style changes.
 - Follow native sphere/cylinder wrapping, preserve routed anchors, and reuse geometry/bounds buffers. Keep compound connectors selectable and GPU-resource disposal explicit.
-- Add a bundled library of five prepared mechanics studies and four comparison setups. Explicit **Open setup** saves a new immutable paused copy without model inference or provider credentials; **Start from prompt** fills a fresh editable draft without saving or sending it. Ordinary AI composition and its real failure handling remain unchanged.
+- Provide a bundled library of five prepared mechanics studies. Explicit **Open setup** saves a new immutable paused copy without model inference or provider credentials; **Start from prompt** fills a fresh editable draft without saving or sending it. Ordinary AI composition and its real failure handling remain unchanged.
 - Keep example actions available during background expiry renewal and prevent late replies from undoing a new draft. Native dialog keyboard handling preserves the underlying selection and draft on cancellation.
 
 - Polish the light workbench without replacing its visual system: remove repeated welcome/category text, collapse recent scenes and defer empty charts/cards until an experiment exists.

@@ -3,13 +3,15 @@ import { getCurrentTools, normalizeContext } from '@earendil-works/pi-ai/utils/t
 import { z } from 'zod';
 import { HARNESS_MAX_TURNS, HARNESS_MAX_TOOL_CALLS, HARNESS_TIMEOUT_MS, HarnessProgressSchema, HarnessRequestSchema, ModelPurposeSchema, type HarnessProgress, type HarnessRequest, type ModelPurpose } from '../shared/harness.ts';
 import { formatHarnessFailure, HarnessFailureSchema } from '../shared/harness-failure.ts';
-import { InlineSceneImageSchema, MAX_JPEG_BASE64, MAX_JPEG_BYTES } from '../shared/visual-inspection.ts';
+import { InlineSceneImageSchema, MAX_JPEG_BASE64, MAX_JPEG_BYTES, MAX_VISUAL_CALLS_PER_RUN, MAX_VISUAL_FRAMES_PER_RUN } from '../shared/visual-inspection.ts';
 import { VerificationReceiptSchema, type VerificationReceipt } from '../shared/verification.ts';
 import { validateDecision } from '../shared/scene.ts';
 import { ReviewProposalSchema, type LabOutcome } from '../shared/review-proposal.ts';
 import { MAX_MODEL_TEXT_CHARS } from '../shared/model-text.ts';
 import { resolveLabModel, providerKey, ProviderError, streamLabModel } from './providers.ts';
 import { runSandbox, SandboxError, type SandboxRun } from './sandbox.ts';
+import { InspectionRequestSchema } from '../shared/inspection-rpc.ts';
+import { renderScene } from './renderer-client.ts';
 const TextSchema = z.object({ type: z.literal('text'), text: z.string().max(MAX_MODEL_TEXT_CHARS) }).passthrough();
 const ImageSchema = InlineSceneImageSchema.refine(({ data }) => {
   if (data.length < 8 || data.length > MAX_JPEG_BASE64 || data.length % 4 !== 0) return false;
@@ -60,6 +62,7 @@ export function validateModelContext(value: unknown, model: Pick<Model<Api>, 'in
 const RecordSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('model'), id: z.number().int().positive(), purpose: ModelPurposeSchema, context: z.unknown() }),
   HarnessProgressSchema.extend({ type: z.literal('progress') }),
+  InspectionRequestSchema,
   z.strictObject({ type: z.literal('decision'), decision: z.unknown(), verification: VerificationReceiptSchema.optional() }),
   z.strictObject({ type: z.literal('proposal'), proposal: ReviewProposalSchema }),
   HarnessFailureSchema,
@@ -68,7 +71,8 @@ let activeRuns = 0;
 
 export async function runLab(request: HarnessRequest, onProgress: (event: HarnessProgress) => void, onAssistant: (text: string) => void, signal: AbortSignal): Promise<LabOutcome> {
   request = HarnessRequestSchema.parse(request);
-  if (activeRuns >= 2) throw new ProviderError('lab_busy', 'Two lab assistants are already working. Wait for one to finish before starting another.', 503);
+  const capacity = process.env.LAB_WORKER_URL ? 1 : 2;
+  if (activeRuns >= capacity) throw new ProviderError('lab_busy', 'The lab is checking another experiment. Wait for it to finish before starting another.', 503);
   activeRuns++;
   const controller = new AbortController();
   const combined = AbortSignal.any([signal, controller.signal, AbortSignal.timeout(HARNESS_TIMEOUT_MS)]);
@@ -79,6 +83,9 @@ export async function runLab(request: HarnessRequest, onProgress: (event: Harnes
   let toolCalls = 0;
   let toolCallLimit = HARNESS_MAX_TOOL_CALLS;
   let pending = false;
+  let inspectionCalls = 0;
+  let inspectionFrames = 0;
+  let lastModelPurpose: ModelPurpose | undefined;
   let assistantBytes = 0;
   let outcome: LabOutcome | null = null;
   let sandbox: SandboxRun | undefined;
@@ -103,7 +110,8 @@ export async function runLab(request: HarnessRequest, onProgress: (event: Harnes
     const model = await resolveLabModel(request.provider, request.model, combined);
     const credential = await providerKey(request.provider, combined);
     combined.throwIfAborted();
-    sandbox = runSandbox({ type: 'init', request, model }, value => {
+    const brokerInspection = Boolean(process.env.LAB_RENDERER_URL) && model.input.includes('image');
+    sandbox = runSandbox({ type: 'init', request, model, brokerInspection }, value => {
       try {
         if (outcome) throw new Error('Unexpected output after the final experiment.');
         const record = RecordSchema.parse(value);
@@ -111,6 +119,7 @@ export async function runLab(request: HarnessRequest, onProgress: (event: Harnes
           if (pending || record.id !== calls + 1 || calls >= HARNESS_MAX_TURNS) throw new ProviderError('lab_limit', 'The assistant reached the model-turn limit. Your current scene is unchanged.', 502);
           const context = validateModelContext(record.context, model, record.purpose);
           calls++;
+          lastModelPurpose = record.purpose;
           pending = true;
           const stage = record.purpose === 'reviewer' ? 'reviewing' : 'generating';
           const task = record.purpose === 'reviewer' ? 'Reviewing' : 'Working with';
@@ -132,6 +141,25 @@ export async function runLab(request: HarnessRequest, onProgress: (event: Harnes
             // Keep SDK lifecycle bookends, not quadratic growing partial snapshots, across the isolated pipe.
             if (event.type === 'start' || event.type === 'done' || event.type === 'error') sandbox!.send({ type: 'model_event', id: record.id, event });
           }, credential, record.purpose === 'reviewer' ? 'submit_review' : 'any').then(() => { pending = false; }).catch(fail);
+        } else if (record.type === 'inspection') {
+          if (!brokerInspection || lastModelPurpose !== 'builder' || pending) throw new ProviderError('lab_tool_scope', 'The assistant requested image inspection outside its declared role.', 502);
+          if (record.id !== inspectionCalls + 1 || inspectionCalls >= MAX_VISUAL_CALLS_PER_RUN
+            || inspectionFrames + record.request.times.length > MAX_VISUAL_FRAMES_PER_RUN) {
+            throw new ProviderError('lab_limit', 'The image inspection allowance was exceeded.', 502);
+          }
+          inspectionCalls++;
+          inspectionFrames += record.request.times.length;
+          pending = true;
+          void renderScene({ scene: record.scene, request: record.request }, combined).then(frames => {
+            combined.throwIfAborted();
+            for (const frame of frames) ImageSchema.parse(frame.image);
+            pending = false;
+            sandbox!.send({ type: 'inspection_result', id: record.id, status: 'ok', frames });
+          }).catch(error => {
+            pending = false;
+            if (combined.aborted) { fail(error); return; }
+            sandbox!.send({ type: 'inspection_result', id: record.id, status: 'error', message: 'The private scene renderer could not complete this inspection.' });
+          });
         } else if (record.type === 'progress') {
           if (record.budget) {
             toolCalls = record.budget.toolCalls;
@@ -177,7 +205,8 @@ export async function runLab(request: HarnessRequest, onProgress: (event: Harnes
     if (error instanceof SandboxError) {
       if (error.code === 'sandbox_timeout') throw new ProviderError('lab_timeout', error.message, 504);
       const unavailable = error.code === 'docker_unavailable' || error.code === 'sandbox_image_missing'
-        || error.code === 'sandbox_start_failed' || error.code === 'sandbox_resource_limit';
+        || error.code === 'sandbox_start_failed' || error.code === 'sandbox_resource_limit'
+        || error.code === 'worker_unavailable' || error.code === 'worker_busy' || error.code === 'worker_auth_failed';
       const guidance = error.code === 'sandbox_image_missing' ? ' Run npm run sandbox:build before retrying.' : '';
       throw new ProviderError(error.code, `${error.message}${guidance} Your draft and previous scene are preserved. No unsandboxed fallback is used.`, unavailable ? 503 : 502);
     }

@@ -141,21 +141,22 @@ async function enforceBrowserAssetLock(page: Page, origin: string, allowedPaths:
   });
 }
 
-function assertNotTimedOut(timedOut: () => boolean): void {
+function assertNotTimedOut(timedOut: () => boolean, signal: AbortSignal): void {
   if (timedOut()) throw new Error('Visual inspection exceeded its 45-second limit.');
+  if (signal.aborted) throw new Error('Visual inspection was cancelled.');
 }
 
 async function captureFrames(scene: Scene, request: VisualCaptureRequest, signal: AbortSignal, timedOut: () => boolean,
   setBrowser: (browser: Browser) => void, setServer: (server: Server) => void,
   setProfile: (path: string) => void): Promise<VisualFrame[]> {
   const assets = await createAssetWhitelist();
-  assertNotTimedOut(timedOut);
+  assertNotTimedOut(timedOut, signal);
   const { server, origin } = await startAssetServer(assets);
   setServer(server);
-  assertNotTimedOut(timedOut);
+  assertNotTimedOut(timedOut, signal);
   const profile = await mkdtemp(join(tmpdir(), 'physics-lab-inspection-'));
   setProfile(profile);
-  assertNotTimedOut(timedOut);
+  assertNotTimedOut(timedOut, signal);
 
   const launch = puppeteer.launch({
     executablePath: CHROMIUM_PATH,
@@ -183,11 +184,9 @@ async function captureFrames(scene: Scene, request: VisualCaptureRequest, signal
       '--enable-unsafe-swiftshader',
     ],
   });
-  void launch.then(browser => {
-    setBrowser(browser);
-  }, () => {});
   const browser = await launch;
-  assertNotTimedOut(timedOut);
+  setBrowser(browser);
+  assertNotTimedOut(timedOut, signal);
   const page = await browser.newPage();
   await page.setViewport({ width: INSPECTION_WIDTH, height: INSPECTION_HEIGHT, deviceScaleFactor: 1 });
   await enforceBrowserAssetLock(page, origin, new Set(assets.keys()));
@@ -210,13 +209,13 @@ async function captureFrames(scene: Scene, request: VisualCaptureRequest, signal
   const times = [...request.times].sort((a, b) => a - b);
   const frames: VisualFrame[] = [];
   for (const requestedAt of times) {
-    assertNotTimedOut(timedOut);
+    assertNotTimedOut(timedOut, signal);
     const capture = await page.evaluate(async (input: { time: number; view: InspectionView; focusId: string | null }) => {
       const bridge = window.physicsLabInspection;
       if (!bridge) throw new Error('The private inspection bridge is unavailable.');
       return bridge.capture(input.time, input.view, input.focusId);
     }, { time: requestedAt, view: request.view, focusId: request.focusId });
-    assertNotTimedOut(timedOut);
+    assertNotTimedOut(timedOut, signal);
     const dimensions = await canvas.evaluate(element => {
       if (!(element instanceof HTMLCanvasElement)) throw new Error('The scene viewport is not a canvas.');
       return { width: element.width, height: element.height, rect: element.getBoundingClientRect().toJSON() };
@@ -246,51 +245,96 @@ async function captureFrames(scene: Scene, request: VisualCaptureRequest, signal
   return frames;
 }
 
-export async function captureScene(sceneInput: Scene, requestInput: VisualCaptureRequest): Promise<VisualFrame[]> {
+export async function captureScene(sceneInput: Scene, requestInput: VisualCaptureRequest, externalSignal?: AbortSignal): Promise<VisualFrame[]> {
   let browser: Browser | null = null;
   let server: Server | null = null;
   let profile: string | null = null;
   let timedOut = false;
+  let interruptedBrowserClose: Promise<void> | null = null;
+  let interruptedBrowserFailure: unknown;
+  let interruptedBrowserFailed = false;
   const controller = new AbortController();
-  const { promise: timeout, reject: rejectTimeout } = Promise.withResolvers<never>();
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-    rejectTimeout(new Error('Visual inspection exceeded its 45-second limit.'));
+  const cancellation = Promise.withResolvers<never>();
+  const interrupt = () => {
     server?.closeAllConnections();
-  }, INSPECTION_TIMEOUT_MS);
+    if (browser && !interruptedBrowserClose) {
+      const activeBrowser = browser;
+      interruptedBrowserClose = Promise.resolve().then(() => activeBrowser.close()).catch(error => {
+        interruptedBrowserFailed = true;
+        interruptedBrowserFailure = error;
+      });
+    }
+  };
+  const cancel = (error: Error, deadline = false) => {
+    if (controller.signal.aborted) return;
+    timedOut = deadline;
+    controller.abort(error);
+    cancellation.reject(error);
+    interrupt();
+  };
+  const onExternalAbort = () => cancel(new Error('Visual inspection was cancelled.'));
+  externalSignal?.addEventListener('abort', onExternalAbort, { once: true });
+  if (externalSignal?.aborted) onExternalAbort();
+  const timer = setTimeout(() => cancel(new Error('Visual inspection exceeded its 45-second limit.'), true), INSPECTION_TIMEOUT_MS);
   const setBrowser = (value: Browser) => {
     browser = value;
+    if (controller.signal.aborted) interrupt();
   };
-  const setServer = (value: Server) => {
-    server = value;
-    if (timedOut) void stopAssetServer(value).catch(() => {});
-  };
-  const setProfile = (value: string) => {
-    profile = value;
-    if (timedOut) void rm(value, { recursive: true, force: true }).catch(() => {});
-  };
+  const setServer = (value: Server) => { server = value; };
+  const setProfile = (value: string) => { profile = value; };
   const work = (async () => {
+    assertNotTimedOut(() => timedOut, controller.signal);
     const scene = validateScene(sceneInput);
     const request = VisualCaptureRequestSchema.parse(requestInput);
     return captureFrames(scene, request, controller.signal, () => timedOut, setBrowser, setServer, setProfile);
   })();
-  let failed = false;
+  const workOutcome = work.then(
+    frames => ({ ok: true as const, frames }),
+    error => ({ ok: false as const, error }),
+  );
+  const cancellationOutcome = cancellation.promise.then(
+    () => ({ ok: false as const, error: new Error('Visual inspection was cancelled.') }),
+    error => ({ ok: false as const, error }),
+  );
+  let captureFailed = false;
+  let captureError: unknown;
+  let frames: VisualFrame[] | undefined;
   try {
-    return await Promise.race([work, timeout]);
+    const outcome = await Promise.race([workOutcome, cancellationOutcome]);
+    if (outcome.ok) frames = outcome.frames;
+    else {
+      captureFailed = true;
+      captureError = outcome.error;
+    }
   } catch (error) {
-    failed = true;
-    throw error;
+    captureFailed = true;
+    captureError = error;
   } finally {
-    controller.abort();
+    clearTimeout(timer);
+    externalSignal?.removeEventListener('abort', onExternalAbort);
+    if (!controller.signal.aborted) controller.abort();
+    // Aborted navigation is the canceled operation, not a failed resource cleanup.
+    await workOutcome;
     const cleanupFailures: unknown[] = [];
     const activeBrowser = browser as Browser | null;
-    if (activeBrowser) try { await activeBrowser.close(); } catch (error) { cleanupFailures.push(error); }
+    if (activeBrowser) {
+      try {
+        if (interruptedBrowserClose) await interruptedBrowserClose;
+        else await activeBrowser.close();
+      } catch (error) {
+        cleanupFailures.push(error);
+      }
+    }
+    if (interruptedBrowserFailed) cleanupFailures.push(interruptedBrowserFailure);
     if (server) try { await stopAssetServer(server); } catch (error) { cleanupFailures.push(error); }
     if (profile) try { await rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); } catch (error) { cleanupFailures.push(error); }
-    clearTimeout(timer);
-    if (!failed && cleanupFailures.length) {
-      throw new Error('Visual inspection could not fully close its disposable browser resources.', { cause: cleanupFailures[0] });
+    if (cleanupFailures.length) {
+      throw new AggregateError(
+        captureFailed ? [captureError, ...cleanupFailures] : cleanupFailures,
+        'Visual inspection could not fully close its disposable browser resources.',
+      );
     }
   }
+  if (captureFailed) throw captureError;
+  return frames!;
 }

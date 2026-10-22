@@ -3,7 +3,7 @@ import test from 'node:test';
 import type { AssistantMessage, JsonObject } from '@earendil-works/pi-ai';
 import { z } from 'zod';
 import { labModel } from '../server/providers.ts';
-import { runSandbox } from '../server/sandbox.ts';
+import { runDockerSandbox, runSandbox } from '../server/sandbox.ts';
 import { HarnessRequestSchema, ModelPurposeSchema } from '../shared/harness.ts';
 import { InlineSceneImageSchema, VisualInspectionRequestSchema, MAX_VISUAL_CALLS_PER_RUN, MAX_VISUAL_FRAMES_PER_RUN } from '../shared/visual-inspection.ts';
 import { validateDecision } from '../shared/scene.ts';
@@ -34,10 +34,10 @@ test('visual inspection frame indices reject negative, fractional, and unsafe va
   assert.equal(VisualInspectionRequestSchema.safeParse({ frames: [1, 2, 3, 4, 5, 6] }).success, false);
 });
 
-test('text-only models are not offered visual inspection and cannot invoke it', { timeout: 60000 }, async () => {
+test('broker inspection flag cannot authorize a text-only model to inspect images', { timeout: 60000 }, async () => {
   let denied = false;
   let completed = false;
-  const sandbox = runSandbox({ type: 'init', request, model: labModel('openrouter', 'example/model') }, value => {
+  const sandbox = runDockerSandbox({ type: 'init', request, model: labModel('openrouter', 'example/model'), brokerInspection: true }, value => {
     const parsed = RequestSchema.safeParse(value);
     if (!parsed.success) {
       if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'decision') completed = true;

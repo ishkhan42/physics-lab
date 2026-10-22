@@ -1,1076 +1,21 @@
 [
   {
-    "id": "rebound",
-    "title": "Stacked-ball rebound",
-    "question": "How can the small ball rebound above its release height?",
-    "setups": [
-      {
-        "id": "elastic-ground",
-        "label": "Elastic ground",
-        "prompt": "Create two rigid dynamic spheres on the same vertical line above a real fixed horizontal ground plane at z=0 m. Release both from rest: the lower Heavy ball has mass 2 kg, radius 0.18 m and center [0,0,1] m; the upper Light ball has mass 0.1 kg, radius 0.07 m and center [0,0,1.26] m, leaving a 0.01 m surface gap. Use Earth gravity [0,0,-9.81] m/s², zero air drag and zero damping. Both spheres have normal restitution 1; set ground restitution to 1. Set sliding and static friction coefficients, torsional friction and rolling friction to zero for both spheres and the ground. Give both balls zero initial linear and angular velocity; add no impulse, spring, or prescribed velocity. Keep a physical ground collider, plain studio appearance, visible reference grid and distinct readable ball colors.",
-        "summary": "Two vertically aligned spheres fall together; elastic ground and sphere contacts produce the Galilean-cannon rebound.",
-        "assumptions": [
-          "The balls are rigid dynamic spheres with the specified radii and masses; both start from rest with no spin.",
-          "Contact restitution and zero-friction values are finite-step native solver targets; no other loads or damping are present."
-        ],
-        "scene": {
-          "category": "mechanics",
-          "title": "Galilean-cannon rebound",
-          "gravity": [
-            0,
-            0,
-            -9.81
-          ],
-          "ground": {
-            "height": 0,
-            "restitution": 1,
-            "friction": {
-              "sliding": 0,
-              "torsional": 0,
-              "rolling": 0,
-              "static": 0
-            }
-          },
-          "appearance": {
-            "surface": "plain",
-            "sky": "studio",
-            "textured": false,
-            "grid": true
-          },
-          "bodies": [
-            {
-              "id": "heavy",
-              "label": "Heavy ball",
-              "parentId": null,
-              "position": [
-                0,
-                0,
-                1
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.18
-              },
-              "mass": 2,
-              "heldBy": null,
-              "restitution": 1,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  0,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#3978d4"
-            },
-            {
-              "id": "light",
-              "label": "Light ball",
-              "parentId": null,
-              "position": [
-                0,
-                0,
-                1.26
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.07
-              },
-              "mass": 0.1,
-              "heldBy": null,
-              "restitution": 1,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  0,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#f1a340"
-            }
-          ],
-          "sites": [],
-          "tendons": [],
-          "connections": [],
-          "loads": [],
-          "events": []
-        },
-        "note": "Run for about 4 seconds, then compare the Height graph with the other ground setting."
-      },
-      {
-        "id": "non-rebounding-ground",
-        "label": "Non-rebounding ground",
-        "prompt": "Create two rigid dynamic spheres on the same vertical line above a real fixed horizontal ground plane at z=0 m. Release both from rest: the lower Heavy ball has mass 2 kg, radius 0.18 m and center [0,0,1] m; the upper Light ball has mass 0.1 kg, radius 0.07 m and center [0,0,1.26] m, leaving a 0.01 m surface gap. Use Earth gravity [0,0,-9.81] m/s², zero air drag and zero damping. Both spheres have normal restitution 1; set ground restitution to 0. Set sliding and static friction coefficients, torsional friction and rolling friction to zero for both spheres and the ground. Give both balls zero initial linear and angular velocity; add no impulse, spring, or prescribed velocity. Keep a physical ground collider, plain studio appearance, visible reference grid and distinct readable ball colors.",
-        "summary": "The same balls and release conditions meet a zero-restitution ground while their mutual contact remains elastic.",
-        "assumptions": [
-          "The balls are rigid dynamic spheres with the specified radii and masses; both start from rest with no spin.",
-          "Only ground restitution differs; all restitution values are finite-step contact targets, with zero friction, drag, damping and applied loads."
-        ],
-        "scene": {
-          "category": "mechanics",
-          "title": "Galilean-cannon rebound",
-          "gravity": [
-            0,
-            0,
-            -9.81
-          ],
-          "ground": {
-            "height": 0,
-            "restitution": 0,
-            "friction": {
-              "sliding": 0,
-              "torsional": 0,
-              "rolling": 0,
-              "static": 0
-            }
-          },
-          "appearance": {
-            "surface": "plain",
-            "sky": "studio",
-            "textured": false,
-            "grid": true
-          },
-          "bodies": [
-            {
-              "id": "heavy",
-              "label": "Heavy ball",
-              "parentId": null,
-              "position": [
-                0,
-                0,
-                1
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.18
-              },
-              "mass": 2,
-              "heldBy": null,
-              "restitution": 1,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  0,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#3978d4"
-            },
-            {
-              "id": "light",
-              "label": "Light ball",
-              "parentId": null,
-              "position": [
-                0,
-                0,
-                1.26
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.07
-              },
-              "mass": 0.1,
-              "heldBy": null,
-              "restitution": 1,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  0,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#f1a340"
-            }
-          ],
-          "sites": [],
-          "tendons": [],
-          "connections": [],
-          "loads": [],
-          "events": []
-        },
-        "note": "Run for about 4 seconds, then compare the Height graph with the other ground setting."
-      }
-    ]
-  },
-  {
-    "id": "pulley",
-    "title": "Pulley and hanging masses",
-    "question": "Why does doubling both masses keep the acceleration but change the cord tension?",
-    "setups": [
-      {
-        "id": "2kg-3kg",
-        "label": "2 kg / 3 kg",
-        "prompt": "Create an ideal Atwood arrangement in Earth gravity [0,0,-9.81] m/s². A Light mass sphere of 2 kg and radius 0.12 m starts at [-0.5,0,5] m; a Heavy mass sphere of 3 kg and radius 0.12 m starts at [0.5,0,5] m. Both are released from rest and constrained to slide only vertically along z at their fixed x coordinates, with zero guide stiffness and damping. Put fixed, frictionless, massless point guides at [-0.5,0,7] m and [0.5,0,7] m. Attach a cord site to each mass center and use world-fixed sites at the guide points. Route one visible native spatial tendon in this order: Light mass site → left guide → right guide → Heavy mass site. Use mode fixed, the bilateral inextensible constraint (not a spring or one-sided rope), with exactly 5.0 m total path length: 2 m + 1 m + 2 m. Give it zero stiffness and damping; this is one massless cord over ideal point guides, not finite-radius wheels, and the rendered cord must be the constrained tendon. Use ground at z=0 m, ground restitution 1, mass restitution 0, and zero sliding/static/torsional/rolling friction on ground and masses. Keep the ground initially clear of both masses. Add no air drag, forces or impulses. Use plain studio lighting, visible grid, and distinct colors.",
-        "summary": "A 2 kg Light mass and 3 kg Heavy mass move vertically on guides under one 5 m inextensible routed cord.",
-        "assumptions": [
-          "The masses are 0.12 m-radius spheres; the guide points are fixed, frictionless and massless, with no pulley-wheel inertia.",
-          "The cord is one fixed-length native tendon; ground is initially clear and no air drag or added forces act."
-        ],
-        "scene": {
-          "category": "mechanics",
-          "title": "Primary 2 kg / 3 kg Atwood setup",
-          "gravity": [
-            0,
-            0,
-            -9.81
-          ],
-          "ground": {
-            "height": 0,
-            "restitution": 1,
-            "friction": {
-              "sliding": 0,
-              "torsional": 0,
-              "rolling": 0,
-              "static": 0
-            }
-          },
-          "appearance": {
-            "surface": "plain",
-            "sky": "studio",
-            "textured": false,
-            "grid": true
-          },
-          "bodies": [
-            {
-              "id": "light",
-              "label": "Light mass",
-              "parentId": null,
-              "position": [
-                -0.5,
-                0,
-                5
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.12
-              },
-              "mass": 2,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "slide",
-                "axis": [
-                  0,
-                  0,
-                  1
-                ],
-                "anchor": [
-                  -0.5,
-                  0,
-                  5
-                ],
-                "position": 0,
-                "velocity": 0,
-                "limits": null,
-                "stiffness": 0,
-                "damping": 0,
-                "springReference": 0
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#37A7E8"
-            },
-            {
-              "id": "heavy",
-              "label": "Heavy mass",
-              "parentId": null,
-              "position": [
-                0.5,
-                0,
-                5
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.12
-              },
-              "mass": 3,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "slide",
-                "axis": [
-                  0,
-                  0,
-                  1
-                ],
-                "anchor": [
-                  0.5,
-                  0,
-                  5
-                ],
-                "position": 0,
-                "velocity": 0,
-                "limits": null,
-                "stiffness": 0,
-                "damping": 0,
-                "springReference": 0
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#E85C5C"
-            }
-          ],
-          "sites": [
-            {
-              "id": "lightSite",
-              "label": "Light mass cord site",
-              "bodyId": "light",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "id": "leftGuide",
-              "label": "Left fixed guide point",
-              "bodyId": null,
-              "position": [
-                -0.5,
-                0,
-                7
-              ]
-            },
-            {
-              "id": "rightGuide",
-              "label": "Right fixed guide point",
-              "bodyId": null,
-              "position": [
-                0.5,
-                0,
-                7
-              ]
-            },
-            {
-              "id": "heavySite",
-              "label": "Heavy mass cord site",
-              "bodyId": "heavy",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            }
-          ],
-          "tendons": [
-            {
-              "id": "cord",
-              "label": "Continuous inextensible cord",
-              "path": [
-                {
-                  "kind": "site",
-                  "siteId": "lightSite"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "leftGuide"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "rightGuide"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "heavySite"
-                }
-              ],
-              "mode": "fixed",
-              "length": 5,
-              "stiffness": 0,
-              "damping": 0,
-              "color": "#F2C178"
-            }
-          ],
-          "connections": [],
-          "loads": [],
-          "events": []
-        },
-        "note": "Pause within the first second, before a mass reaches a guide. Inspect the cord's Tension value. The guides are ideal fixed points."
-      },
-      {
-        "id": "4kg-6kg",
-        "label": "4 kg / 6 kg",
-        "prompt": "Create an ideal Atwood arrangement in Earth gravity [0,0,-9.81] m/s². A Light mass sphere of 4 kg and radius 0.12 m starts at [-0.5,0,5] m; a Heavy mass sphere of 6 kg and radius 0.12 m starts at [0.5,0,5] m. Both are released from rest and constrained to slide only vertically along z at their fixed x coordinates, with zero guide stiffness and damping. Put fixed, frictionless, massless point guides at [-0.5,0,7] m and [0.5,0,7] m. Attach a cord site to each mass center and use world-fixed sites at the guide points. Route one visible native spatial tendon in this order: Light mass site → left guide → right guide → Heavy mass site. Use mode fixed, the bilateral inextensible constraint (not a spring or one-sided rope), with exactly 5.0 m total path length: 2 m + 1 m + 2 m. Give it zero stiffness and damping; this is one massless cord over ideal point guides, not finite-radius wheels, and the rendered cord must be the constrained tendon. Use ground at z=0 m, ground restitution 1, mass restitution 0, and zero sliding/static/torsional/rolling friction on ground and masses. Keep the ground initially clear of both masses. Add no air drag, forces or impulses. Use plain studio lighting, visible grid, and distinct colors.",
-        "summary": "A 4 kg Light mass and 6 kg Heavy mass use the same geometry, guides and 5 m fixed-length cord.",
-        "assumptions": [
-          "The masses are 0.12 m-radius spheres; the guide points are fixed, frictionless and massless, with no pulley-wheel inertia.",
-          "Only the hanging masses differ from the 2 kg / 3 kg setup; the cord, geometry and release conditions are unchanged."
-        ],
-        "scene": {
-          "category": "mechanics",
-          "title": "4 kg / 6 kg Atwood setup",
-          "gravity": [
-            0,
-            0,
-            -9.81
-          ],
-          "ground": {
-            "height": 0,
-            "restitution": 1,
-            "friction": {
-              "sliding": 0,
-              "torsional": 0,
-              "rolling": 0,
-              "static": 0
-            }
-          },
-          "appearance": {
-            "surface": "plain",
-            "sky": "studio",
-            "textured": false,
-            "grid": true
-          },
-          "bodies": [
-            {
-              "id": "light",
-              "label": "Light mass",
-              "parentId": null,
-              "position": [
-                -0.5,
-                0,
-                5
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.12
-              },
-              "mass": 4,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "slide",
-                "axis": [
-                  0,
-                  0,
-                  1
-                ],
-                "anchor": [
-                  -0.5,
-                  0,
-                  5
-                ],
-                "position": 0,
-                "velocity": 0,
-                "limits": null,
-                "stiffness": 0,
-                "damping": 0,
-                "springReference": 0
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#37A7E8"
-            },
-            {
-              "id": "heavy",
-              "label": "Heavy mass",
-              "parentId": null,
-              "position": [
-                0.5,
-                0,
-                5
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "sphere",
-                "radius": 0.12
-              },
-              "mass": 6,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "slide",
-                "axis": [
-                  0,
-                  0,
-                  1
-                ],
-                "anchor": [
-                  0.5,
-                  0,
-                  5
-                ],
-                "position": 0,
-                "velocity": 0,
-                "limits": null,
-                "stiffness": 0,
-                "damping": 0,
-                "springReference": 0
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#E85C5C"
-            }
-          ],
-          "sites": [
-            {
-              "id": "lightSite",
-              "label": "Light mass cord site",
-              "bodyId": "light",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "id": "leftGuide",
-              "label": "Left fixed guide point",
-              "bodyId": null,
-              "position": [
-                -0.5,
-                0,
-                7
-              ]
-            },
-            {
-              "id": "rightGuide",
-              "label": "Right fixed guide point",
-              "bodyId": null,
-              "position": [
-                0.5,
-                0,
-                7
-              ]
-            },
-            {
-              "id": "heavySite",
-              "label": "Heavy mass cord site",
-              "bodyId": "heavy",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            }
-          ],
-          "tendons": [
-            {
-              "id": "cord",
-              "label": "Continuous inextensible cord",
-              "path": [
-                {
-                  "kind": "site",
-                  "siteId": "lightSite"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "leftGuide"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "rightGuide"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "heavySite"
-                }
-              ],
-              "mode": "fixed",
-              "length": 5,
-              "stiffness": 0,
-              "damping": 0,
-              "color": "#F2C178"
-            }
-          ],
-          "connections": [],
-          "loads": [],
-          "events": []
-        },
-        "note": "Pause within the first second, before a mass reaches a guide. Inspect the cord's Tension value. The guides are ideal fixed points."
-      }
-    ]
-  },
-  {
-    "id": "moving-spring",
-    "title": "Spring-coupled carts",
-    "question": "Can two carts oscillate relative to one another while their center of mass translates uniformly?",
-    "setups": [
-      {
-        "id": "12-nm",
-        "label": "12 N/m spring",
-        "prompt": "Create two free rigid box carts on a real level ground plane at z=0 m. Cart A has mass 1 kg, full dimensions [0.3,0.3,0.3] m and center [-0.5,0,0.15] m. Cart B has mass 2 kg, the same dimensions and center [0.9,0,0.15] m. Release both with world velocity [1,0,0] m/s and zero angular velocity. Connect their centers with one actual massless linear spring, attached at body-local center sites, with natural length 1 m, stiffness 12 N/m and damping 0 N·s/m; their initial center separation is 1.4 m. Use Earth gravity [0,0,-9.81] m/s², no air drag, loads or impulses. All ground and cart friction components are zero; ground restitution is 1 and cart restitution is 0. Keep free native cart and spring dynamics rather than a scripted path, with plain ground, studio lighting, a visible reference grid and distinct colors.",
-        "summary": "Two freely moving carts share a center-to-center spring with 1 m natural length and stiffness 12 N/m.",
-        "assumptions": [
-          "The center-attached spring is ideal and massless; its initial length is 1.4 m and damping is zero.",
-          "Ground and cart friction targets are zero; gravity is vertical, so no external horizontal load is applied."
-        ],
-        "scene": {
-          "category": "mechanics",
-          "title": "Spring-coupled carts and center-of-mass motion",
-          "gravity": [
-            0,
-            0,
-            -9.81
-          ],
-          "ground": {
-            "height": 0,
-            "restitution": 1,
-            "friction": {
-              "sliding": 0,
-              "torsional": 0,
-              "rolling": 0,
-              "static": 0
-            }
-          },
-          "appearance": {
-            "surface": "plain",
-            "sky": "studio",
-            "textured": false,
-            "grid": true
-          },
-          "bodies": [
-            {
-              "id": "cartA",
-              "label": "Cart A",
-              "parentId": null,
-              "position": [
-                -0.5,
-                0,
-                0.15
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "box",
-                "size": [
-                  0.3,
-                  0.3,
-                  0.3
-                ]
-              },
-              "mass": 1,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  1,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#3978C5"
-            },
-            {
-              "id": "cartB",
-              "label": "Cart B",
-              "parentId": null,
-              "position": [
-                0.9,
-                0,
-                0.15
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "box",
-                "size": [
-                  0.3,
-                  0.3,
-                  0.3
-                ]
-              },
-              "mass": 2,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  1,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#D85A45"
-            }
-          ],
-          "sites": [
-            {
-              "id": "springA",
-              "label": "Spring attachment Cart A center",
-              "bodyId": "cartA",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "id": "springB",
-              "label": "Spring attachment Cart B center",
-              "bodyId": "cartB",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            }
-          ],
-          "tendons": [
-            {
-              "id": "cartSpring",
-              "label": "Center-to-center spring",
-              "path": [
-                {
-                  "kind": "site",
-                  "siteId": "springA"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "springB"
-                }
-              ],
-              "mode": "spring",
-              "length": 1,
-              "stiffness": 12,
-              "damping": 0,
-              "color": "#F2C178"
-            }
-          ],
-          "connections": [],
-          "loads": [],
-          "events": []
-        },
-        "note": "Compare Speed and spring force. Use the cart masses and positions to check the center of mass."
-      },
-      {
-        "id": "24-nm",
-        "label": "24 N/m spring",
-        "prompt": "Create two free rigid box carts on a real level ground plane at z=0 m. Cart A has mass 1 kg, full dimensions [0.3,0.3,0.3] m and center [-0.5,0,0.15] m. Cart B has mass 2 kg, the same dimensions and center [0.9,0,0.15] m. Release both with world velocity [1,0,0] m/s and zero angular velocity. Connect their centers with one actual massless linear spring, attached at body-local center sites, with natural length 1 m, stiffness 24 N/m and damping 0 N·s/m; their initial center separation is 1.4 m. Use Earth gravity [0,0,-9.81] m/s², no air drag, loads or impulses. All ground and cart friction components are zero; ground restitution is 1 and cart restitution is 0. Keep free native cart and spring dynamics rather than a scripted path, with plain ground, studio lighting, a visible reference grid and distinct colors.",
-        "summary": "The same two freely moving carts use a center-to-center spring with stiffness 24 N/m.",
-        "assumptions": [
-          "The center-attached spring is ideal and massless; its initial length is 1.4 m and damping is zero.",
-          "Only spring stiffness differs from the 12 N/m setup; initial state, ground and gravity are unchanged."
-        ],
-        "scene": {
-          "category": "mechanics",
-          "title": "Spring-coupled carts and center-of-mass motion",
-          "gravity": [
-            0,
-            0,
-            -9.81
-          ],
-          "ground": {
-            "height": 0,
-            "restitution": 1,
-            "friction": {
-              "sliding": 0,
-              "torsional": 0,
-              "rolling": 0,
-              "static": 0
-            }
-          },
-          "appearance": {
-            "surface": "plain",
-            "sky": "studio",
-            "textured": false,
-            "grid": true
-          },
-          "bodies": [
-            {
-              "id": "cartA",
-              "label": "Cart A",
-              "parentId": null,
-              "position": [
-                -0.5,
-                0,
-                0.15
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "box",
-                "size": [
-                  0.3,
-                  0.3,
-                  0.3
-                ]
-              },
-              "mass": 1,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  1,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#3978C5"
-            },
-            {
-              "id": "cartB",
-              "label": "Cart B",
-              "parentId": null,
-              "position": [
-                0.9,
-                0,
-                0.15
-              ],
-              "orientation": [
-                1,
-                0,
-                0,
-                0
-              ],
-              "shape": {
-                "kind": "box",
-                "size": [
-                  0.3,
-                  0.3,
-                  0.3
-                ]
-              },
-              "mass": 2,
-              "heldBy": null,
-              "restitution": 0,
-              "motion": {
-                "kind": "free",
-                "linearVelocity": [
-                  1,
-                  0,
-                  0
-                ],
-                "angularVelocity": [
-                  0,
-                  0,
-                  0
-                ]
-              },
-              "friction": {
-                "sliding": 0,
-                "torsional": 0,
-                "rolling": 0,
-                "static": 0
-              },
-              "color": "#D85A45"
-            }
-          ],
-          "sites": [
-            {
-              "id": "springA",
-              "label": "Spring attachment Cart A center",
-              "bodyId": "cartA",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "id": "springB",
-              "label": "Spring attachment Cart B center",
-              "bodyId": "cartB",
-              "position": [
-                0,
-                0,
-                0
-              ]
-            }
-          ],
-          "tendons": [
-            {
-              "id": "cartSpring",
-              "label": "Center-to-center spring",
-              "path": [
-                {
-                  "kind": "site",
-                  "siteId": "springA"
-                },
-                {
-                  "kind": "site",
-                  "siteId": "springB"
-                }
-              ],
-              "mode": "spring",
-              "length": 1,
-              "stiffness": 24,
-              "damping": 0,
-              "color": "#F2C178"
-            }
-          ],
-          "connections": [],
-          "loads": [],
-          "events": []
-        },
-        "note": "Compare Speed and spring force. Use the cart masses and positions to check the center of mass."
-      }
-    ]
-  },
-  {
     "id": "sensitive-pendulums",
-    "title": "Sensitive double pendulums",
-    "question": "What difference does a 0.1° change make in a double pendulum?",
+    "title": "Double pendulums, 5° apart",
+    "question": "Will a 5° difference stay small?",
     "setups": [
       {
-        "id": "120-vs-120-1-deg",
-        "label": "120° / 120.1° upper links",
-        "prompt": "Create two independent double-pendulum chains in parallel X-Z planes at y=-0.6 m and y=+0.6 m, each with a fixed pivot at [0,y,3.5] m. Each chain has two rigid spherical bobs of mass 1 kg and radius 0.06 m, joined by ideal massless rigid links of length 1 m. Both chains release from rest. Define signed world angle θ from the downward vertical in each X-Z plane, positive toward +X; a link vector at θ is [sin(θ),0,-cos(θ)] m. Chain A has upper angle +120° and lower angle -10°; chain B has upper angle +120.1° and lower angle -10°. The lower hinge of each chain must be carried by its moving upper bob as a real parent-child hinge, not an independent world hinge. Use zero hinge stiffness and damping, zero friction and drag, Earth gravity [0,0,-9.81] m/s², and a real ground at z=0 m with restitution 1 and zero friction; bob restitution is 0. Use distinct chain colors, plain studio appearance and a visible reference grid.",
-        "summary": "Two independent parallel double-pendulum chains start with upper-link angles 120° and 120.1° and lower-link angles -10°.",
+        "id": "120-vs-125-deg",
+        "label": "120° and 125°",
+        "prompt": "Create two independent double-pendulum chains in parallel X-Z planes at y=-0.6 m and y=+0.6 m, each with a fixed pivot at [0,y,3.5] m. Each chain has two rigid spherical bobs of mass 1 kg and radius 0.06 m, joined by ideal massless rigid links of length 1 m. Both chains release from rest. Define signed world angle θ from the downward vertical in each X-Z plane, positive toward +X; a link vector at θ is [sin(θ),0,-cos(θ)] m. Chain A has upper angle +120° and lower angle -10°; chain B has upper angle +125° and lower angle -10°. The lower hinge of each chain must be carried by its moving upper bob as a real parent-child hinge, not an independent world hinge. Use zero hinge stiffness and damping, zero friction and drag, Earth gravity [0,0,-9.81] m/s², and a real ground at z=0 m with restitution 1 and zero friction; bob restitution is 0. Use distinct chain colors, plain studio appearance and no reference grid.",
+        "summary": "Two parallel double pendulums start at rest, with upper links at 120° and 125° and both lower links at −10°.",
         "assumptions": [
           "Ideal massless links are represented by hinges; each lower hinge is attached to its moving upper bob.",
           "Angles are absolute world angles measured from downward vertical toward +X; all bobs start at rest."
         ],
         "scene": {
           "category": "mechanics",
-          "title": "Parallel double pendulums",
+          "title": "Double pendulums, 5° apart",
           "gravity": [
             0,
             0,
@@ -1090,7 +35,7 @@
             "surface": "plain",
             "sky": "studio",
             "textured": false,
-            "grid": true
+            "grid": false
           },
           "bodies": [
             {
@@ -1270,9 +215,9 @@
               "label": "B upper",
               "parentId": null,
               "position": [
-                0.8651514205697046,
+                0.819152044288992,
                 0.6,
-                4.001510737159457
+                4.073576436351046
               ],
               "orientation": [
                 1,
@@ -1319,9 +264,9 @@
               "label": "B lower",
               "parentId": "Bupper",
               "position": [
-                0.6915032430122082,
+                0.6455038666220617,
                 0.6,
-                3.016702984147249
+                3.088768683338838
               ],
               "orientation": [
                 1,
@@ -1344,9 +289,9 @@
                   0
                 ],
                 "anchor": [
-                  0.8651514205697046,
+                  0.819152044288992,
                   0.6,
-                  4.001510737159457
+                  4.073576436351046
                 ],
                 "position": 0,
                 "velocity": 0,
@@ -1370,27 +315,28 @@
           "loads": [],
           "events": []
         },
-        "note": "Compare their X/Z motion, not the fixed spacing between the planes. The difference varies with time."
+        "note": "Run for four seconds, then compare the blue and red lower bobs."
       }
     ]
   },
   {
-    "id": "recoil",
-    "title": "Three-shot launcher",
-    "question": "How do repeated launches and ground friction change a free cart’s recoil and remaining loaded mass?",
+    "id": "spring-net",
+    "title": "A spring net catches a ball",
+    "question": "Can a net catch and relaunch a falling ball?",
     "setups": [
       {
-        "id": "frictional-contacts",
-        "label": "Frictional contacts",
-        "prompt": "Create a free rigid launcher cart with its own mass 5 kg, full box size [1.2,0.6,0.3] m, center [0,0,0.15] m and zero initial linear and angular velocity, supported by a real level ground plane at z=0 m. The cart carries three separate true 1 kg spherical rounds of radius 0.07 m at world centers [0.75,-0.18,0.25], [0.75,0,0.25] and [0.75,0.18,0.25] m. Physically hold each round to the cart so the rounds' mass and inertia contribute to the loaded cart until launch; their zero velocity/spin fields are held-state placeholders. Keep the specified overhanging round positions. Schedule exactly one launch of Round 1 at t=0 s, Round 2 at t=2 s and Round 3 at t=4 s. Each action sets absolute WORLD velocity [10.392304845413264,0,5.999999999999999] m/s (12 m/s at 30° above the +X ground direction, with y velocity zero), not cart-relative speed. The cart remains free to translate and rotate. Ground, cart and rounds have restitution 0; set their sliding and static friction coefficients to 0.15 and torsional and rolling friction to zero. Use Earth gravity [0,0,-9.81] m/s² and no drag. Name the bodies Launcher cart, Round 1, Round 2, Round 3; use distinct round colors, plain studio appearance and a visible reference grid.",
-        "summary": "A free 5 kg cart carries three 1 kg rounds and launches them at 0, 2 and 4 s with 0.15 static/sliding contact friction.",
+        "id": "drop-and-rebound",
+        "label": "A 1.5 kg ball over an elastic net",
+        "prompt": "Create a square spring-net impact experiment under Earth gravity [0,0,-9.81] m/s², with a real non-rebounding frictionless ground at z=0. A fixed rectangular frame is centered at [0,0,1.8] m: four 0.08 m square-section beams at x=±0.94 or y=±0.94, full length 1.96 m, with four 0.08×0.08×1.76 m fixed legs at [±0.94,±0.94,0.88]. Make a 5×5 grid of spherical junctions radius 0.045 m at [(c−2)0.45,(r−2)0.45,1.8] m for integer r,c=0..4. Fix the perimeter junctions (r or c is 0 or 4); the nine interior junctions are free rigid bodies of mass 0.08 kg each. All start at rest. Connect nearest horizontal/vertical neighboring junction centers with linear spring tendons of stiffness 70 N/m; connect both diagonals of every square with 40 N/m springs. Omit links whose two endpoints are both fixed. Every spring has rest length 0.88 times its initial straight-line distance and damping 0.2 N·s/m. This is an explicitly pretensioned discrete network, not cloth or a stress/strain simulation. Show thin coils with wire radius 0.004 m, coil radius 0.018 m and five turns. Put a rigid 1.5 kg ball of radius 0.30 m at [0,0,3.25] m, initially held by the fixed north frame beam. Schedule one native release at 1.2 s with no launch impulse. All contact restitution and all friction coefficients are zero; add no air drag or other loads. Only the network springs store elastic energy; the ball itself does not deform. Use an orange ball, blue moving junctions, muted frame and daylight over a concrete ground.",
+        "summary": "A scheduled drop loads a pretensioned spring network, which deflects and returns stored elastic energy.",
         "assumptions": [
-          "The cart’s 5 kg is its own mass; each held 1 kg round contributes mass and inertia until its launch.",
-          "Launches are instantaneous ideal world-velocity actions, not modeled propellant; there is no air drag."
+          "The net is nine moving rigid junctions and 52 linear spring links tied to a fixed perimeter, not a continuous membrane.",
+          "Spring rest lengths are 12% shorter than the initial spans; contact is inelastic and frictionless.",
+          "The initially held ball becomes visible when released at 1.2 s; frame and ground are fixed."
         ],
         "scene": {
           "category": "mechanics",
-          "title": "Staggered launcher-cart rounds",
+          "title": "A spring net catches a ball",
           "gravity": [
             0,
             0,
@@ -1400,27 +346,27 @@
             "height": 0,
             "restitution": 0,
             "friction": {
-              "sliding": 0.15,
+              "sliding": 0,
               "torsional": 0,
               "rolling": 0,
-              "static": 0.15
+              "static": 0
             }
           },
           "appearance": {
-            "surface": "plain",
-            "sky": "studio",
-            "textured": false,
-            "grid": true
+            "surface": "concrete",
+            "sky": "day",
+            "textured": true,
+            "grid": false
           },
           "bodies": [
             {
-              "id": "cart",
-              "label": "Launcher cart",
+              "id": "frame-north",
+              "label": "frame north",
               "parentId": null,
               "position": [
                 0,
-                0,
-                0.15
+                0.94,
+                1.8
               ],
               "orientation": [
                 1,
@@ -1431,12 +377,502 @@
               "shape": {
                 "kind": "box",
                 "size": [
-                  1.2,
-                  0.6,
-                  0.3
+                  1.96,
+                  0.08,
+                  0.08
                 ]
               },
-              "mass": 5,
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "frame-south",
+              "label": "frame south",
+              "parentId": null,
+              "position": [
+                0,
+                -0.94,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  1.96,
+                  0.08,
+                  0.08
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "frame-east",
+              "label": "frame east",
+              "parentId": null,
+              "position": [
+                0.94,
+                0,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.08,
+                  1.96,
+                  0.08
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "frame-west",
+              "label": "frame west",
+              "parentId": null,
+              "position": [
+                -0.94,
+                0,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.08,
+                  1.96,
+                  0.08
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "leg-ws",
+              "label": "leg ws",
+              "parentId": null,
+              "position": [
+                -0.94,
+                -0.94,
+                0.88
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.08,
+                  0.08,
+                  1.76
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "leg-wn",
+              "label": "leg wn",
+              "parentId": null,
+              "position": [
+                -0.94,
+                0.94,
+                0.88
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.08,
+                  0.08,
+                  1.76
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "leg-es",
+              "label": "leg es",
+              "parentId": null,
+              "position": [
+                0.94,
+                -0.94,
+                0.88
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.08,
+                  0.08,
+                  1.76
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "leg-en",
+              "label": "leg en",
+              "parentId": null,
+              "position": [
+                0.94,
+                0.94,
+                0.88
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.08,
+                  0.08,
+                  1.76
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-0-0",
+              "label": "Fixed junction 0,0",
+              "parentId": null,
+              "position": [
+                -0.9,
+                -0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-0-1",
+              "label": "Fixed junction 0,1",
+              "parentId": null,
+              "position": [
+                -0.45,
+                -0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-0-2",
+              "label": "Fixed junction 0,2",
+              "parentId": null,
+              "position": [
+                0,
+                -0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-0-3",
+              "label": "Fixed junction 0,3",
+              "parentId": null,
+              "position": [
+                0.45,
+                -0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-0-4",
+              "label": "Fixed junction 0,4",
+              "parentId": null,
+              "position": [
+                0.9,
+                -0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-1-0",
+              "label": "Fixed junction 1,0",
+              "parentId": null,
+              "position": [
+                -0.9,
+                -0.45,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-1-1",
+              "label": "Moving junction 1,1",
+              "parentId": null,
+              "position": [
+                -0.45,
+                -0.45,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": 0.08,
               "heldBy": null,
               "restitution": 0,
               "motion": {
@@ -1453,21 +889,21 @@
                 ]
               },
               "friction": {
-                "sliding": 0.15,
+                "sliding": 0,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0.15
+                "static": 0
               },
-              "color": "#67d9ce"
+              "color": "#247fba"
             },
             {
-              "id": "round1",
-              "label": "Round 1",
+              "id": "node-1-2",
+              "label": "Moving junction 1,2",
               "parentId": null,
               "position": [
-                0.75,
-                -0.18,
-                0.25
+                0,
+                -0.45,
+                1.8
               ],
               "orientation": [
                 1,
@@ -1477,10 +913,10 @@
               ],
               "shape": {
                 "kind": "sphere",
-                "radius": 0.07
+                "radius": 0.045
               },
-              "mass": 1,
-              "heldBy": "cart",
+              "mass": 0.08,
+              "heldBy": null,
               "restitution": 0,
               "motion": {
                 "kind": "free",
@@ -1496,21 +932,21 @@
                 ]
               },
               "friction": {
-                "sliding": 0.15,
+                "sliding": 0,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0.15
+                "static": 0
               },
-              "color": "#d96b5f"
+              "color": "#247fba"
             },
             {
-              "id": "round2",
-              "label": "Round 2",
+              "id": "node-1-3",
+              "label": "Moving junction 1,3",
               "parentId": null,
               "position": [
-                0.75,
-                0,
-                0.25
+                0.45,
+                -0.45,
+                1.8
               ],
               "orientation": [
                 1,
@@ -1520,10 +956,10 @@
               ],
               "shape": {
                 "kind": "sphere",
-                "radius": 0.07
+                "radius": 0.045
               },
-              "mass": 1,
-              "heldBy": "cart",
+              "mass": 0.08,
+              "heldBy": null,
               "restitution": 0,
               "motion": {
                 "kind": "free",
@@ -1539,21 +975,21 @@
                 ]
               },
               "friction": {
-                "sliding": 0.15,
+                "sliding": 0,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0.15
+                "static": 0
               },
-              "color": "#e4b64e"
+              "color": "#247fba"
             },
             {
-              "id": "round3",
-              "label": "Round 3",
+              "id": "node-1-4",
+              "label": "Fixed junction 1,4",
               "parentId": null,
               "position": [
-                0.75,
-                0.18,
-                0.25
+                0.9,
+                -0.45,
+                1.8
               ],
               "orientation": [
                 1,
@@ -1563,10 +999,76 @@
               ],
               "shape": {
                 "kind": "sphere",
-                "radius": 0.07
+                "radius": 0.045
               },
-              "mass": 1,
-              "heldBy": "cart",
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-2-0",
+              "label": "Fixed junction 2,0",
+              "parentId": null,
+              "position": [
+                -0.9,
+                0,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-2-1",
+              "label": "Moving junction 2,1",
+              "parentId": null,
+              "position": [
+                -0.45,
+                0,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": 0.08,
+              "heldBy": null,
               "restitution": 0,
               "motion": {
                 "kind": "free",
@@ -1582,80 +1084,2289 @@
                 ]
               },
               "friction": {
-                "sliding": 0.15,
+                "sliding": 0,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0.15
+                "static": 0
               },
-              "color": "#5e9eaa"
+              "color": "#247fba"
+            },
+            {
+              "id": "node-2-2",
+              "label": "Center junction",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": 0.08,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#247fba"
+            },
+            {
+              "id": "node-2-3",
+              "label": "Moving junction 2,3",
+              "parentId": null,
+              "position": [
+                0.45,
+                0,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": 0.08,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#247fba"
+            },
+            {
+              "id": "node-2-4",
+              "label": "Fixed junction 2,4",
+              "parentId": null,
+              "position": [
+                0.9,
+                0,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-3-0",
+              "label": "Fixed junction 3,0",
+              "parentId": null,
+              "position": [
+                -0.9,
+                0.45,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-3-1",
+              "label": "Moving junction 3,1",
+              "parentId": null,
+              "position": [
+                -0.45,
+                0.45,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": 0.08,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#247fba"
+            },
+            {
+              "id": "node-3-2",
+              "label": "Moving junction 3,2",
+              "parentId": null,
+              "position": [
+                0,
+                0.45,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": 0.08,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#247fba"
+            },
+            {
+              "id": "node-3-3",
+              "label": "Moving junction 3,3",
+              "parentId": null,
+              "position": [
+                0.45,
+                0.45,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": 0.08,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#247fba"
+            },
+            {
+              "id": "node-3-4",
+              "label": "Fixed junction 3,4",
+              "parentId": null,
+              "position": [
+                0.9,
+                0.45,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-4-0",
+              "label": "Fixed junction 4,0",
+              "parentId": null,
+              "position": [
+                -0.9,
+                0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-4-1",
+              "label": "Fixed junction 4,1",
+              "parentId": null,
+              "position": [
+                -0.45,
+                0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-4-2",
+              "label": "Fixed junction 4,2",
+              "parentId": null,
+              "position": [
+                0,
+                0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-4-3",
+              "label": "Fixed junction 4,3",
+              "parentId": null,
+              "position": [
+                0.45,
+                0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "node-4-4",
+              "label": "Fixed junction 4,4",
+              "parentId": null,
+              "position": [
+                0.9,
+                0.9,
+                1.8
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.045
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#617481"
+            },
+            {
+              "id": "impact-ball",
+              "label": "1.5 kg impact ball",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                3.25
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.3
+              },
+              "mass": 1.5,
+              "heldBy": "frame-north",
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#df7b32"
+            }
+          ],
+          "sites": [
+            {
+              "id": "site-0-0",
+              "label": "Junction 0,0",
+              "bodyId": "node-0-0",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-0-1",
+              "label": "Junction 0,1",
+              "bodyId": "node-0-1",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-0-2",
+              "label": "Junction 0,2",
+              "bodyId": "node-0-2",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-0-3",
+              "label": "Junction 0,3",
+              "bodyId": "node-0-3",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-0-4",
+              "label": "Junction 0,4",
+              "bodyId": "node-0-4",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-1-0",
+              "label": "Junction 1,0",
+              "bodyId": "node-1-0",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-1-1",
+              "label": "Junction 1,1",
+              "bodyId": "node-1-1",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-1-2",
+              "label": "Junction 1,2",
+              "bodyId": "node-1-2",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-1-3",
+              "label": "Junction 1,3",
+              "bodyId": "node-1-3",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-1-4",
+              "label": "Junction 1,4",
+              "bodyId": "node-1-4",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-2-0",
+              "label": "Junction 2,0",
+              "bodyId": "node-2-0",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-2-1",
+              "label": "Junction 2,1",
+              "bodyId": "node-2-1",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-2-2",
+              "label": "Junction 2,2",
+              "bodyId": "node-2-2",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-2-3",
+              "label": "Junction 2,3",
+              "bodyId": "node-2-3",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-2-4",
+              "label": "Junction 2,4",
+              "bodyId": "node-2-4",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-3-0",
+              "label": "Junction 3,0",
+              "bodyId": "node-3-0",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-3-1",
+              "label": "Junction 3,1",
+              "bodyId": "node-3-1",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-3-2",
+              "label": "Junction 3,2",
+              "bodyId": "node-3-2",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-3-3",
+              "label": "Junction 3,3",
+              "bodyId": "node-3-3",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-3-4",
+              "label": "Junction 3,4",
+              "bodyId": "node-3-4",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-4-0",
+              "label": "Junction 4,0",
+              "bodyId": "node-4-0",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-4-1",
+              "label": "Junction 4,1",
+              "bodyId": "node-4-1",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-4-2",
+              "label": "Junction 4,2",
+              "bodyId": "node-4-2",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-4-3",
+              "label": "Junction 4,3",
+              "bodyId": "node-4-3",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "site-4-4",
+              "label": "Junction 4,4",
+              "bodyId": "node-4-4",
+              "position": [
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "tendons": [
+            {
+              "id": "spring-0-0-1-1",
+              "label": "Spring 0,0 to 1,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-0-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-0-1-1-1",
+              "label": "Spring 0,1 to 1,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-0-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-0-1-1-2",
+              "label": "Spring 0,1 to 1,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-0-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-1-1-0-2",
+              "label": "Spring 1,1 to 0,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-0-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-0-2-1-2",
+              "label": "Spring 0,2 to 1,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-0-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-0-2-1-3",
+              "label": "Spring 0,2 to 1,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-0-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-1-2-0-3",
+              "label": "Spring 1,2 to 0,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-0-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-0-3-1-3",
+              "label": "Spring 0,3 to 1,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-0-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-3-0-4",
+              "label": "Spring 1,3 to 0,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-0-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-1-0-1-1",
+              "label": "Spring 1,0 to 1,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-0-2-1",
+              "label": "Spring 1,0 to 2,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-0-1-1",
+              "label": "Spring 2,0 to 1,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-1-1-2-1",
+              "label": "Spring 1,1 to 2,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-1-1-2",
+              "label": "Spring 1,1 to 1,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-1-2-2",
+              "label": "Spring 1,1 to 2,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-1-1-2",
+              "label": "Spring 2,1 to 1,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-1-2-2-2",
+              "label": "Spring 1,2 to 2,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-2-1-3",
+              "label": "Spring 1,2 to 1,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-2-2-3",
+              "label": "Spring 1,2 to 2,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-2-1-3",
+              "label": "Spring 2,2 to 1,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-1-3-2-3",
+              "label": "Spring 1,3 to 2,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-3-1-4",
+              "label": "Spring 1,3 to 1,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-1-3-2-4",
+              "label": "Spring 1,3 to 2,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-1-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-3-1-4",
+              "label": "Spring 2,3 to 1,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-1-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-0-2-1",
+              "label": "Spring 2,0 to 2,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-2-0-3-1",
+              "label": "Spring 2,0 to 3,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-0-2-1",
+              "label": "Spring 3,0 to 2,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-1-3-1",
+              "label": "Spring 2,1 to 3,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-2-1-2-2",
+              "label": "Spring 2,1 to 2,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-2-1-3-2",
+              "label": "Spring 2,1 to 3,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-1-2-2",
+              "label": "Spring 3,1 to 2,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-2-3-2",
+              "label": "Spring 2,2 to 3,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-2-2-2-3",
+              "label": "Spring 2,2 to 2,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-2-2-3-3",
+              "label": "Spring 2,2 to 3,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-2-2-3",
+              "label": "Spring 3,2 to 2,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-2-3-3-3",
+              "label": "Spring 2,3 to 3,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-2-3-2-4",
+              "label": "Spring 2,3 to 2,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-2-3-3-4",
+              "label": "Spring 2,3 to 3,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-2-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-3-2-4",
+              "label": "Spring 3,3 to 2,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-2-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-0-3-1",
+              "label": "Spring 3,0 to 3,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-4-0-3-1",
+              "label": "Spring 4,0 to 3,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-4-0"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-1-4-1",
+              "label": "Spring 3,1 to 4,1",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-4-1"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-3-1-3-2",
+              "label": "Spring 3,1 to 3,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-3-1-4-2",
+              "label": "Spring 3,1 to 4,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-4-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-4-1-3-2",
+              "label": "Spring 4,1 to 3,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-4-1"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-2-4-2",
+              "label": "Spring 3,2 to 4,2",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-4-2"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-3-2-3-3",
+              "label": "Spring 3,2 to 3,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-3-2-4-3",
+              "label": "Spring 3,2 to 4,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-4-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-4-2-3-3",
+              "label": "Spring 4,2 to 3,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-4-2"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            },
+            {
+              "id": "spring-3-3-4-3",
+              "label": "Spring 3,3 to 4,3",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-4-3"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-3-3-3-4",
+              "label": "Spring 3,3 to 3,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-3-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.396,
+              "stiffness": 70,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#d4a451"
+            },
+            {
+              "id": "spring-3-3-4-4",
+              "label": "Spring 3,3 to 4,4",
+              "path": [
+                {
+                  "kind": "site",
+                  "siteId": "site-3-3"
+                },
+                {
+                  "kind": "site",
+                  "siteId": "site-4-4"
+                }
+              ],
+              "mode": "spring",
+              "length": 0.5600285706997458,
+              "stiffness": 40,
+              "damping": 0.2,
+              "visual": {
+                "wireRadius": 0.004,
+                "coilRadius": 0.018,
+                "turns": 5,
+                "forceScale": 12
+              },
+              "color": "#b5c3c8"
+            }
+          ],
+          "connections": [],
+          "loads": [],
+          "events": [
+            {
+              "id": "drop-ball",
+              "label": "Drop the ball",
+              "at": 1.2,
+              "action": {
+                "kind": "release",
+                "bodyId": "impact-ball"
+              }
+            }
+          ]
+        },
+        "note": "Drops at 1.2 s. The ball is inelastic; the springs return stored energy."
+      }
+    ]
+  },
+  {
+    "id": "three-body-figure-eight",
+    "title": "Three-body figure eight",
+    "question": "Can three equal point masses repeat a figure eight under mutual gravity alone?",
+    "setups": [
+      {
+        "id": "native-mutual-gravity",
+        "label": "Three equal point masses",
+        "prompt": "Create a groundless space model with a readable XY plane and z=0. Use three world-root ideal point particles with equal mass m=14,982,844,642.8839 kg (1/G), and one mutual-gravity load acting on exactly those three particles with G=6.67430e-11 N·m²/kg². Set uniform gravity to [0,0,0] m/s². Start the blue particle at [-0.97000436,0.24308753,0] m with velocity [0.466203685,0.432365730,0] m/s; the orange particle at [0.97000436,-0.24308753,0] m with velocity [0.466203685,0.432365730,0] m/s; and the teal particle at [0,0,0] m with velocity [-0.93240737,-0.86473146,0] m/s. Add no drag, ground, other loads, central body, or prescribed path. Show each particle's trajectory trail from the existing renderer. This is an ideal point-mass lab-display scale: Gm=1 m³/s² gives a metre-scale orbit with a period of about 6.326 s. The particles have no physical radius; these values are not finite stars or a precision astronomy model.",
+        "summary": "Three equal ideal point masses chase one another around a planar figure eight under mutual gravity alone.",
+        "assumptions": [
+          "Each moving body is an ideal point particle with no physical radius or collision surface.",
+          "The large equal masses and metre-scale orbit are a lab-display scale, not a model of finite stars.",
+          "The XY plane has no uniform gravity or drag; native mutual gravity is the only load."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Three-body figure eight",
+          "gravity": [
+            0,
+            0,
+            0
+          ],
+          "ground": null,
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": false
+          },
+          "bodies": [
+            {
+              "id": "blue-mass",
+              "label": "Blue mass",
+              "parentId": null,
+              "position": [
+                -0.97000436,
+                0.24308753,
+                0
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "point"
+              },
+              "mass": 14982844642.8839,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "particle",
+                "linearVelocity": [
+                  0.466203685,
+                  0.43236573,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2878d0"
+            },
+            {
+              "id": "orange-mass",
+              "label": "Orange mass",
+              "parentId": null,
+              "position": [
+                0.97000436,
+                -0.24308753,
+                0
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "point"
+              },
+              "mass": 14982844642.8839,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "particle",
+                "linearVelocity": [
+                  0.466203685,
+                  0.43236573,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#ef7b28"
+            },
+            {
+              "id": "teal-mass",
+              "label": "Teal mass",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "point"
+              },
+              "mass": 14982844642.8839,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "particle",
+                "linearVelocity": [
+                  -0.93240737,
+                  -0.86473146,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#199f94"
             }
           ],
           "sites": [],
           "tendons": [],
           "connections": [],
-          "loads": [],
-          "events": [
+          "loads": [
             {
-              "id": "launch1",
-              "label": "Launch Round 1",
-              "at": 0,
-              "action": {
-                "kind": "launch",
-                "bodyId": "round1",
-                "velocity": [
-                  10.392304845413264,
-                  0,
-                  5.999999999999999
-                ],
-                "frame": "world"
-              }
-            },
-            {
-              "id": "launch2",
-              "label": "Launch Round 2",
-              "at": 2,
-              "action": {
-                "kind": "launch",
-                "bodyId": "round2",
-                "velocity": [
-                  10.392304845413264,
-                  0,
-                  5.999999999999999
-                ],
-                "frame": "world"
-              }
-            },
-            {
-              "id": "launch3",
-              "label": "Launch Round 3",
-              "at": 4,
-              "action": {
-                "kind": "launch",
-                "bodyId": "round3",
-                "velocity": [
-                  10.392304845413264,
-                  0,
-                  5.999999999999999
-                ],
-                "frame": "world"
-              }
+              "kind": "gravity",
+              "bodyIds": [
+                "blue-mass",
+                "orange-mass",
+                "teal-mass"
+              ],
+              "G": 6.6743e-11
             }
-          ]
+          ],
+          "events": []
         },
-        "note": "Watch the loaded mass drop at each shot. Launch speed is measured against the ground."
-      },
+        "note": "Run for about 6.3 seconds. Switch to Speed to compare the changing velocities."
+      }
+    ]
+  },
+  {
+    "id": "loop-the-loop",
+    "title": "The frictionless loop",
+    "question": "Can a frictionless track still slow a bead?",
+    "setups": [
       {
-        "id": "frictionless-contacts",
-        "label": "Frictionless contacts",
-        "prompt": "Create a free rigid launcher cart with its own mass 5 kg, full box size [1.2,0.6,0.3] m, center [0,0,0.15] m and zero initial linear and angular velocity, supported by a real level ground plane at z=0 m. The cart carries three separate true 1 kg spherical rounds of radius 0.07 m at world centers [0.75,-0.18,0.25], [0.75,0,0.25] and [0.75,0.18,0.25] m. Physically hold each round to the cart so the rounds' mass and inertia contribute to the loaded cart until launch; their zero velocity/spin fields are held-state placeholders. Keep the specified overhanging round positions. Schedule exactly one launch of Round 1 at t=0 s, Round 2 at t=2 s and Round 3 at t=4 s. Each action sets absolute WORLD velocity [10.392304845413264,0,5.999999999999999] m/s (12 m/s at 30° above the +X ground direction, with y velocity zero), not cart-relative speed. The cart remains free to translate and rotate. Ground, cart and rounds have restitution 0; set their sliding and static friction coefficients to 0 and torsional and rolling friction to zero. Use Earth gravity [0,0,-9.81] m/s² and no drag. Name the bodies Launcher cart, Round 1, Round 2, Round 3; use distinct round colors, plain studio appearance and a visible reference grid.",
-        "summary": "The same loaded launcher and scheduled world-velocity launches use zero static/sliding friction on ground, cart and rounds.",
+        "id": "elastic-and-inelastic",
+        "label": "Same speed, different impacts",
+        "prompt": "Build a vertical 32-panel polygonal loop with two separate free spherical beads under Earth gravity [0,0,-9.81] m/s². The loop center is [0,0,1.35] m. For i=0..31 use φ=-90°+11.25°i, panel center [1.03 cosφ,0,1.35+1.03 sinφ] m, full box size [0.197967721,0.54,0.06] m, and quaternion [cos(α/2),0,sin(α/2),0] in w,x,y,z order with α=-φ-90°. All 32 panels are fixed, with normal restitution 1. Their real corners are intentional: this is a polygonal impact track, not a smooth rail. Each bead has mass 0.15 kg, radius 0.055 m and no initial spin. The blue elastic bead starts at [0,-0.17,0.405] m with restitution 1; the orange inelastic bead starts at [0,+0.17,0.405] m with restitution 0. Give both initial world velocity [10,0,0] m/s. Set all sliding, static, torsional and rolling friction coefficients to zero for beads, panels and ground. Include a fixed ground at z=0 with restitution 0. Add no air drag, additional viscous damping, hinges, guides, forces, scheduled impulses or prescribed paths. The separated lanes are established by their initial geometry, not a constraint. Compare energy transfer at panel impacts: zero friction does not eliminate normal-impact losses. Both beads are free rigid bodies and can leave the panel surfaces. Use blue and orange beads, muted panels, a plain visual ground, daylight and no reference grid; appearance must not change the declared contact coefficients.",
+        "summary": "Equal-speed beads meet the same frictionless polygonal track, but only the orange bead absorbs energy in normal impacts.",
         "assumptions": [
-          "The cart’s 5 kg is its own mass; each held 1 kg round contributes mass and inertia until its launch.",
-          "Only static and sliding contact friction differ from the frictional setup; launches remain instantaneous world-velocity targets, with no drag."
+          "The track has 32 real flat panels and corners, not an ideal smooth circular guide.",
+          "All friction is zero. Panel and blue-bead restitution targets are 1; orange-bead and ground restitution targets are 0.",
+          "Both beads start at 10 m/s with no spin or air drag. No joint keeps either bead on the track."
         ],
         "scene": {
           "category": "mechanics",
-          "title": "Staggered launcher-cart rounds",
+          "title": "The frictionless loop",
           "gravity": [
             0,
             0,
@@ -1673,19 +3384,19 @@
           },
           "appearance": {
             "surface": "plain",
-            "sky": "studio",
+            "sky": "day",
             "textured": false,
-            "grid": true
+            "grid": false
           },
           "bodies": [
             {
-              "id": "cart",
-              "label": "Launcher cart",
+              "id": "panel-00",
+              "label": "Loop panel 01",
               "parentId": null,
               "position": [
+                6.306931015608869e-17,
                 0,
-                0,
-                0.15
+                0.32000000000000006
               ],
               "orientation": [
                 1,
@@ -1696,12 +3407,1332 @@
               "shape": {
                 "kind": "box",
                 "size": [
-                  1.2,
-                  0.6,
-                  0.3
+                  0.19796772074790012,
+                  0.54,
+                  0.06
                 ]
               },
-              "mass": 5,
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-01",
+              "label": "Loop panel 02",
+              "parentId": null,
+              "position": [
+                0.20094303167661218,
+                0,
+                0.3397911611846727
+              ],
+              "orientation": [
+                0.9951847266721969,
+                0,
+                -0.0980171403295606,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-02",
+              "label": "Loop panel 03",
+              "parentId": null,
+              "position": [
+                0.39416393533604255,
+                0,
+                0.3984040815133747
+              ],
+              "orientation": [
+                0.9807852804032304,
+                0,
+                -0.19509032201612825,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-03",
+              "label": "Loop panel 04",
+              "parentId": null,
+              "position": [
+                0.5722373400101903,
+                0,
+                0.4935862993283785
+              ],
+              "orientation": [
+                0.9569403357322088,
+                0,
+                -0.29028467725446233,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-04",
+              "label": "Loop panel 05",
+              "parentId": null,
+              "position": [
+                0.728319984622144,
+                0,
+                0.6216800153778562
+              ],
+              "orientation": [
+                0.9238795325112867,
+                0,
+                -0.3826834323650898,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-05",
+              "label": "Loop panel 06",
+              "parentId": null,
+              "position": [
+                0.8564137006716216,
+                0,
+                0.7777626599898099
+              ],
+              "orientation": [
+                0.881921264348355,
+                0,
+                -0.47139673682599764,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-06",
+              "label": "Loop panel 07",
+              "parentId": null,
+              "position": [
+                0.9515959184866254,
+                0,
+                0.9558360646639577
+              ],
+              "orientation": [
+                0.8314696123025452,
+                0,
+                -0.5555702330196022,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-07",
+              "label": "Loop panel 08",
+              "parentId": null,
+              "position": [
+                1.0102088388153274,
+                0,
+                1.149056968323388
+              ],
+              "orientation": [
+                0.773010453362737,
+                0,
+                -0.6343932841636455,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-08",
+              "label": "Loop panel 09",
+              "parentId": null,
+              "position": [
+                1.03,
+                0,
+                1.35
+              ],
+              "orientation": [
+                0.7071067811865476,
+                0,
+                -0.7071067811865475,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-09",
+              "label": "Loop panel 10",
+              "parentId": null,
+              "position": [
+                1.0102088388153274,
+                0,
+                1.5509430316766122
+              ],
+              "orientation": [
+                0.6343932841636455,
+                0,
+                -0.7730104533627369,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-10",
+              "label": "Loop panel 11",
+              "parentId": null,
+              "position": [
+                0.9515959184866254,
+                0,
+                1.7441639353360425
+              ],
+              "orientation": [
+                0.5555702330196023,
+                0,
+                -0.8314696123025452,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-11",
+              "label": "Loop panel 12",
+              "parentId": null,
+              "position": [
+                0.8564137006716217,
+                0,
+                1.9222373400101902
+              ],
+              "orientation": [
+                0.4713967368259978,
+                0,
+                -0.8819212643483549,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-12",
+              "label": "Loop panel 13",
+              "parentId": null,
+              "position": [
+                0.728319984622144,
+                0,
+                2.078319984622144
+              ],
+              "orientation": [
+                0.38268343236508984,
+                0,
+                -0.9238795325112867,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-13",
+              "label": "Loop panel 14",
+              "parentId": null,
+              "position": [
+                0.5722373400101901,
+                0,
+                2.2064137006716216
+              ],
+              "orientation": [
+                0.29028467725446233,
+                0,
+                -0.9569403357322089,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-14",
+              "label": "Loop panel 15",
+              "parentId": null,
+              "position": [
+                0.39416393533604255,
+                0,
+                2.3015959184866253
+              ],
+              "orientation": [
+                0.19509032201612833,
+                0,
+                -0.9807852804032304,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-15",
+              "label": "Loop panel 16",
+              "parentId": null,
+              "position": [
+                0.2009430316766124,
+                0,
+                2.3602088388153275
+              ],
+              "orientation": [
+                0.09801714032956077,
+                0,
+                -0.9951847266721968,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-16",
+              "label": "Loop panel 17",
+              "parentId": null,
+              "position": [
+                6.306931015608869e-17,
+                0,
+                2.38
+              ],
+              "orientation": [
+                6.123233995736766e-17,
+                0,
+                -1,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-17",
+              "label": "Loop panel 18",
+              "parentId": null,
+              "position": [
+                -0.20094303167661226,
+                0,
+                2.3602088388153275
+              ],
+              "orientation": [
+                -0.09801714032956065,
+                0,
+                -0.9951847266721969,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-18",
+              "label": "Loop panel 19",
+              "parentId": null,
+              "position": [
+                -0.39416393533604244,
+                0,
+                2.3015959184866253
+              ],
+              "orientation": [
+                -0.1950903220161282,
+                0,
+                -0.9807852804032304,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-19",
+              "label": "Loop panel 20",
+              "parentId": null,
+              "position": [
+                -0.57223734001019,
+                0,
+                2.2064137006716216
+              ],
+              "orientation": [
+                -0.29028467725446216,
+                0,
+                -0.9569403357322089,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-20",
+              "label": "Loop panel 21",
+              "parentId": null,
+              "position": [
+                -0.7283199846221439,
+                0,
+                2.0783199846221443
+              ],
+              "orientation": [
+                -0.3826834323650897,
+                0,
+                -0.9238795325112867,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-21",
+              "label": "Loop panel 22",
+              "parentId": null,
+              "position": [
+                -0.8564137006716217,
+                0,
+                1.9222373400101902
+              ],
+              "orientation": [
+                -0.4713967368259977,
+                0,
+                -0.881921264348355,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-22",
+              "label": "Loop panel 23",
+              "parentId": null,
+              "position": [
+                -0.9515959184866252,
+                0,
+                1.7441639353360432
+              ],
+              "orientation": [
+                -0.555570233019602,
+                0,
+                -0.8314696123025453,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-23",
+              "label": "Loop panel 24",
+              "parentId": null,
+              "position": [
+                -1.0102088388153274,
+                0,
+                1.5509430316766126
+              ],
+              "orientation": [
+                -0.6343932841636454,
+                0,
+                -0.7730104533627371,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-24",
+              "label": "Loop panel 25",
+              "parentId": null,
+              "position": [
+                -1.03,
+                0,
+                1.3500000000000003
+              ],
+              "orientation": [
+                -0.7071067811865475,
+                0,
+                -0.7071067811865476,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-25",
+              "label": "Loop panel 26",
+              "parentId": null,
+              "position": [
+                -1.0102088388153274,
+                0,
+                1.149056968323388
+              ],
+              "orientation": [
+                -0.773010453362737,
+                0,
+                -0.6343932841636455,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-26",
+              "label": "Loop panel 27",
+              "parentId": null,
+              "position": [
+                -0.9515959184866253,
+                0,
+                0.9558360646639573
+              ],
+              "orientation": [
+                -0.8314696123025453,
+                0,
+                -0.5555702330196022,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-27",
+              "label": "Loop panel 28",
+              "parentId": null,
+              "position": [
+                -0.8564137006716218,
+                0,
+                0.7777626599898101
+              ],
+              "orientation": [
+                -0.8819212643483549,
+                0,
+                -0.47139673682599786,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-28",
+              "label": "Loop panel 29",
+              "parentId": null,
+              "position": [
+                -0.7283199846221441,
+                0,
+                0.6216800153778562
+              ],
+              "orientation": [
+                -0.9238795325112867,
+                0,
+                -0.3826834323650899,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-29",
+              "label": "Loop panel 30",
+              "parentId": null,
+              "position": [
+                -0.5722373400101902,
+                0,
+                0.4935862993283785
+              ],
+              "orientation": [
+                -0.9569403357322088,
+                0,
+                -0.2902846772544624,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-30",
+              "label": "Loop panel 31",
+              "parentId": null,
+              "position": [
+                -0.39416393533604305,
+                0,
+                0.3984040815133749
+              ],
+              "orientation": [
+                -0.9807852804032304,
+                0,
+                -0.1950903220161286,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "panel-31",
+              "label": "Loop panel 32",
+              "parentId": null,
+              "position": [
+                -0.20094303167661254,
+                0,
+                0.3397911611846729
+              ],
+              "orientation": [
+                -0.9951847266721968,
+                0,
+                -0.09801714032956083,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.19796772074790012,
+                  0.54,
+                  0.06
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#76838a"
+            },
+            {
+              "id": "elastic-bead",
+              "label": "Elastic bead",
+              "parentId": null,
+              "position": [
+                0,
+                -0.17,
+                0.4050000000000001
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.055
+              },
+              "mass": 0.15,
+              "heldBy": null,
+              "restitution": 1,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  10,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#377eb8"
+            },
+            {
+              "id": "inelastic-bead",
+              "label": "Inelastic bead",
+              "parentId": null,
+              "position": [
+                0,
+                0.17,
+                0.4050000000000001
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.055
+              },
+              "mass": 0.15,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  10,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#e67e22"
+            }
+          ],
+          "sites": [],
+          "tendons": [],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Both start at 10 m/s. Compare their paths after three seconds."
+      }
+    ]
+  },
+  {
+    "id": "domino-arc",
+    "title": "Dominoes around a bend",
+    "question": "How does a fall travel around a curve?",
+    "setups": [
+      {
+        "id": "twenty-domino-arc",
+        "label": "Twenty dominoes around a bend",
+        "prompt": "Create a chain of 20 independent free rigid wooden domino blocks on a fixed level ground plane at z=0 m. Use Earth gravity [0,0,-9.81] m/s². Each block is a uniform rectangular solid with full dimensions 0.036 m along its local X (the path direction), 0.012 m along local Y, and 0.180 m high along local Z, mass 0.055 kg, and initially zero linear and angular velocity. Place their upright center stations on a circular arc in the XY plane: radius 0.85943669 m, equal 5° tangent turns and 0.075 m arc spacing. For block number i=0,…,19, set φ=i×5°; center x=R sinφ, y=R(1−cosφ), yaw=φ, and upright center z=0.090 m. Give only the first block a 14° initial tip toward the second along local +X; rotate about local Y after its yaw, and raise its center only enough to put its lowest bottom corner at z=0: z=0.090 cos14°+0.018 sin14°=0.09168121 m. Keep all other blocks exactly upright. Adjacent centers are 0.075 m apart along the arc, leaving a clear initial gap; do not add pivots, joints, scheduled actions, impulses, loads, additional viscous damping, air drag, or other moving bodies. Use zero restitution for the blocks and ground, sliding friction 0.55 and static friction 0.70 for both, and zero torsional and rolling friction. All motion after release must arise only from gravity and native block-to-block and block-to-ground contact. Use a concrete visual ground, daylight and no reference grid; these cosmetic choices must not change the stated friction.",
+        "summary": "A single gravity-driven tip travels through 20 free blocks on a circular arc.",
+        "assumptions": [
+          "Each domino is a uniform rigid wooden block with the stated dimensions and mass.",
+          "Contact friction and zero restitution are native solver targets; no other forces, damping or scheduled motions act."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Dominoes around a bend",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 0,
+            "friction": {
+              "sliding": 0.55,
+              "torsional": 0,
+              "rolling": 0,
+              "static": 0.7
+            }
+          },
+          "appearance": {
+            "surface": "concrete",
+            "sky": "day",
+            "textured": true,
+            "grid": false
+          },
+          "bodies": [
+            {
+              "id": "domino01",
+              "label": "Domino 01",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                0.0916812094856337
+              ],
+              "orientation": [
+                0.992546151641322,
+                0,
+                0.12186934340514748,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
               "heldBy": null,
               "restitution": 0,
               "motion": {
@@ -1718,34 +4749,38 @@
                 ]
               },
               "friction": {
-                "sliding": 0,
+                "sliding": 0.55,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0
+                "static": 0.7
               },
-              "color": "#67d9ce"
+              "color": "#b8895a"
             },
             {
-              "id": "round1",
-              "label": "Round 1",
+              "id": "domino02",
+              "label": "Domino 02",
               "parentId": null,
               "position": [
-                0.75,
-                -0.18,
-                0.25
+                0.07490484329653119,
+                0.0032704160867408796,
+                0.09
               ],
               "orientation": [
-                1,
+                0.9990482215818578,
                 0,
                 0,
-                0
+                0.043619387365336
               ],
               "shape": {
-                "kind": "sphere",
-                "radius": 0.07
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
               },
-              "mass": 1,
-              "heldBy": "cart",
+              "mass": 0.055,
+              "heldBy": null,
               "restitution": 0,
               "motion": {
                 "kind": "free",
@@ -1761,34 +4796,38 @@
                 ]
               },
               "friction": {
-                "sliding": 0,
+                "sliding": 0.55,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0
+                "static": 0.7
               },
-              "color": "#d96b5f"
+              "color": "#b8895a"
             },
             {
-              "id": "round2",
-              "label": "Round 2",
+              "id": "domino03",
+              "label": "Domino 03",
               "parentId": null,
               "position": [
-                0.75,
-                0,
-                0.25
+                0.1492396155067948,
+                0.013056774505812274,
+                0.09
               ],
               "orientation": [
-                1,
+                0.9961946980917455,
                 0,
                 0,
-                0
+                0.08715574274765817
               ],
               "shape": {
-                "kind": "sphere",
-                "radius": 0.07
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
               },
-              "mass": 1,
-              "heldBy": "cart",
+              "mass": 0.055,
+              "heldBy": null,
               "restitution": 0,
               "motion": {
                 "kind": "free",
@@ -1804,34 +4843,38 @@
                 ]
               },
               "friction": {
-                "sliding": 0,
+                "sliding": 0.55,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0
+                "static": 0.7
               },
-              "color": "#e4b64e"
+              "color": "#b8895a"
             },
             {
-              "id": "round3",
-              "label": "Round 3",
+              "id": "domino04",
+              "label": "Domino 04",
               "parentId": null,
               "position": [
-                0.75,
-                0.18,
-                0.25
+                0.22243858412970804,
+                0.02928459516048012,
+                0.09
               ],
               "orientation": [
-                1,
+                0.9914448613738104,
                 0,
                 0,
-                0
+                0.13052619222005157
               ],
               "shape": {
-                "kind": "sphere",
-                "radius": 0.07
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
               },
-              "mass": 1,
-              "heldBy": "cart",
+              "mass": 0.055,
+              "heldBy": null,
               "restitution": 0,
               "motion": {
                 "kind": "free",
@@ -1847,67 +4890,773 @@
                 ]
               },
               "friction": {
-                "sliding": 0,
+                "sliding": 0.55,
                 "torsional": 0,
                 "rolling": 0,
-                "static": 0
+                "static": 0.7
               },
-              "color": "#5e9eaa"
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino05",
+              "label": "Domino 05",
+              "parentId": null,
+              "position": [
+                0.2939446608153049,
+                0.051830374536936515,
+                0.09
+              ],
+              "orientation": [
+                0.984807753012208,
+                0,
+                0,
+                0.17364817766693033
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino06",
+              "label": "Domino 06",
+              "parentId": null,
+              "position": [
+                0.36321364114345844,
+                0.08052252564061288,
+                0.09
+              ],
+              "orientation": [
+                0.9762960071199334,
+                0,
+                0,
+                0.21643961393810288
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino07",
+              "label": "Domino 07",
+              "parentId": null,
+              "position": [
+                0.42971834634811734,
+                0.11514268387681549,
+                0.09
+              ],
+              "orientation": [
+                0.9659258262890683,
+                0,
+                0,
+                0.25881904510252074
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino08",
+              "label": "Domino 08",
+              "parentId": null,
+              "position": [
+                0.49295263546603546,
+                0.15542736893714404,
+                0.09
+              ],
+              "orientation": [
+                0.9537169507482269,
+                0,
+                0,
+                0.3007057995042731
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino09",
+              "label": "Domino 09",
+              "parentId": null,
+              "position": [
+                0.5524352573751176,
+                0.20106999004373138,
+                0.09
+              ],
+              "orientation": [
+                0.9396926207859084,
+                0,
+                0,
+                0.3420201433256687
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino10",
+              "label": "Domino 10",
+              "parentId": null,
+              "position": [
+                0.6077135134060465,
+                0.25172317929018817,
+                0.09
+              ],
+              "orientation": [
+                0.9238795325112867,
+                0,
+                0,
+                0.3826834323650898
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino11",
+              "label": "Domino 11",
+              "parentId": null,
+              "position": [
+                0.6583667026525034,
+                0.3070014353211171,
+                0.09
+              ],
+              "orientation": [
+                0.9063077870366499,
+                0,
+                0,
+                0.42261826174069944
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino12",
+              "label": "Domino 12",
+              "parentId": null,
+              "position": [
+                0.7040093237590908,
+                0.36648405723019933,
+                0.09
+              ],
+              "orientation": [
+                0.8870108331782217,
+                0,
+                0,
+                0.4617486132350339
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino13",
+              "label": "Domino 13",
+              "parentId": null,
+              "position": [
+                0.7442940088194192,
+                0.4297183463481173,
+                0.09
+              ],
+              "orientation": [
+                0.8660254037844387,
+                0,
+                0,
+                0.49999999999999994
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino14",
+              "label": "Domino 14",
+              "parentId": null,
+              "position": [
+                0.7789141670556219,
+                0.4962230515527763,
+                0.09
+              ],
+              "orientation": [
+                0.8433914458128857,
+                0,
+                0,
+                0.5372996083468239
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino15",
+              "label": "Domino 15",
+              "parentId": null,
+              "position": [
+                0.8076063181592982,
+                0.5654920318809298,
+                0.09
+              ],
+              "orientation": [
+                0.8191520442889918,
+                0,
+                0,
+                0.573576436351046
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino16",
+              "label": "Domino 16",
+              "parentId": null,
+              "position": [
+                0.8301520975357547,
+                0.6369981085665267,
+                0.09
+              ],
+              "orientation": [
+                0.7933533402912352,
+                0,
+                0,
+                0.6087614290087207
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino17",
+              "label": "Domino 17",
+              "parentId": null,
+              "position": [
+                0.8463799181904225,
+                0.7101970771894399,
+                0.09
+              ],
+              "orientation": [
+                0.766044443118978,
+                0,
+                0,
+                0.6427876096865393
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino18",
+              "label": "Domino 18",
+              "parentId": null,
+              "position": [
+                0.856166276609494,
+                0.7845318493997034,
+                0.09
+              ],
+              "orientation": [
+                0.7372773368101241,
+                0,
+                0,
+                0.6755902076156601
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino19",
+              "label": "Domino 19",
+              "parentId": null,
+              "position": [
+                0.8594366926962348,
+                0.8594366926962347,
+                0.09
+              ],
+              "orientation": [
+                0.7071067811865476,
+                0,
+                0,
+                0.7071067811865475
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
+            },
+            {
+              "id": "domino20",
+              "label": "Domino 20",
+              "parentId": null,
+              "position": [
+                0.856166276609494,
+                0.9343415359927658,
+                0.09
+              ],
+              "orientation": [
+                0.6755902076156604,
+                0,
+                0,
+                0.737277336810124
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.036,
+                  0.012,
+                  0.18
+                ]
+              },
+              "mass": 0.055,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "free",
+                "linearVelocity": [
+                  0,
+                  0,
+                  0
+                ],
+                "angularVelocity": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "friction": {
+                "sliding": 0.55,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0.7
+              },
+              "color": "#b8895a"
             }
           ],
           "sites": [],
           "tendons": [],
           "connections": [],
           "loads": [],
-          "events": [
-            {
-              "id": "launch1",
-              "label": "Launch Round 1",
-              "at": 0,
-              "action": {
-                "kind": "launch",
-                "bodyId": "round1",
-                "velocity": [
-                  10.392304845413264,
-                  0,
-                  5.999999999999999
-                ],
-                "frame": "world"
-              }
-            },
-            {
-              "id": "launch2",
-              "label": "Launch Round 2",
-              "at": 2,
-              "action": {
-                "kind": "launch",
-                "bodyId": "round2",
-                "velocity": [
-                  10.392304845413264,
-                  0,
-                  5.999999999999999
-                ],
-                "frame": "world"
-              }
-            },
-            {
-              "id": "launch3",
-              "label": "Launch Round 3",
-              "at": 4,
-              "action": {
-                "kind": "launch",
-                "bodyId": "round3",
-                "velocity": [
-                  10.392304845413264,
-                  0,
-                  5.999999999999999
-                ],
-                "frame": "world"
-              }
-            }
-          ]
+          "events": []
         },
-        "note": "Watch the loaded mass drop at each shot. Launch speed is measured against the ground."
+        "note": "Only the first block starts tilted. The fall reaches the far end in about 2.5 s."
       }
     ]
   }

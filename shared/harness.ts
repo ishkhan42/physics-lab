@@ -4,7 +4,7 @@ import { ProviderSchema, DecisionSchema, SceneSchema, validateScene } from './sc
 
 export const HarnessRequestSchema = z.strictObject({
   provider: ProviderSchema,
-  model: z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9][A-Za-z0-9._:/+-]*$/),
+  model: z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9~][A-Za-z0-9._:/+~-]*$/),
   description: z.string().trim().min(3).max(16000),
   clarification: z.array(z.strictObject({ question: z.string().min(1).max(2000), answer: z.string().trim().min(1).max(4000) })).max(12).default([]),
   history: z.array(z.strictObject({ role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(16000) })).max(24).default([]),

@@ -20,13 +20,22 @@ import { HarnessFailureIssueSchema, makeHarnessFailure, formatHarnessFailure, ty
 import { reviewExperiment, ReviewUnusableError, type ModelReview } from './harness-review.ts';
 import { ReviewProposalConcernSchema, ReviewProposalSchema, type ReviewProposal } from '../shared/review-proposal.ts';
 import { captureScene } from './scene-inspector.ts';
-import { INSPECTION_FPS, MAX_INSPECTION_FRAMES, MAX_VISUAL_CALLS_PER_RUN, MAX_VISUAL_FRAMES_PER_RUN, VisualFrameSchema, VisualInspectionRequestSchema, type VisualFrame, type VisualInspectionRequest } from '../shared/visual-inspection.ts';
+import { INSPECTION_RPC_TIMEOUT_MS, InspectionRequestSchema, InspectionResultSchema, type InspectionResult } from '../shared/inspection-rpc.ts';
+import { INSPECTION_FPS, MAX_INSPECTION_FRAMES, MAX_VISUAL_CALLS_PER_RUN, MAX_VISUAL_FRAMES_PER_RUN, VisualFrameSchema, VisualInspectionRequestSchema, type VisualCaptureRequest, type VisualFrame, type VisualInspectionRequest } from '../shared/visual-inspection.ts';
 import { withLabResources } from './lab-resources.ts';
 
 const MAX_DECISION_JSON_CHARS = 524288;
 const send = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
 const streams = new Map<number, AssistantMessageEventStream>();
+const MAX_WORKER_RUNTIME_MS = 240_000;
+const workerStartedAt = Date.now();
+type PendingInspection = { resolve: (result: InspectionResult) => void; reject: (error: Error) => void };
+const pendingInspections = new Map<number, PendingInspection>();
+let inspectionSequence = 0;
+let brokerInspection = false;
+let inputClosed = false;
+let ended = false;
 let initialized = false;
 let sequence = 0;
 const failureContext: HarnessFailureContext = { stage: 'initializing', modelTurns: 0, toolCalls: 0 };
@@ -85,8 +94,43 @@ const streamFor = (purpose: ModelPurpose): StreamFn => (model, context) => {
 };
 const result = (value: unknown, terminate = false) => ({ content: modelTextContent(JSON.stringify(value)), details: undefined, terminate });
 
+function rejectPendingInspections(error: Error) {
+  for (const pending of pendingInspections.values()) pending.reject(error);
+  pendingInspections.clear();
+}
+
 function endWithRecord(record: unknown, exitCode: number) {
+  if (ended) return;
+  ended = true;
+  rejectPendingInspections(new Error('The worker stopped before the inspection completed.'));
   process.stdout.write(`${JSON.stringify(record)}\n`, () => process.exit(exitCode));
+}
+
+async function requestInspection(scene: Scene, request: VisualCaptureRequest): Promise<VisualFrame[]> {
+  const timeoutMs = Math.min(INSPECTION_RPC_TIMEOUT_MS, MAX_WORKER_RUNTIME_MS - (Date.now() - workerStartedAt));
+  if (timeoutMs <= 0) throw new Error('Visual inspection exceeded its remaining time limit.');
+  const id = ++inspectionSequence;
+  const message = InspectionRequestSchema.parse({ type: 'inspection', id, scene, request });
+  const { promise, resolve, reject } = Promise.withResolvers<InspectionResult>();
+  const timer = setTimeout(() => {
+    const pending = pendingInspections.get(id);
+    if (!pending) return;
+    pendingInspections.delete(id);
+    pending.reject(new Error('Visual inspection exceeded its time limit.'));
+  }, timeoutMs);
+  const pending: PendingInspection = {
+    resolve: result => { clearTimeout(timer); resolve(result); },
+    reject: error => { clearTimeout(timer); reject(error); },
+  };
+  pendingInspections.set(id, pending);
+  try { send(message); }
+  catch (error) {
+    pendingInspections.delete(id);
+    pending.reject(error instanceof Error ? error : new Error('The inspection request could not be sent.'));
+  }
+  const result = await promise;
+  if (result.status === 'error') throw new Error(result.message);
+  return result.frames;
 }
 
 function sceneCheckKey(decision: Decision): string {
@@ -110,7 +154,8 @@ async function inspectInitialState(scene: Scene) {
 }
 
 async function run(input: unknown): Promise<WorkerResult> {
-  const init = z.strictObject({ type: z.literal('init'), request: HarnessRequestSchema, model: z.custom<Model<Api>>() }).parse(input);
+  const init = z.strictObject({ type: z.literal('init'), request: HarnessRequestSchema, model: z.custom<Model<Api>>(), brokerInspection: z.boolean().default(false) }).parse(input);
+  brokerInspection = init.brokerInspection;
   canInspectImages = init.model.input.includes('image');
   visualCalls = 0;
   visualFrameCount = 0;
@@ -329,7 +374,9 @@ async function run(input: unknown): Promise<WorkerResult> {
     visualFrameCount += request.frames.length;
     try {
       const captureRequest = { times: request.frames.map(frame => frame / INSPECTION_FPS), view: request.view, focusId: request.focusId };
-      const frames = z.array(VisualFrameSchema).min(1).max(MAX_INSPECTION_FRAMES).parse(await captureScene(decision.scene, captureRequest));
+      const frames = z.array(VisualFrameSchema).min(1).max(MAX_INSPECTION_FRAMES).parse(await (brokerInspection
+        ? requestInspection(decision.scene, captureRequest)
+        : captureScene(decision.scene, captureRequest)));
       if (frames.length !== request.frames.length) throw new Error('The renderer did not return every requested frame.');
       visualFrames.push(...frames);
       visualFrames.sort((a, b) => a.simulatedAt - b.simulatedAt || a.requestedAt - b.requestedAt);
@@ -564,6 +611,7 @@ async function run(input: unknown): Promise<WorkerResult> {
 
 lines.on('line', line => {
   try {
+    if (inputClosed) return;
     if (Buffer.byteLength(line) > 2 * 1024 * 1024) throw new Error('Protocol limit exceeded.');
     const value = JSON.parse(line);
     if (!initialized) {
@@ -578,6 +626,12 @@ lines.on('line', line => {
         if (lastIssue) failure.lastIssue = lastIssue;
         endWithRecord(failure, 1);
       });
+    } else if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'inspection_result') {
+      const record = InspectionResultSchema.parse(value);
+      const pending = pendingInspections.get(record.id);
+      if (!pending) throw new Error('Unknown or repeated inspection response.');
+      pendingInspections.delete(record.id);
+      pending.resolve(record);
     } else {
       const record = z.object({ type: z.literal('model_event'), id: z.number().int().positive(), event: z.custom<AssistantMessageEvent>() }).parse(value);
       const stream = streams.get(record.id);
@@ -589,3 +643,10 @@ lines.on('line', line => {
     endWithRecord(makeHarnessFailure(error, { ...failureContext, code: 'protocol' }), 1);
   }
 });
+const rejectOnShutdown = () => {
+  inputClosed = true;
+  rejectPendingInspections(new Error('The worker stopped before the inspection completed.'));
+};
+lines.on('close', rejectOnShutdown);
+process.once('SIGTERM', rejectOnShutdown);
+process.once('SIGINT', rejectOnShutdown);

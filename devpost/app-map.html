@@ -89,14 +89,14 @@
       <p class="eyebrow">Physics Lab · technical reference</p>
       <h1>From a prepared physics example or mechanics description to a paused experiment</h1>
       <p class="lede">A compact route through both explicit entry paths: bundled prepared setups and ordinary model composition, followed by native checks and an inspectable scene.</p>
-      <p class="snapshot"><strong>Reference route only.</strong> This page documents code locations; it does not claim that anyone has toured, practiced, learned, or approved anything.</p>
+      <p class="snapshot"><strong>Reference route only.</strong> This page maps source locations; it does not report individual use or learning outcomes.</p>
       <nav aria-label="Map sections">
         <ul>
           <li><a href="#purpose">Purpose</a></li>
           <li><a href="#flow">System flow</a></li>
           <li><a href="#route">Code route</a></li>
           <li><a href="#changes">Change pointers</a></li>
-          <li><a href="#practice">Reusable practice</a></li>
+          <li><a href="#limits">Numerical limits</a></li>
           <li><a href="#run">Run again</a></li>
         </ul>
       </nav>
@@ -120,7 +120,7 @@
         <ol class="flow" aria-label="Flow from user description to native scene inspection">
           <li>
             <h3>Describe</h3>
-            <p><code>src/App.tsx</code> sends the description to the loopback <code>/api/lab</code> endpoint. <code>server/providers.ts</code> brokers inference with the selected outside model provider; the browser does not hold provider credentials.</p>
+            <p><code>src/App.tsx</code> sends the description to the configured <code>/api/lab</code> endpoint. <code>server/providers.ts</code> brokers inference with the selected model provider; the browser does not hold provider credentials. Hosted subscription-demo mode uses <code>server/demo.ts</code> for the authorized model window and <code>server/subscription-auth.ts</code> for private credential renewal.</p>
           </li>
           <li>
             <h3>Assemble and check</h3>
@@ -128,11 +128,11 @@
           </li>
           <li>
             <h3>Save paused, then run</h3>
-            <p>The local service saves the scene in private SQLite storage. The browser compiles a native runtime and shows its paused preview, measured cards and charts. Run starts playback; inspection reads solver state.</p>
+            <p>The API saves an immutable setup in private SQLite locally or Firestore when hosted. The browser prepares the native runtime and shows a paused preview, measured cards and charts. Run starts playback; inspection reads solver state.</p>
           </li>
         </ol>
-        <p class="callout"><strong>Storage and services:</strong> inference uses the configured external provider through the server-side broker; worker networking is disabled. Saved scene documents live in private SQLite outside the project tree and last 24 hours, renewed by Run/Resume. Browser recents retain link metadata, not scene definitions. Credentials and provider settings are not saved with scenes.</p>
-        <p><strong>Prepared examples:</strong> The composer offers an explicit <strong>Open setup</strong> path and a separate <strong>Start from prompt</strong> path. The bundled definitions in <code>shared/examples.json</code> / <code>shared/examples.ts</code> are not saved-link references and remain available when old URLs expire. Open setup makes no <code>/api/lab</code> inference request and needs no provider credential, but saving a fresh immutable copy and preparing its native preview still require the normal local API/storage service and MuJoCo runtime. Only after save and native readiness succeeds does it replace the visible preview and clear the active draft/conversation; it remains paused until Run, and failures preserve the previous usable state. The copy follows the ordinary 24-hour retention rules. Start from prompt resets only the active draft/conversation and fills/focuses an editable prompt; it does not save or send it. Build experiment is the user's explicit action to use ordinary AI composition. Neither entry path changes freeform prompting, and failures never fall back to an example.</p>
+        <p class="callout"><strong>Storage and services:</strong> inference uses the configured provider through the trusted broker. Hosted runs pass through <code>server/sandbox.ts</code> and the authenticated private <code>server/worker-gateway.ts</code> to fresh network-denied Docker workers; image inspection uses <code>server/renderer-client.ts</code> and a separate keyless, IAM-protected <code>server/render-gateway.ts</code> through bounded broker RPC. Neither service is a browser endpoint. Scene documents use local private SQLite or hosted Firestore and expire 24 hours after the latest Run/Resume. Browser recents contain link metadata only. Credentials and provider settings are not saved with scenes.</p>
+        <p><strong>Prepared examples:</strong> Five visual studies cover double pendulums starting 5° apart, an impacting spring net, three-body choreography, contact losses on a frictionless loop, and a curved domino cascade. Preview images are captured from actual native simulations. <strong>Open setup</strong> creates a new paused saved copy without inference or provider credentials; <strong>Start from prompt</strong> fills an editable draft without saving or sending it. Definitions remain available after old links expire, and existing saved scenes are unchanged. Neither path replaces freeform prompting or acts as a fallback for a failed build. The visual reference grid is off by default; hiding it never removes ground or changes physics.</p>
       </section>
 
       <section id="route" aria-labelledby="route-title">
@@ -150,7 +150,7 @@
           <li>
             <h3>Watch the paused preview become observable</h3>
             <p>Back in <code>src/App.tsx</code>, search <code>saveSceneDocument</code> and <code>preparePreview</code>. <code>src/SimulationCanvas.tsx</code> prepares <code>createRuntime</code> and gates playback in <code>toggleRunning</code>. <code>src/ObjectCards.tsx</code> and <code>src/TelemetryPanel.tsx</code> display native observations and sampled motion. The preview begins paused; rendering or inspection does not itself run inference.</p>
-            <p>For loaded connectors, follow <code>src/physics/mujoco.ts</code> into <code>RenderItem.tendon</code> and <code>src/tendon-visuals.ts</code> — <code>TendonVisual</code>. Native routes and signed branch forces drive the shared viewer/inspection geometry. <code>shared/scene.ts</code> — <code>TendonSchema</code> exposes optional presentation-only controls; coils and slack bows do not add material or collision physics.</p>
+            <p>For loaded connectors, follow <code>src/physics/types.ts</code> — <code>RenderItem.tendon</code>, <code>src/physics/mujoco.ts</code> — native routes and signed branch forces, and <code>src/tendon-visuals.ts</code> — <code>TendonVisual</code>. The shared viewer and inspection use the same geometry. <code>shared/scene.ts</code> — <code>TendonSchema</code> exposes optional presentation-only controls; coils and slack bows do not add material or collision physics.</p>
           </li>
         </ol>
       </section>
@@ -167,15 +167,11 @@
         </ul>
       </section>
 
-      <section id="practice" aria-labelledby="practice-title">
-        <p class="kicker">05 · A practice to reuse</p>
-        <h2 id="practice-title">A valid model is not proof of the requested physics</h2>
-        <p>This project encountered a real limitation: the original catalog did not control elastic versus inelastic rebound. The calibrated material/contact layer added those numerical targets, verified by <code>tests/contacts.test.ts</code> — “sphere-plane restitution follows the lower pair coefficient at a selected impact speed” — at coefficients 0, 0.5 and 1. Measured behavior is stronger evidence than executable output or schema validity alone.</p>
-        <p>Reusable approach: turn the request into observable conditions, compare actual native measurements and assumptions against those conditions, then inspect the setup yourself. The reviewer is a separate call to the same selected model, not human sign-off. Readiness covers the initial state and a 0.5-second warm-up; scheduled actions after that remain pending, and longer-term outcomes are not certified.</p>
-        <details>
-          <summary>Optional transfer reflection</summary>
-          <p>What would you do differently next time you start a project with an agent? This is optional; no response or personal learning claim is recorded by this page.</p>
-        </details>
+      <section id="limits" aria-labelledby="limits-title">
+        <p class="kicker">05 · Numerical limits</p>
+        <h2 id="limits-title">A valid model is not proof of the requested physics</h2>
+        <p>The calibrated contact layer targets restitution coefficients 0, 0.5 and 1; <code>tests/contacts.test.ts</code> checks selected sphere-plane impacts to absolute tolerances 0.015, 0.04 and 0.01 respectively. These finite-step results are not a universal accuracy guarantee.</p>
+        <p>Native readiness covers initialization and a 0.5-second warm-up, not later scheduled events or long-term behavior. The independent reviewer is a model call, not human validation.</p>
       </section>
 
       <section id="run" aria-labelledby="run-title">
@@ -187,7 +183,7 @@ npm run build
 npm start</code></pre>
         <p><code>npm start</code> runs the prestart hook to build/cache the sandbox image and serves the built app at <code>http://127.0.0.1:3001</code>. First sandbox setup needs registry access to fetch the Node base image and pinned packages. The worker container itself has no network access.</p>
         <p>For an authorized provider, use the secret-free <a href="../.env.example"><code>.env.example</code></a> as the server-side template; keep real credentials in a private file outside this public checkout. The map contains no credentials or private data. See <a href="../README.md">README.md</a> for configuration details.</p>
-        <p class="snapshot"><strong>Source snapshot:</strong> the original runtime and tool route references match the reviewed release checkpoint <a href="https://github.com/ishkhan42/physics-lab/tree/273d074"><code>273d074</code></a>. Example-library and loaded-connector visual pointers describe later additions and were not present there. This map is versioned with the source and can drift as code changes.</p>
+        <p class="snapshot"><strong>Historical source checkpoint:</strong> the linked <a href="https://github.com/ishkhan42/physics-lab/tree/273d074"><code>273d074</code></a> was the reviewed checkpoint for the original runtime/tool-route references. Prepared-example and loaded-connector pointers describe later additions. This map follows the current source tree and can drift as code changes.</p>
       </section>
     </main>
     <footer>Standalone technical reference · no scripts, remote fonts, CDN, or network resources required for this page.</footer>

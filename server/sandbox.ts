@@ -2,6 +2,7 @@ import { isUtf8 } from 'node:buffer';
 import { spawn } from 'node:child_process';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import WebSocket from 'ws';
 
 const IMAGE = 'physics-lab-harness:local';
 const MAX_LINE_BYTES = 2 * 1024 * 1024;
@@ -21,7 +22,7 @@ export interface SandboxRun {
   done: Promise<void>;
   stop: () => void;
 }
-export type SandboxFailureCode = 'docker_unavailable' | 'sandbox_image_missing' | 'sandbox_start_failed' | 'sandbox_resource_limit' | 'sandbox_worker_failed' | 'sandbox_protocol_failed' | 'sandbox_input_limit' | 'sandbox_output_limit' | 'sandbox_io_failed' | 'sandbox_timeout';
+export type SandboxFailureCode = 'docker_unavailable' | 'sandbox_image_missing' | 'sandbox_start_failed' | 'sandbox_resource_limit' | 'sandbox_worker_failed' | 'sandbox_protocol_failed' | 'sandbox_input_limit' | 'sandbox_output_limit' | 'sandbox_io_failed' | 'sandbox_timeout' | 'worker_unavailable' | 'worker_busy' | 'worker_auth_failed';
 const SANDBOX_FAILURE_MESSAGES: Record<SandboxFailureCode, string> = {
   docker_unavailable: 'Docker is unavailable or inaccessible to the physics-lab service.',
   sandbox_image_missing: 'The local physics-lab harness image is missing.',
@@ -33,6 +34,9 @@ const SANDBOX_FAILURE_MESSAGES: Record<SandboxFailureCode, string> = {
   sandbox_output_limit: 'The isolated harness output exceeded its communication size allowance.',
   sandbox_io_failed: 'Communication with the isolated harness failed.',
   sandbox_timeout: 'The isolated harness exceeded its 240-second maximum lifetime.',
+  worker_unavailable: 'The isolated physics worker is unavailable.',
+  worker_busy: 'Another experiment is being checked. Wait for it to finish, then try again.',
+  worker_auth_failed: 'The lab server could not authenticate its isolated worker connection.',
 };
 
 export class SandboxError extends Error {
@@ -60,13 +64,126 @@ export function sandboxExitFailure(code: number | null, exitSignal: NodeJS.Signa
 export function sandboxResourceArgs(input: unknown): string[] {
   const model = typeof input === 'object' && input !== null && 'model' in input && typeof input.model === 'object' && input.model !== null ? input.model : null;
   const imageInput = model !== null && 'input' in model && Array.isArray(model.input) && model.input.includes('image');
-  return imageInput
+  const brokerInspection = typeof input === 'object' && input !== null && 'brokerInspection' in input && input.brokerInspection === true;
+  return imageInput && !brokerInspection
     ? ['--memory=1g', '--pids-limit=128', '--tmpfs', '/tmp:rw,noexec,nosuid,size=128m']
     : ['--memory=512m', '--pids-limit=64', '--tmpfs', '/tmp:rw,noexec,nosuid,size=16m'];
 }
 
 
-export function runSandbox(
+export function runSandbox(input: unknown, onMessage: (message: unknown) => void, signal: AbortSignal): SandboxRun {
+  const workerUrl = process.env.LAB_WORKER_URL;
+  return workerUrl ? runRemoteSandbox(workerUrl, input, onMessage, signal) : runDockerSandbox(input, onMessage, signal);
+}
+
+function runRemoteSandbox(url: string, input: unknown, onMessage: (message: unknown) => void, signal: AbortSignal): SandboxRun {
+  let socket: WebSocket | undefined;
+  let settled = false;
+  let terminalError: Error | undefined;
+  let inputBytes = 0;
+  let outputBytes = 0;
+  let queuedBytes = 0;
+  let queued: string[] = [];
+  let lifetimeTimer: NodeJS.Timeout | undefined;
+  let closeTimer: NodeJS.Timeout | undefined;
+  const { promise: done, resolve: resolveDone, reject: rejectDone } = Promise.withResolvers<void>();
+  void done.catch(() => {});
+
+  const finish = (error?: Error) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(lifetimeTimer);
+    clearTimeout(closeTimer);
+    signal.removeEventListener('abort', onAbort);
+    queued = [];
+    if (error) rejectDone(error);
+    else resolveDone();
+  };
+  const fail = (error: Error) => {
+    if (settled || terminalError) return;
+    terminalError = error;
+    queued = [];
+    if (!socket || socket.readyState === WebSocket.CLOSED) { finish(error); return; }
+    if (socket.readyState === WebSocket.OPEN) socket.close(1000, 'canceled');
+    else socket.terminate();
+    closeTimer = setTimeout(() => { socket?.terminate(); finish(error); }, 5_000);
+    closeTimer.unref();
+  };
+  function onAbort() {
+    const error = new Error('Sandbox run was aborted.');
+    error.name = 'AbortError';
+    fail(error);
+  }
+  const send = (message: unknown) => {
+    if (settled || terminalError) return;
+    let body: string | undefined;
+    try { body = JSON.stringify(message); } catch { fail(new SandboxError('sandbox_protocol_failed')); return; }
+    if (body === undefined) { fail(new SandboxError('sandbox_protocol_failed')); return; }
+    const bytes = Buffer.byteLength(body) + 1;
+    if (bytes - 1 > MAX_LINE_BYTES || inputBytes + bytes > MAX_STDIN_BYTES) {
+      fail(new SandboxError('sandbox_input_limit')); return;
+    }
+    inputBytes += bytes;
+    if (socket?.readyState === WebSocket.CONNECTING) {
+      if (queuedBytes + bytes > MAX_LINE_BYTES * 2) { fail(new SandboxError('sandbox_input_limit')); return; }
+      queued.push(body);
+      queuedBytes += bytes;
+    } else if (socket?.readyState === WebSocket.OPEN) {
+      if (socket.bufferedAmount + bytes > MAX_LINE_BYTES * 2) { fail(new SandboxError('sandbox_input_limit')); return; }
+      socket.send(body, error => { if (error) fail(new SandboxError('sandbox_io_failed')); });
+    } else fail(new SandboxError('sandbox_io_failed'));
+  };
+
+  if (signal.aborted) { onAbort(); return { send, done, stop: onAbort }; }
+  try {
+    const target = new URL(url);
+    const secret = process.env.WORKER_AUTH_TOKEN;
+    if (!['ws:', 'wss:'].includes(target.protocol) || target.pathname !== '/run'
+      || target.username || target.password || target.search || target.hash || !secret || secret.length < 32) {
+      throw new Error('Invalid private worker configuration.');
+    }
+    socket = new WebSocket(target, {
+      headers: { authorization: `Bearer ${secret}` }, maxPayload: MAX_LINE_BYTES, handshakeTimeout: 10_000,
+    });
+  } catch { fail(new SandboxError('worker_unavailable')); return { send, done, stop: onAbort }; }
+  signal.addEventListener('abort', onAbort, { once: true });
+  if (signal.aborted) onAbort();
+  lifetimeTimer = setTimeout(() => fail(new SandboxError('sandbox_timeout')), MAX_RUNTIME_MS);
+  lifetimeTimer.unref();
+  socket.once('open', () => {
+    if (terminalError || settled) return;
+    for (const body of queued) socket!.send(body, error => { if (error) fail(new SandboxError('sandbox_io_failed')); });
+    queued = [];
+    queuedBytes = 0;
+  });
+  socket.on('unexpected-response', (_request, response) => {
+    response.resume();
+    fail(new SandboxError(response.statusCode === 503 ? 'worker_busy' : response.statusCode === 401 ? 'worker_auth_failed' : 'worker_unavailable'));
+    socket?.terminate();
+  });
+  socket.on('error', () => fail(new SandboxError('worker_unavailable')));
+  socket.on('message', (data, binary) => {
+    if (settled || terminalError) return;
+    const bytes = Buffer.isBuffer(data) ? data : Array.isArray(data) ? Buffer.concat(data) : Buffer.from(data);
+    outputBytes += bytes.length + 1;
+    if (binary || !isUtf8(bytes)) { fail(new SandboxError('sandbox_protocol_failed')); return; }
+    if (bytes.length > MAX_LINE_BYTES || outputBytes > MAX_STDOUT_BYTES) { fail(new SandboxError('sandbox_output_limit')); return; }
+    try { onMessage(JSON.parse(bytes.toString('utf8'))); }
+    catch { fail(new SandboxError('sandbox_protocol_failed')); }
+  });
+  socket.once('close', (code, reason) => {
+    if (terminalError) finish(terminalError);
+    else if (code === 1000) finish();
+    else {
+      const detail = reason.toString('utf8');
+      finish(new SandboxError(Object.hasOwn(SANDBOX_FAILURE_MESSAGES, detail) ? detail as SandboxFailureCode : 'worker_unavailable'));
+    }
+  });
+  send(input);
+  return { send, done, stop: onAbort };
+}
+
+export function runDockerSandbox(
   input: unknown,
   onMessage: (message: unknown) => void,
   signal: AbortSignal,

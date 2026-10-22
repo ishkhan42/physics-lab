@@ -159,7 +159,8 @@ function assemblyFailure(error: unknown): { message: string; detail: string } {
     lab_protocol_error: 'The isolated assistant returned an invalid response.',
     lab_tool_scope: 'The assistant’s tool permissions did not match its current task.',
     required_tool_unavailable: 'The assistant’s required lab tool was unavailable.',
-    provider_tool_choice_rejected: 'Your AI service rejected the required lab-tool request.',
+    provider_request_rejected: 'Your AI service rejected its request parameters.',
+    provider_route_unavailable: 'This model is unavailable under your OpenRouter provider settings.',
     visual_check_failed: 'The scene preview could not be visually inspected.',
     lab_canceled: 'The lab assistant was stopped.',
     model_budget: 'The assistant could not finish within this update’s request allowance.',
@@ -1582,7 +1583,7 @@ export default function App() {
                         disabled={!provider || isBusy}
                         required
                       />
-                      <span className="field-hint field-hint--warning">{provider === 'openai-codex' ? 'Uses your existing GPT login. Subscription usage limits apply.' : 'Custom model IDs may incur charges. Check your provider’s current pricing.'}</span>
+                      <span className="field-hint field-hint--warning">{provider === 'openai-codex' ? 'GPT-6 Luna · High reasoning. Subscription usage limits apply.' : 'Custom model IDs may incur charges. Check your provider’s current pricing.'}</span>
                     </label>
                   )}
                 </div>
@@ -1636,7 +1637,7 @@ export default function App() {
             ) : null}
 
             <div className="submit-row">
-              <p className="privacy-note">Up to {HARNESS_MAX_TURNS} AI requests per update. Charges may apply.</p>
+              <p className="privacy-note">Up to {HARNESS_MAX_TURNS} AI requests per update. {provider === 'openai-codex' ? 'Subscription usage limits apply.' : 'Charges may apply.'}</p>
               <div className="submit-actions">
                 <button className="primary-button" type="submit" disabled={!canSubmit || (question !== '' && answer.trim().length === 0)}>
                   <span>{isBusy ? 'Working…' : flow.kind === 'error' ? 'Try again' : question ? 'Continue' : activeExperiment ? 'Update experiment' : 'Build experiment'}</span>

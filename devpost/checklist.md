@@ -7,7 +7,7 @@ status: approved
 
 Build mode: fast. The learner approved the presented build order and fast mode. Verification, commits, early hands-on feedback and final review remain required.
 
-Scope, PRD, the MuJoCo technical direction and this build order are approved. Each slice leaves usable behavior rather than a hidden layer. No public deployment or submission is included.
+Scope, PRD, the MuJoCo technical direction and this build order are approved. The original three-slice plan covered local implementation; later revisions add hosted deployment. Devpost submission remains separate.
 
 Live model checks require an authorized application API key supplied privately. Missing credentials are an external prerequisite, never permission to substitute a fake model. Do not copy coding-agent credentials or publish personal learner context.
 
@@ -46,27 +46,27 @@ Live model checks require an authorized application API key supplied privately. 
 ## Hands-on Checkpoints
 
 - [x] Early trial attempted and feedback received — the learner encountered a model-decision error before completing the journey and requested a high-grade usability revision. This is not a claim that the full journey worked for them.
-- [ ] Final kick-the-tires confirmation for the current release — the learner has already supplied substantial hands-on feedback throughout the revisions; one final readiness response remains, not another full build walkthrough.
+- [x] Final kick-the-tires confirmation — after the requested refinements and force-overlay rollback, the learner accepted the current release as sufficient for the contest POC.
 
 ## Final Review
 
-- [ ] Final review complete — feedback resolved and learner confirms ready to ship.
+- [x] Final review complete — requested changes resolved and learner accepted the contest POC.
 
 Technical source and publication reviews are complete: no must-fix correctness finding or confirmed publication-security blocker survived review. Current production/runtime verification is recorded under Revisions; this does not substitute for learner acceptance.
 - [x] Independent technical review of the current release and connected native, broker, persistence and rendering paths.
-- [ ] Learner final acceptance — confirm the ordinary describe/follow-up/Run/Pause/inspect journey, current look/progress/assumptions, elastic/inelastic behavior and relevant material/readout values are acceptable, or report the remaining change.
+- [x] Learner final acceptance — “For the scope of this contest its good enough as a POC.” Submission preparation remains separate.
 
 ## Code Tour and App Map
 
 - [x] Focused evidence recap delivered — connect the real schema-versus-physics failure to observable acceptance and native validation, without claiming a hands-on code tour or personal learning.
-- [x] Optional edit and transfer reflection addressed — no extra edit needed for this reference recap; an optional reflection question is available in the map, with no response or learning claim recorded.
+- [x] Optional edit and transfer reflection addressed — no extra edit was needed for the reference recap. An optional reflection was offered; no response or learning claim is recorded.
 - [x] `devpost/app-map.html` generated from current code, paths/anchors checked and shown offline, including the project-grounded practice to reuse.
 
 Activity and evidence: A brief reference recap connected the previously encountered elastic/inelastic limitation and interpretation failures to measured native restitution regressions. Executability and schema validity are not proof of the requested physics; the 0.5-second readiness window is not a whole-future certificate.
 Route and stops: Reference route only: `src/App.tsx` (`handleSubmit`), the bounded assembly/check path (`server/harness.ts`, `server/harness-worker.ts`, `src/physics/native-check.ts`), and native preview/readouts (`src/SimulationCanvas.tsx`, `src/ObjectCards.tsx`, `src/TelemetryPanel.tsx`). The map expands the pointers; no guided traversal by the learner is claimed.
 Edit outcome: Not applicable to the evidence recap; no new kernel or incidental presentation edit was imposed.
 Reflection: Optional transfer question offered in the map; no personal answer has been supplied or invented.
-Activity mode: Focused reference recap for an experienced plan-first workflow. Final learner readiness remains open above.
+Activity mode: Focused reference recap for an experienced plan-first workflow. Final POC acceptance is complete; no additional learning activity or personal reflection is claimed.
 
 ## Revisions
 
@@ -206,3 +206,11 @@ Activity mode: Focused reference recap for an experienced plan-first workflow. F
 - Production and inspection/Docker builds pass, and all 199 behavioral checks pass with zero failures/skips. Regressions cover native force signs/availability, pulley scaling, wrapped surfaces, explicit dimensions, degenerate/expanded routes, picking, style-independent motion and actual inspection refresh.
 - Browser runs showed spring length 1.4 m/extension 0.4 m/force 4.8 N changing to about 0.6002 m/-0.3998 m/-4.798 N near 0.748 s. A 7 m maximum-length cord began with a 5 m route and 0 N tension, then became loaded at about 7 m and 23.54 N. Visible-wire clicking, selection/follow and 320px touch/reduced-motion layout worked.
 - The real image-capable inspect_scene tool returned actual 960×640 JPEGs for extended/compressed springs and a routed sphere guide from the hardened worker. Model responses at that test boundary were synthetic; no paid model generation or universal visual-quality guarantee is claimed. Captures stayed temporary, not in vault.
+
+### Withdrawn body-force overlay and grid default
+
+- Withdrew the experimental general body-force renderer, controls and expanded native decomposition after the user's visual rejection. Restored the accepted tendon renderer and original numerical observation path rather than retaining a hidden or disabled implementation.
+- Default unspecified reference grids off in authoring, saved-scene parsing and initial viewing; explicit saved grid choices remain authoritative. No stored setup is rewritten.
+- Production, inspection and all three container targets build; all 233 behavioral checks pass with zero failures or skips. Browser playback exercised the restored spring net beyond impact, grid toggling without a time reset, saved-choice refresh, unchanged original scene records and a 320px layout without horizontal overflow or browser errors.
+- The restored hosted viewer passed desktop/mobile playback, grid defaults and persistence across the rollout; anonymous configuration and the existing subscription deadline remain unchanged. The private renderer returned an actual 960×640 frame. This rollback check did not invoke fresh AI generation or establish long-duration uptime.
+
