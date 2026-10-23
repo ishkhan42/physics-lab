@@ -5,6 +5,7 @@ Describe a mechanics problem, run a 3D simulation, then change the experiment in
 [Try the demo](https://physics-lab-324399059273.us-central1.run.app)
 
 <p>
+  <img src="media/pendulum-wave.gif" alt="Fifteen pendulums of slightly different lengths swing out of step and form a travelling wave." width="49%">
   <img src="media/double-pendulum.gif" alt="Two double pendulums diverge after starting five degrees apart." width="49%">
   <img src="media/spring-net.gif" alt="A falling ball stretches a spring net and rebounds." width="49%">
   <img src="media/three-body-figure-eight.gif" alt="Three equal masses trace a figure-eight orbit under mutual gravity." width="49%">
@@ -12,18 +13,18 @@ Describe a mechanics problem, run a 3D simulation, then change the experiment in
   <img src="media/domino-cascade.gif" alt="A falling domino starts a cascade around a curved line of twenty blocks." width="49%">
 </p>
 
-Five-second clips from the app's simulation renderer; playback speeds vary to show each experiment's motion. Open **Examples** to try any of the five prepared setups without an AI request.
+Clips sampled from the app's own simulation renderer. Most play at real speed; the three-body orbit is sped up 1.27× and the domino cascade slowed to 0.6× to fit five seconds. Open **Examples** to try any of the six prepared setups without an AI request.
 
 ## Use it
 
-1. Describe the situation and press **Build experiment**.
+1. Describe the situation in the message box and press Enter.
 2. Review the paused setup, including its assumptions and any approximation.
 3. Press **Run**. Change speed, move the camera, or pause to inspect an object's values and motion graphs.
 4. Ask for a change. The next request includes the current experiment so you can revise it without describing everything again.
 
 Objects, joints, springs, friction, collisions and scheduled actions can be combined in one scene. Springs and cords show their current shape and tension/compression cues. The **Ground** switch changes the physical floor; **Appearance** changes its look. The reference grid starts off.
 
-**Open setup** loads a prepared experiment. **Start from prompt** copies its description into an editable draft; it sends nothing until you press Build.
+In **Examples**, **Open** loads a prepared experiment. **Edit the prompt** copies its description into the message box; nothing is sent until you press Enter.
 
 Saved links contain the prompt, assumptions and setup. Each setup change creates a new link. A saved scene expires 24 hours after creation or its latest Run/Resume; opening a link does not extend it. Anyone with the link can read and run that scene.
 

@@ -7,7 +7,7 @@ export interface ExampleSetup {
   document: SceneDocument;
   note: string;
   /** Opening camera direction for the viewer only; not part of the saved scene. */
-  view?: 'top';
+  view?: 'top' | 'front';
 }
 
 export interface ExperimentExample {
@@ -39,6 +39,6 @@ export const EXPERIMENT_EXAMPLES: ExperimentExample[] = rawExamples.map(({ id, t
       scene,
     }),
     note,
-    ...('view' in rest && rest.view === 'top' ? { view: 'top' as const } : {}),
+    ...('view' in rest && (rest.view === 'top' || rest.view === 'front') ? { view: rest.view } : {}),
   })),
 }));

@@ -1,5 +1,903 @@
 [
   {
+    "id": "pendulum-wave",
+    "title": "Pendulum wave",
+    "question": "Fifteen pendulums, one release. When do they line up again?",
+    "setups": [
+      {
+        "id": "fifteen-pendulums",
+        "label": "Fifteen pendulums, 30 s cycle",
+        "prompt": "Create a pendulum wave under Earth gravity [0,0,-9.81] m/s² above a real ground at z=0 with restitution 0 and sliding friction 0.5. A fixed 1.5×0.05×0.05 m beam is centred at [0,0,0.69] m on two fixed 0.05×0.05×0.715 m posts at x=±0.75 m. Hang fifteen pendulums from hinges about the X axis at [x,0,0.66] m, with x from −0.63 to +0.63 m in 0.09 m steps. Each pendulum is a solid 0.1 kg sphere of radius 0.03 m on an ideal massless link. Link lengths from pivot to sphere centre, from x=−0.63 m to x=+0.63 m, are 0.4987, 0.4543, 0.4155, 0.3814, 0.3514, 0.3247, 0.3009, 0.2796, 0.2605, 0.2432, 0.2276, 0.2134, 0.2005, 0.1886, 0.1778 m. These lengths make pendulum n (n=1 to 15) complete exactly 20+n full swings in 30.0 s at a 20° amplitude, including the sphere's rotational inertia and the large-amplitude period correction. Release every pendulum from rest at 20° from the downward vertical toward −Y. Use zero hinge stiffness, damping and friction, and no drag. Colour the spheres as a gradient from blue (longest) to red (shortest), with a dark grey beam and posts, plain studio appearance and no reference grid.",
+        "summary": "Fifteen pendulums of slightly different lengths swing out of step, form travelling waves and splits, and line up again after 30 s.",
+        "assumptions": [
+          "Each sphere hangs on an ideal massless link; its own rotational inertia is included in the chosen lengths.",
+          "All start at rest at the same 20° angle. The large-amplitude period change is the same for every pendulum, so the 30 s realignment still holds.",
+          "No damping or friction acts on the hinges, so the pattern repeats; real pendulums would slowly lose amplitude."
+        ],
+        "scene": {
+          "category": "mechanics",
+          "title": "Pendulum wave",
+          "gravity": [
+            0,
+            0,
+            -9.81
+          ],
+          "ground": {
+            "height": 0,
+            "restitution": 0,
+            "friction": {
+              "sliding": 0.5,
+              "torsional": 0,
+              "rolling": 0,
+              "static": null
+            }
+          },
+          "appearance": {
+            "surface": "plain",
+            "sky": "studio",
+            "textured": false,
+            "grid": false
+          },
+          "bodies": [
+            {
+              "id": "beam",
+              "label": "Support beam",
+              "parentId": null,
+              "position": [
+                0,
+                0,
+                0.6900000000000001
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  1.5,
+                  0.05,
+                  0.05
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0.5,
+                "torsional": 0,
+                "rolling": 0,
+                "static": null
+              },
+              "color": "#5b6470"
+            },
+            {
+              "id": "post-left",
+              "label": "Left post",
+              "parentId": null,
+              "position": [
+                -0.75,
+                0,
+                0.35750000000000004
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.05,
+                  0.05,
+                  0.7150000000000001
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0.5,
+                "torsional": 0,
+                "rolling": 0,
+                "static": null
+              },
+              "color": "#5b6470"
+            },
+            {
+              "id": "post-right",
+              "label": "Right post",
+              "parentId": null,
+              "position": [
+                0.75,
+                0,
+                0.35750000000000004
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "box",
+                "size": [
+                  0.05,
+                  0.05,
+                  0.7150000000000001
+                ]
+              },
+              "mass": null,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "fixed"
+              },
+              "friction": {
+                "sliding": 0.5,
+                "torsional": 0,
+                "rolling": 0,
+                "static": null
+              },
+              "color": "#5b6470"
+            },
+            {
+              "id": "bob01",
+              "label": "Pendulum 1",
+              "parentId": null,
+              "position": [
+                -0.63,
+                -0.170569309,
+                0.191364674
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  -0.63,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2c5edd"
+            },
+            {
+              "id": "bob02",
+              "label": "Pendulum 2",
+              "parentId": null,
+              "position": [
+                -0.54,
+                -0.155369336,
+                0.233126257
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  -0.54,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2c8ddd"
+            },
+            {
+              "id": "bob03",
+              "label": "Pendulum 3",
+              "parentId": null,
+              "position": [
+                -0.45,
+                -0.142104305,
+                0.26957163
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  -0.45,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2cbbdd"
+            },
+            {
+              "id": "bob04",
+              "label": "Pendulum 4",
+              "parentId": null,
+              "position": [
+                -0.36,
+                -0.130458353,
+                0.301568621
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  -0.36,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2cddcf"
+            },
+            {
+              "id": "bob05",
+              "label": "Pendulum 5",
+              "parentId": null,
+              "position": [
+                -0.27,
+                -0.120177496,
+                0.329815044
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  -0.27,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2cdda0"
+            },
+            {
+              "id": "bob06",
+              "label": "Pendulum 6",
+              "parentId": null,
+              "position": [
+                -0.18,
+                -0.111055632,
+                0.35487716
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  -0.18,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2cdd71"
+            },
+            {
+              "id": "bob07",
+              "label": "Pendulum 7",
+              "parentId": null,
+              "position": [
+                -0.09,
+                -0.102924101,
+                0.377218356
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  -0.09,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#2cdd43"
+            },
+            {
+              "id": "bob08",
+              "label": "Pendulum 8",
+              "parentId": null,
+              "position": [
+                0.0,
+                -0.095643812,
+                0.397220785
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.0,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#45dd2c"
+            },
+            {
+              "id": "bob09",
+              "label": "Pendulum 9",
+              "parentId": null,
+              "position": [
+                0.09,
+                -0.08909923,
+                0.415201876
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.09,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#74dd2c"
+            },
+            {
+              "id": "bob10",
+              "label": "Pendulum 10",
+              "parentId": null,
+              "position": [
+                0.18,
+                -0.083193746,
+                0.431427061
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.18,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#a3dd2c"
+            },
+            {
+              "id": "bob11",
+              "label": "Pendulum 11",
+              "parentId": null,
+              "position": [
+                0.27,
+                -0.077846074,
+                0.44611967
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.27,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#d2dd2c"
+            },
+            {
+              "id": "bob12",
+              "label": "Pendulum 12",
+              "parentId": null,
+              "position": [
+                0.36,
+                -0.072987423,
+                0.459468704
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.36,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#ddb92c"
+            },
+            {
+              "id": "bob13",
+              "label": "Pendulum 13",
+              "parentId": null,
+              "position": [
+                0.45,
+                -0.06855926,
+                0.471634981
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.45,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#dd8a2c"
+            },
+            {
+              "id": "bob14",
+              "label": "Pendulum 14",
+              "parentId": null,
+              "position": [
+                0.54,
+                -0.064511529,
+                0.48275603
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.54,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#dd5b2c"
+            },
+            {
+              "id": "bob15",
+              "label": "Pendulum 15",
+              "parentId": null,
+              "position": [
+                0.63,
+                -0.060801214,
+                0.492950037
+              ],
+              "orientation": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "shape": {
+                "kind": "sphere",
+                "radius": 0.03
+              },
+              "mass": 0.1,
+              "heldBy": null,
+              "restitution": 0,
+              "motion": {
+                "kind": "hinge",
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "anchor": [
+                  0.63,
+                  0,
+                  0.66
+                ],
+                "position": 0,
+                "velocity": 0,
+                "limits": null,
+                "stiffness": 0,
+                "damping": 0,
+                "springReference": 0
+              },
+              "friction": {
+                "sliding": 0,
+                "torsional": 0,
+                "rolling": 0,
+                "static": 0
+              },
+              "color": "#dd2c2c"
+            }
+          ],
+          "sites": [],
+          "tendons": [],
+          "connections": [],
+          "loads": [],
+          "events": []
+        },
+        "note": "Watch the waves, the two-way split at 15 s, and the full line-up at 30 s.",
+        "view": "front"
+      }
+    ]
+  },
+  {
     "id": "sensitive-pendulums",
     "title": "Double pendulums, 5° apart",
     "question": "Will a 5° difference stay small?",
@@ -327,12 +1225,13 @@
       {
         "id": "drop-and-rebound",
         "label": "A 1.5 kg ball over an elastic net",
-        "prompt": "Create a square spring-net impact experiment under Earth gravity [0,0,-9.81] m/s², with a real non-rebounding frictionless ground at z=0. A fixed rectangular frame is centered at [0,0,1.8] m: four 0.08 m square-section beams at x=±0.94 or y=±0.94, full length 1.96 m, with four 0.08×0.08×1.76 m fixed legs at [±0.94,±0.94,0.88]. Make a 5×5 grid of spherical junctions radius 0.045 m at [(c−2)0.45,(r−2)0.45,1.8] m for integer r,c=0..4. Fix the perimeter junctions (r or c is 0 or 4); the nine interior junctions are free rigid bodies of mass 0.08 kg each. All start at rest. Connect nearest horizontal/vertical neighboring junction centers with linear spring tendons of stiffness 70 N/m; connect both diagonals of every square with 40 N/m springs. Omit links whose two endpoints are both fixed. Every spring has rest length 0.88 times its initial straight-line distance and damping 0.2 N·s/m. This is an explicitly pretensioned discrete network, not cloth or a stress/strain simulation. Show thin coils with wire radius 0.004 m, coil radius 0.018 m and five turns. Put a rigid 1.5 kg ball of radius 0.30 m at [0,0,3.25] m, initially held by the fixed north frame beam. Schedule one native release at 1.2 s with no launch impulse. All contact restitution and all friction coefficients are zero; add no air drag or other loads. Only the network springs store elastic energy; the ball itself does not deform. Use an orange ball, blue moving junctions, muted frame and daylight over a concrete ground.",
+        "prompt": "Create a square spring-net impact experiment under Earth gravity [0,0,-9.81] m/s², with a real non-rebounding frictionless ground at z=0. A fixed rectangular frame is centered at [0,0,1.8] m: four 0.08 m square-section beams at x=±0.94 or y=±0.94, full length 1.96 m, with four 0.08×0.08×1.76 m fixed legs at [±0.94,±0.94,0.88]. Make a 5×5 grid of spherical junctions radius 0.045 m at [(c−2)0.45,(r−2)0.45,1.8] m for integer r,c=0..4. Fix the perimeter junctions (r or c is 0 or 4); the nine interior junctions are free rigid bodies of mass 0.08 kg each. All start at rest. Connect nearest horizontal/vertical neighboring junction centers with linear spring tendons of stiffness 70 N/m; connect both diagonals of every square with 40 N/m springs. Omit links whose two endpoints are both fixed. Every spring has rest length 0.88 times its initial straight-line distance and damping 0.2 N·s/m. This is an explicitly pretensioned discrete network, not cloth or a stress/strain simulation. Show thin coils with wire radius 0.004 m, coil radius 0.018 m and five turns. Put a rigid 1.5 kg ball of radius 0.50 m at [0,0,3.25] m. The ball is wider than the 0.45 m junction spacing, so it rests on several junctions instead of balancing on one, initially held by the fixed north frame beam. Schedule one native release at 1.2 s with no launch impulse. All contact restitution and all friction coefficients are zero; add no air drag or other loads. Only the network springs store elastic energy; the ball itself does not deform. Use an orange ball, blue moving junctions, muted frame and daylight over a concrete ground.",
         "summary": "A scheduled drop loads a pretensioned spring network, which deflects and returns stored elastic energy.",
         "assumptions": [
           "The net is nine moving rigid junctions and 52 linear spring links tied to a fixed perimeter, not a continuous membrane.",
           "Spring rest lengths are 12% shorter than the initial spans; contact is inelastic and frictionless.",
-          "The initially held ball becomes visible when released at 1.2 s; frame and ground are fixed."
+          "The initially held ball becomes visible when released at 1.2 s; frame and ground are fixed.",
+          "The 0.5 m ball is wider than the 0.45 m junction spacing, so after impact it settles onto several junctions instead of rolling off a single one."
         ],
         "scene": {
           "category": "mechanics",
@@ -1587,7 +2486,7 @@
               ],
               "shape": {
                 "kind": "sphere",
-                "radius": 0.3
+                "radius": 0.5
               },
               "mass": 1.5,
               "heldBy": "frame-north",
@@ -3182,7 +4081,7 @@
             }
           ]
         },
-        "note": "Drops at 1.2 s. The ball is inelastic; the springs return stored energy."
+        "note": "Drops at 1.2 s, then keeps bouncing as the springs return stored energy."
       }
     ]
   },

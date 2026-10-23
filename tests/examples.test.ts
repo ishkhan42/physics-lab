@@ -94,9 +94,10 @@ test('the spring net releases its load on schedule, stretches under impact and r
     assert.equal(runtime.snapshot().events?.[0].status, 'completed');
     assert.ok(Math.abs(runtime.snapshot().events![0].firedAt! - 1.2) < 1e-9);
     assert.ok(vector(runtime.snapshot(), 'impact-ball', 'Velocity')[2] < 0);
-    advanceTo(runtime, 2);
+    advanceTo(runtime, 1.9);
     assert.ok(vector(runtime.snapshot(), 'node-2-2')[2] < 1.3);
     assert.ok(tendonForce(runtime, 'spring-2-2-2-3') > beforeForce + 1);
+    advanceTo(runtime, 2);
     assert.ok(vector(runtime.snapshot(), 'impact-ball', 'Velocity')[2] > 1);
     advanceTo(runtime, 2.5);
     assert.ok(vector(runtime.snapshot(), 'impact-ball')[2] > 2.7);
@@ -113,6 +114,36 @@ test('equal-speed beads retain or lose mechanical energy through normal impacts 
     const final = runtime.snapshot();
     assert.ok(mechanicalEnergy(runtime, final, 'elastic-bead') > initialEnergy * 0.9);
     assert.ok(mechanicalEnergy(runtime, final, 'inelastic-bead') < initialEnergy * 0.3);
+  } finally { runtime.dispose(); }
+});
+
+test('the spring net keeps the ball instead of letting it roll off a single junction', async () => {
+  const runtime = await createRuntime(exampleScene('spring-net', 'drop-and-rebound'));
+  try {
+    for (const time of [5, 10, 20, 30]) {
+      advanceTo(runtime, time);
+      const ball = vector(runtime.snapshot(), 'impact-ball');
+      assert.ok(ball[2] > 1.2, `ball left the net by ${time} s`);
+      assert.ok(Math.hypot(ball[0], ball[1]) < 0.8, `ball drifted to the frame by ${time} s`);
+    }
+  } finally { runtime.dispose(); }
+});
+
+test('the pendulum wave splits in two at half its cycle and lines up again after 30 s', async () => {
+  const runtime = await createRuntime(exampleScene('pendulum-wave', 'fifteen-pendulums'));
+  try {
+    const ids = Array.from({ length: 15 }, (_, index) => `bob${String(index + 1).padStart(2, '0')}`);
+    const sideways = () => ids.map(id => vector(runtime.snapshot(), id)[1]);
+    const initial = sideways();
+    assert.ok(initial.every(value => Math.abs(value) > 0.05));
+    advanceTo(runtime, 3);
+    assert.ok(sideways().some((value, index) => value * initial[index] < 0), 'the pendulums should fall out of step');
+    advanceTo(runtime, 15);
+    const half = sideways();
+    // Odd swing counts end on the far side, even counts on the release side.
+    half.forEach((value, index) => assert.ok(Math.abs(value + (index % 2 === 0 ? 1 : -1) * initial[index]) < 0.005, `pendulum ${index + 1} at 15 s`));
+    advanceTo(runtime, 30);
+    sideways().forEach((value, index) => assert.ok(Math.abs(value - initial[index]) < 0.002, `pendulum ${index + 1} at 30 s`));
   } finally { runtime.dispose(); }
 });
 

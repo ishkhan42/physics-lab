@@ -51,7 +51,7 @@ export interface CanvasExperiment {
   decision: Decision;
   userGroundChoice?: 'default' | 'none';
   /** Optional opening camera direction; prepared examples use it when the default angle hides the motion. */
-  view?: 'top';
+  view?: 'top' | 'front';
 }
 export interface CanvasInspectionCapture {
   simulatedAt: number;
@@ -142,8 +142,10 @@ function markerTexture(): CanvasTexture {
 const initialCameraDirection = new Vector3(1, -1.25, 0.9).normalize();
 // Nearly overhead but still Z-up, so orbiting afterwards behaves as usual.
 const topCameraDirection = new Vector3(0.12, -0.42, 1).normalize();
+// Mostly from the front and above, so motion toward the viewer reads as up-and-down on screen.
+const frontCameraDirection = new Vector3(0.3, -1, 0.85).normalize();
 function cameraDirection(view: CanvasExperiment['view']): Vector3 {
-  return view === 'top' ? topCameraDirection : initialCameraDirection;
+  return view === 'top' ? topCameraDirection : view === 'front' ? frontCameraDirection : initialCameraDirection;
 }
 const TIME_FORMAT = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 5 });
 const selectionColor = new Color(0x0f6b62);
